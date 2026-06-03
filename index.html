@@ -15,7 +15,7 @@
     --gray:#5a5a58;--gray-bg:#f1efea;--radius:8px;--radius-lg:12px;
   }
   body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
-
+ 
   /* LOGIN */
   .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
   .login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:40px;width:100%;max-width:380px}
@@ -26,14 +26,16 @@
   label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;font-family:'DM Mono',monospace}
   input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);transition:border 0.15s}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--text)}
-  .btn{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:13px;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;transition:all 0.15s;width:100%;justify-content:center}
+  textarea{resize:vertical;min-height:80px}
+  .btn{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:13px;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;transition:all 0.15s}
   .btn:hover{background:var(--bg)}
   .btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
   .btn-primary:hover{opacity:0.85}
-  .btn-sm{padding:5px 10px;font-size:12px;width:auto}
+  .btn-sm{padding:5px 10px;font-size:12px}
   .btn-danger{background:var(--red-bg);color:var(--red);border-color:transparent}
+  .btn-full{width:100%;justify-content:center}
   .login-error{background:var(--red-bg);color:var(--red);padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:16px;display:none}
-
+ 
   /* APP */
   .app{display:flex;height:100vh;overflow:hidden}
   .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
@@ -50,11 +52,15 @@
   .topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);flex-shrink:0}
   .topbar-title{font-size:15px;font-weight:500}
   .content{flex:1;overflow-y:auto;padding:24px}
+ 
+  /* STATS */
   .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
   .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
   .stat-label{font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
   .stat-value{font-size:24px;font-weight:500}
   .stat-sub{font-size:11px;color:var(--muted);margin-top:4px}
+ 
+  /* TABLES */
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
   table{width:100%;border-collapse:collapse}
   th{padding:11px 16px;text-align:left;background:var(--bg);font-weight:500;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
@@ -63,23 +69,56 @@
   tbody tr:hover{background:var(--bg)}
   td .actions{display:flex;gap:6px;opacity:0;transition:opacity 0.15s}
   tbody tr:hover td .actions{opacity:1}
+ 
+  /* BADGES */
   .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
   .badge-green{background:var(--green-bg);color:var(--green)}
   .badge-amber{background:var(--amber-bg);color:var(--amber)}
   .badge-blue{background:var(--blue-bg);color:var(--blue)}
   .badge-gray{background:var(--gray-bg);color:var(--gray)}
   .badge-red{background:var(--red-bg);color:var(--red)}
+ 
   .avatar{width:32px;height:32px;border-radius:50%;background:var(--blue-bg);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--blue);flex-shrink:0;font-family:'DM Mono',monospace}
   .client-cell{display:flex;align-items:center;gap:10px}
   .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:6px;min-width:80px}
   .progress-fill{height:100%;background:var(--green);border-radius:2px}
+ 
+  /* MODAL */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
   .modal{background:var(--surface);border-radius:var(--radius-lg);padding:28px;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;border:1px solid var(--border)}
   .modal-title{font-size:16px;font-weight:500;margin-bottom:20px}
   .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
-  .modal-footer .btn{width:auto}
-  textarea{resize:vertical;min-height:80px}
-  .hidden{display:none!important}
+ 
+  /* DEVIS BUILDER */
+  .devis-builder{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .devis-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .devis-header-left{display:flex;align-items:center;gap:16px}
+  .devis-ref{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)}
+  .devis-client-name{font-size:15px;font-weight:500}
+  .devis-body{padding:24px}
+  .section-block{border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden}
+  .section-header{padding:12px 16px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+  .section-name{font-weight:500;font-size:13px}
+  .section-subtitle{font-size:11px;color:var(--muted);margin-top:2px}
+  .section-actions{display:flex;gap:6px}
+  .articles-table{width:100%;border-collapse:collapse}
+  .articles-table th{padding:8px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;background:var(--bg);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px}
+  .articles-table td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px}
+  .articles-table tr:last-child td{border-bottom:none}
+  .articles-table input{border:none;background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);padding:2px 4px;width:100%}
+  .articles-table input:focus{outline:1px solid var(--border);border-radius:4px;background:var(--surface)}
+  .section-subtotal{padding:10px 16px;background:var(--bg);text-align:right;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+  .section-subtotal span{font-weight:500;color:var(--text);font-family:'DM Mono',monospace}
+  .add-article-btn{padding:8px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;transition:background 0.15s}
+  .add-article-btn:hover{background:var(--bg);color:var(--text)}
+  .devis-total{background:var(--text);color:#fff;border-radius:var(--radius-lg);padding:20px 24px;margin-top:16px}
+  .devis-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px}
+  .devis-total-row:last-child{margin-bottom:0;font-size:16px;font-weight:500;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.2)}
+  .devis-total-row span:last-child{font-family:'DM Mono',monospace}
+  .add-section-btn{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:14px;text-align:center;cursor:pointer;font-size:13px;color:var(--muted);margin-bottom:16px;transition:all 0.15s}
+  .add-section-btn:hover{border-color:var(--text);color:var(--text);background:var(--bg)}
+ 
+  /* KANBAN */
   .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .kanban-col{background:var(--bg);border-radius:var(--radius-lg);padding:14px}
   .kanban-header{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:12px;font-family:'DM Mono',monospace;display:flex;align-items:center;justify-content:space-between}
@@ -87,17 +126,38 @@
   .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px}
   .kanban-card-title{font-size:13px;font-weight:500;margin-bottom:4px}
   .kanban-card-sub{font-size:11px;color:var(--muted)}
+ 
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .section-title{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
+  .hidden{display:none!important}
   .toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:var(--radius);font-size:13px;z-index:200;opacity:0;transform:translateY(8px);transition:all 0.25s;pointer-events:none}
   .toast.show{opacity:1;transform:translateY(0)}
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
   .loading{padding:40px;text-align:center;color:var(--muted)}
+ 
+  /* PDF PRINT */
+  @media print {
+    body * { visibility: hidden; }
+    #pdf-preview, #pdf-preview * { visibility: visible; }
+    #pdf-preview { position: fixed; inset: 0; background: white; z-index: 9999; padding: 40px; }
+    .no-print { display: none !important; }
+  }
+  #pdf-preview { display: none; }
+ 
+  /* DEVIS LIST CARD */
+  .devis-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all 0.15s}
+  .devis-card:hover{border-color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+  .devis-card-left{}
+  .devis-card-ref{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:4px}
+  .devis-card-title{font-size:14px;font-weight:500}
+  .devis-card-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .devis-card-right{display:flex;align-items:center;gap:16px}
+  .devis-card-amount{font-family:'DM Mono',monospace;font-size:14px;font-weight:500}
 </style>
 </head>
 <body>
-
-<!-- LOGIN PAGE -->
+ 
+<!-- LOGIN -->
 <div id="login-page" class="login-wrap">
   <div class="login-box">
     <div class="login-logo">BRUT</div>
@@ -106,18 +166,15 @@
     <div class="login-error" id="login-error"></div>
     <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="votre@email.com"></div>
     <div class="form-group"><label>Mot de passe</label><input type="password" id="login-password" placeholder="••••••••"></div>
-    <button class="btn btn-primary" onclick="login()" id="login-btn">Se connecter</button>
+    <button class="btn btn-primary btn-full" onclick="login()" id="login-btn">Se connecter</button>
   </div>
 </div>
-
+ 
 <!-- APP -->
 <div id="app-page" class="hidden">
 <div class="app">
   <div class="sidebar">
-    <div class="logo">
-      <div class="logo-name">BRUT</div>
-      <div class="logo-sub">CRM · Fabrication</div>
-    </div>
+    <div class="logo"><div class="logo-name">BRUT</div><div class="logo-sub">CRM · Fabrication</div></div>
     <nav>
       <button class="nav-item active" onclick="showPage('dashboard',this)">⊞ Tableau de bord</button>
       <button class="nav-item" onclick="showPage('clients',this)">◎ Clients</button>
@@ -130,13 +187,16 @@
       <button class="btn btn-sm" onclick="logout()">Déconnexion</button>
     </div>
   </div>
-
+ 
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="page-title">Tableau de bord</div>
-      <button class="btn btn-primary" onclick="openNew()">+ Nouveau</button>
+      <div style="display:flex;gap:8px" id="topbar-actions">
+        <button class="btn btn-primary" id="btn-new" onclick="openNew()">+ Nouveau</button>
+      </div>
     </div>
     <div class="content">
+      <!-- DASHBOARD -->
       <div id="page-dashboard">
         <div class="stats-grid">
           <div class="stat"><div class="stat-label">Clients</div><div class="stat-value" id="stat-clients">—</div><div class="stat-sub">actifs</div></div>
@@ -149,30 +209,64 @@
           <div><div class="section-title">Avancement atelier</div><div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div></div>
         </div>
       </div>
+      <!-- CLIENTS -->
       <div id="page-clients" class="hidden"><div class="table-wrap" id="clients-table"><div class="loading">Chargement…</div></div></div>
+      <!-- COMMANDES -->
       <div id="page-commandes" class="hidden"><div class="table-wrap" id="commandes-table"><div class="loading">Chargement…</div></div></div>
-      <div id="page-atelier" class="hidden"><div class="kanban" id="atelier-kanban"><div class="loading">Chargement…</div></div></div>
-      <div id="page-devis" class="hidden"><div class="table-wrap" id="devis-table"><div class="loading">Chargement…</div></div></div>
+      <!-- ATELIER -->
+      <div id="page-atelier" class="hidden"><div class="kanban" id="atelier-kanban"></div></div>
+      <!-- DEVIS LIST -->
+      <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
+      <!-- DEVIS BUILDER -->
+      <div id="page-devis-builder" class="hidden">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <button class="btn btn-sm" onclick="showPage('devis', document.querySelector('.nav-item:nth-child(5)'))">← Retour</button>
+          <span id="builder-ref" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)"></span>
+        </div>
+        <!-- INFO DEVIS -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:20px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+            <div class="form-group" style="margin:0"><label>Client</label><select id="builder-client"></select></div>
+            <div class="form-group" style="margin:0"><label>Nom du projet</label><input type="text" id="builder-projet" placeholder="Appartement Agadir…"></div>
+            <div class="form-group" style="margin:0"><label>Statut</label>
+              <select id="builder-statut"><option>En attente</option><option>Accepté</option><option>Refusé</option></select>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:12px">
+            <button class="btn btn-primary" onclick="saveDevisBuilder()">Enregistrer</button>
+            <button class="btn" onclick="printDevis()" style="gap:6px">🖨 Imprimer / PDF</button>
+          </div>
+        </div>
+        <!-- SECTIONS -->
+        <div id="sections-container"></div>
+        <div class="add-section-btn" onclick="addSection()">+ Ajouter une pièce / section</div>
+        <!-- TOTAL -->
+        <div class="devis-total" id="devis-total-block">
+          <div class="devis-total-row"><span>Total HT</span><span id="total-ht">0 MAD</span></div>
+          <div class="devis-total-row"><span>TVA 20%</span><span id="total-tva">0 MAD</span></div>
+          <div class="devis-total-row"><span>TOTAL TTC</span><span id="total-ttc">0 MAD</span></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 </div>
-
+ 
 <!-- MODAL CLIENT -->
 <div class="overlay hidden" id="modal-client">
   <div class="modal">
     <div class="modal-title" id="modal-client-title">Nouveau client</div>
     <input type="hidden" id="client-id">
-    <div class="form-group"><label>Nom *</label><input type="text" id="client-nom" placeholder="Hôtel Atlas…"></div>
+    <div class="form-group"><label>Nom *</label><input type="text" id="client-nom"></div>
     <div class="form-group"><label>Type</label><select id="client-type"><option>Particulier</option><option>Hôtellerie</option><option>Commerce</option><option>Architecte</option><option>Promoteur</option></select></div>
-    <div class="form-group"><label>Email</label><input type="email" id="client-email" placeholder="contact@…"></div>
-    <div class="form-group"><label>Téléphone</label><input type="tel" id="client-tel" placeholder="+212 6…"></div>
-    <div class="form-group"><label>Ville</label><input type="text" id="client-ville" placeholder="Marrakech"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="client-email"></div>
+    <div class="form-group"><label>Téléphone</label><input type="tel" id="client-tel"></div>
+    <div class="form-group"><label>Ville</label><input type="text" id="client-ville"></div>
     <div class="form-group"><label>Notes</label><textarea id="client-notes"></textarea></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-client')">Annuler</button><button class="btn btn-primary" onclick="saveClient()">Enregistrer</button></div>
   </div>
 </div>
-
+ 
 <!-- MODAL COMMANDE -->
 <div class="overlay hidden" id="modal-commande">
   <div class="modal">
@@ -188,106 +282,84 @@
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-commande')">Annuler</button><button class="btn btn-primary" onclick="saveCommande()">Enregistrer</button></div>
   </div>
 </div>
-
-<!-- MODAL DEVIS -->
-<div class="overlay hidden" id="modal-devis">
-  <div class="modal">
-    <div class="modal-title" id="modal-devis-title">Nouveau devis</div>
-    <input type="hidden" id="devis-id">
-    <div class="form-group"><label>Client *</label><select id="devis-client"></select></div>
-    <div class="form-group"><label>Objet *</label><input type="text" id="devis-objet"></div>
-    <div class="form-group"><label>Montant HT (MAD)</label><input type="number" id="devis-montant"></div>
-    <div class="form-group"><label>Date d'envoi</label><input type="date" id="devis-date"></div>
-    <div class="form-group"><label>Statut</label><select id="devis-statut"><option>En attente</option><option>Accepté</option><option>Refusé</option></select></div>
-    <div class="form-group"><label>Notes</label><textarea id="devis-notes"></textarea></div>
-    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-devis')">Annuler</button><button class="btn btn-primary" onclick="saveDevis()">Enregistrer</button></div>
-  </div>
-</div>
-
+ 
+<!-- PDF PREVIEW -->
+<div id="pdf-preview"></div>
+ 
 <div class="toast" id="toast"></div>
-
+ 
 <script>
 const SUPABASE_URL = 'https://ejftmtecehyqlaspoxfh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EsfhC7RsteRwLEQoIYqPxQ_vb3Jx10r';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentPage = 'dashboard';
-
+let currentDevisId = null;
+let sectionsData = []; // {id, nom, sous_titre, ordre, articles:[{id,description,quantite,prix_unitaire}]}
+ 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
-async function checkSession() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) showApp(session.user.email);
-  else showLogin();
+async function checkSession(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(session)showApp(session.user.email); else showLogin();
 }
-
-function showApp(email) {
+function showApp(email){
   document.getElementById('login-page').classList.add('hidden');
   document.getElementById('app-page').classList.remove('hidden');
-  document.getElementById('user-email').textContent = email;
+  document.getElementById('user-email').textContent=email;
   loadDashboard();
 }
-
-function showLogin() {
+function showLogin(){
   document.getElementById('login-page').classList.remove('hidden');
   document.getElementById('app-page').classList.add('hidden');
 }
-
-async function login() {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const err = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
-  err.style.display = 'none';
-  btn.textContent = 'Connexion…';
-  btn.disabled = true;
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) {
-    err.textContent = 'Email ou mot de passe incorrect.';
-    err.style.display = 'block';
-    btn.textContent = 'Se connecter';
-    btn.disabled = false;
-  } else {
-    showApp(data.user.email);
-  }
+async function login(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const err=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  err.style.display='none'; btn.textContent='Connexion…'; btn.disabled=true;
+  const{data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error){err.textContent='Email ou mot de passe incorrect.';err.style.display='block';btn.textContent='Se connecter';btn.disabled=false;}
+  else showApp(data.user.email);
 }
-
-async function logout() {
-  await sb.auth.signOut();
-  showLogin();
-}
-
-// Enter key on login
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !document.getElementById('login-page').classList.contains('hidden')) login();
-});
-
+async function logout(){await sb.auth.signOut();showLogin();}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('login-page').classList.contains('hidden'))login();});
+ 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
-function showPage(page, el) {
-  document.querySelectorAll('.content > div').forEach(d => d.classList.add('hidden'));
-  document.getElementById('page-' + page).classList.remove('hidden');
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('page-title').textContent = {dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis'}[page];
-  currentPage = page;
+function showPage(page,el){
+  document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
+  document.getElementById('page-'+page).classList.remove('hidden');
+  if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis'}[page];
+  currentPage=page;
+  const btnNew=document.getElementById('btn-new');
+  btnNew.style.display=(page==='devis-builder')?'none':'flex';
   loadPage(page);
 }
-function loadPage(page) {
-  if (page==='dashboard') loadDashboard();
-  else if (page==='clients') loadClients();
-  else if (page==='commandes') loadCommandes();
-  else if (page==='atelier') loadAtelier();
-  else if (page==='devis') loadDevis();
+function loadPage(p){
+  if(p==='dashboard')loadDashboard();
+  else if(p==='clients')loadClients();
+  else if(p==='commandes')loadCommandes();
+  else if(p==='atelier')loadAtelier();
+  else if(p==='devis')loadDevisList();
 }
-
+ 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-function initials(nom){return nom.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+function initials(nom){return(nom||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
 function badgeClass(s){s=(s||'').toLowerCase();if(s.includes('livré')||s.includes('accepté'))return 'badge-green';if(s.includes('fabrication')||s.includes('finition'))return 'badge-amber';if(s.includes('devis')||s.includes('démarrage'))return 'badge-blue';if(s.includes('retard')||s.includes('refusé'))return 'badge-red';return 'badge-gray'}
 function fmt(n){return Number(n||0).toLocaleString('fr-FR')+' MAD'}
+function fmtNum(n){return Number(n||0).toLocaleString('fr-FR')}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 function closeModal(id){document.getElementById(id).classList.add('hidden')}
-
+function openNew(){
+  if(currentPage==='clients')openClientModal();
+  else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
+  else if(currentPage==='devis')openDevisBuilder(null);
+  else openClientModal();
+}
+ 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 async function loadDashboard(){
-  const [{data:clients},{data:commandes},{data:devis}]=await Promise.all([
+  const[{data:clients},{data:commandes},{data:devis}]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente')
@@ -301,24 +373,19 @@ async function loadDashboard(){
   const av=(commandes||[]).filter(c=>c.progression>0&&c.statut!=='Livré').slice(0,5);
   document.getElementById('dash-atelier').innerHTML=av.length?av.map(c=>`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="font-weight:500">${c.description||'—'}</span><span style="color:var(--muted)">${c.progression||0}%</span></div><div class="progress-bar"><div class="progress-fill" style="width:${c.progression||0}%"></div></div></div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
 }
-
+ 
 // ─── CLIENTS ──────────────────────────────────────────────────────────────────
 async function loadClients(){
   const{data}=await sb.from('clients').select('*,commandes(id,montant)').order('created_at',{ascending:false});
   const el=document.getElementById('clients-table');
-  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun client. Créez-en un !</div>';return}
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun client.</div>';return}
   el.innerHTML=`<table><thead><tr><th>Client</th><th>Type</th><th>Contact</th><th>Commandes</th><th>CA total</th><th></th></tr></thead><tbody>${(data||[]).map(c=>{const ca=(c.commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);return`<tr><td><div class="client-cell"><div class="avatar">${initials(c.nom)}</div><span style="font-weight:500">${c.nom}</span></div></td><td><span class="badge badge-gray">${c.type||'—'}</span></td><td style="color:var(--muted)">${c.email||c.telephone||'—'}</td><td>${(c.commandes||[]).length}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(ca)}</td><td><div class="actions"><button class="btn btn-sm" onclick="editClient('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Suppr.</button></div></td></tr>`}).join('')}</tbody></table>`;
 }
-async function editClient(id){const{data}=await sb.from('clients').select('*').eq('id',id).single();openClientModal(data||{})}
+async function editClient(id){const{data}=await sb.from('clients').select('*').eq('id',id).single();openClientModal(data||{});}
 function openClientModal(data={}){
   document.getElementById('modal-client-title').textContent=data.id?'Modifier client':'Nouveau client';
-  document.getElementById('client-id').value=data.id||'';
-  document.getElementById('client-nom').value=data.nom||'';
+  ['id','nom','email','tel','ville','notes'].forEach(f=>document.getElementById('client-'+f).value=data[f==='tel'?'telephone':f]||'');
   document.getElementById('client-type').value=data.type||'Particulier';
-  document.getElementById('client-email').value=data.email||'';
-  document.getElementById('client-tel').value=data.telephone||'';
-  document.getElementById('client-ville').value=data.ville||'';
-  document.getElementById('client-notes').value=data.notes||'';
   document.getElementById('modal-client').classList.remove('hidden');
 }
 async function saveClient(){
@@ -330,8 +397,8 @@ async function saveClient(){
   else await sb.from('clients').insert(payload);
   closeModal('modal-client');toast('Client enregistré ✓');loadClients();
 }
-async function deleteClient(id){if(!confirm('Supprimer ce client ?'))return;await sb.from('clients').delete().eq('id',id);toast('Supprimé');loadClients()}
-
+async function deleteClient(id){if(!confirm('Supprimer ?'))return;await sb.from('clients').delete().eq('id',id);toast('Supprimé');loadClients();}
+ 
 // ─── COMMANDES ────────────────────────────────────────────────────────────────
 async function loadCommandes(){
   const{data}=await sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false});
@@ -341,10 +408,9 @@ async function loadCommandes(){
 }
 async function openCommandeModal(data={}){
   const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
-  const sel=document.getElementById('commande-client');
-  sel.innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  if(data.client_id)sel.value=data.client_id;
-  document.getElementById('modal-commande-title').textContent=data.id?'Modifier commande':'Nouvelle commande';
+  document.getElementById('commande-client').innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  if(data.client_id)document.getElementById('commande-client').value=data.client_id;
+  document.getElementById('modal-commande-title').textContent=data.id?'Modifier':'Nouvelle commande';
   document.getElementById('commande-id').value=data.id||'';
   document.getElementById('commande-desc').value=data.description||'';
   document.getElementById('commande-montant').value=data.montant||'';
@@ -354,72 +420,310 @@ async function openCommandeModal(data={}){
   document.getElementById('commande-notes').value=data.notes||'';
   document.getElementById('modal-commande').classList.remove('hidden');
 }
-async function editCommande(id){const{data}=await sb.from('commandes').select('*').eq('id',id).single();openCommandeModal(data||{})}
+async function editCommande(id){const{data}=await sb.from('commandes').select('*').eq('id',id).single();openCommandeModal(data||{});}
 async function saveCommande(){
   const id=document.getElementById('commande-id').value;
   const desc=document.getElementById('commande-desc').value.trim();
-  if(!desc){toast('La description est requise');return}
+  if(!desc){toast('Description requise');return}
   const ref=id?undefined:'CMD-'+Date.now().toString().slice(-6);
   const payload={client_id:document.getElementById('commande-client').value,description:desc,montant:Number(document.getElementById('commande-montant').value)||0,date_livraison:document.getElementById('commande-livraison').value||null,statut:document.getElementById('commande-statut').value,progression:Number(document.getElementById('commande-progression').value)||0,notes:document.getElementById('commande-notes').value,...(ref?{reference:ref}:{})};
   if(id)await sb.from('commandes').update(payload).eq('id',id);
   else await sb.from('commandes').insert(payload);
   closeModal('modal-commande');toast('Commande enregistrée ✓');loadPage(currentPage);
 }
-async function deleteCommande(id){if(!confirm('Supprimer cette commande ?'))return;await sb.from('commandes').delete().eq('id',id);toast('Supprimée');loadPage(currentPage)}
-
+async function deleteCommande(id){if(!confirm('Supprimer ?'))return;await sb.from('commandes').delete().eq('id',id);toast('Supprimée');loadPage(currentPage);}
+ 
 // ─── ATELIER ──────────────────────────────────────────────────────────────────
 async function loadAtelier(){
   const{data}=await sb.from('commandes').select('*,clients(nom)').not('statut','eq','Livré').order('created_at',{ascending:false});
   const groups={'En fabrication':[],'Finition':[],'En attente':[]};
-  (data||[]).forEach(c=>{if(c.statut==='En fabrication')groups['En fabrication'].push(c);else if(c.statut==='Finition')groups['Finition'].push(c);else groups['En attente'].push(c)});
+  (data||[]).forEach(c=>{if(c.statut==='En fabrication')groups['En fabrication'].push(c);else if(c.statut==='Finition')groups['Finition'].push(c);else groups['En attente'].push(c);});
   const colors={'En fabrication':'#EF9F27','Finition':'#5DCAA5','En attente':'#378ADD'};
   document.getElementById('atelier-kanban').innerHTML=Object.entries(groups).map(([col,items])=>`<div class="kanban-col" style="border-top:3px solid ${colors[col]}"><div class="kanban-header">${col} <span class="kanban-count">${items.length}</span></div>${items.length?items.map(c=>`<div class="kanban-card"><div class="kanban-card-title">${c.description||'—'}</div><div class="kanban-card-sub">${c.clients?.nom||'—'}</div>${c.progression>0?`<div class="progress-bar"><div class="progress-fill" style="width:${c.progression}%"></div></div><div style="font-size:10px;color:var(--muted);margin-top:4px">${c.progression}%</div>`:''}</div>`).join(''):'<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucun projet</div>'}</div>`).join('');
 }
-
-// ─── DEVIS ────────────────────────────────────────────────────────────────────
-async function loadDevis(){
-  const{data}=await sb.from('devis').select('*,clients(nom)').order('created_at',{ascending:false});
-  const el=document.getElementById('devis-table');
-  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis.</div>';return}
-  el.innerHTML=`<table><thead><tr><th>Réf.</th><th>Client</th><th>Objet</th><th>Montant HT</th><th>Date</th><th>Statut</th><th></th></tr></thead><tbody>${data.map(d=>`<tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${d.reference||'—'}</td><td>${d.clients?.nom||'—'}</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.objet||'—'}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(d.montant)}</td><td style="color:var(--muted)">${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</td><td><span class="badge ${badgeClass(d.statut)}">${d.statut}</span></td><td><div class="actions"><button class="btn btn-sm" onclick="editDevis('${d.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteDevis('${d.id}')">Suppr.</button></div></td></tr>`).join('')}</tbody></table>`;
+ 
+// ─── DEVIS LIST ───────────────────────────────────────────────────────────────
+async function loadDevisList(){
+  const{data}=await sb.from('devis').select('*,clients(nom),devis_sections(id,devis_articles(quantite,prix_unitaire))').order('created_at',{ascending:false});
+  const el=document.getElementById('devis-list');
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis. Cliquez sur + Nouveau pour commencer.</div>';return}
+  el.innerHTML=(data||[]).map(d=>{
+    const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+    const ttc=ht*1.2;
+    return`<div class="devis-card" onclick="openDevisBuilder('${d.id}')">
+      <div class="devis-card-left">
+        <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
+        <div class="devis-card-title">${d.clients?.nom||'—'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
+        <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)</div>
+      </div>
+      <div class="devis-card-right">
+        <div>
+          <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
+          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
+        </div>
+        <span class="badge ${badgeClass(d.statut)}">${d.statut}</span>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteDevis('${d.id}')">Suppr.</button>
+      </div>
+    </div>`;
+  }).join('');
 }
-async function openDevisModal(data={}){
+async function deleteDevis(id){if(!confirm('Supprimer ce devis ?'))return;await sb.from('devis').delete().eq('id',id);toast('Supprimé');loadDevisList();}
+ 
+// ─── DEVIS BUILDER ────────────────────────────────────────────────────────────
+async function openDevisBuilder(devisId){
+  currentDevisId=devisId;
+  sectionsData=[];
+  // Load clients
   const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
-  const sel=document.getElementById('devis-client');
-  sel.innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  if(data.client_id)sel.value=data.client_id;
-  document.getElementById('modal-devis-title').textContent=data.id?'Modifier devis':'Nouveau devis';
-  document.getElementById('devis-id').value=data.id||'';
-  document.getElementById('devis-objet').value=data.objet||'';
-  document.getElementById('devis-montant').value=data.montant||'';
-  document.getElementById('devis-date').value=data.date_envoi||new Date().toISOString().split('T')[0];
-  document.getElementById('devis-statut').value=data.statut||'En attente';
-  document.getElementById('devis-notes').value=data.notes||'';
-  document.getElementById('modal-devis').classList.remove('hidden');
+  document.getElementById('builder-client').innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+ 
+  if(devisId){
+    // Load existing devis
+    const{data:d}=await sb.from('devis').select('*').eq('id',devisId).single();
+    if(d){
+      document.getElementById('builder-client').value=d.client_id||'';
+      document.getElementById('builder-projet').value=d.projet_nom||'';
+      document.getElementById('builder-statut').value=d.statut||'En attente';
+      document.getElementById('builder-ref').textContent=d.reference||'';
+    }
+    // Load sections + articles
+    const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
+    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire)}))}));
+  } else {
+    document.getElementById('builder-ref').textContent='Nouveau devis';
+    document.getElementById('builder-projet').value='';
+    document.getElementById('builder-statut').value='En attente';
+    // Start with one empty section
+    sectionsData=[{id:null,nom:'',sous_titre:'',ordre:0,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]}];
+  }
+  renderSections();
+  showPage('devis-builder',null);
 }
-async function editDevis(id){const{data}=await sb.from('devis').select('*').eq('id',id).single();openDevisModal(data||{})}
-async function saveDevis(){
-  const id=document.getElementById('devis-id').value;
-  const objet=document.getElementById('devis-objet').value.trim();
-  if(!objet){toast("L'objet est requis");return}
-  const ref=id?undefined:'DEV-'+Date.now().toString().slice(-6);
-  const payload={client_id:document.getElementById('devis-client').value,objet,montant:Number(document.getElementById('devis-montant').value)||0,date_envoi:document.getElementById('devis-date').value||null,statut:document.getElementById('devis-statut').value,notes:document.getElementById('devis-notes').value,...(ref?{reference:ref}:{})};
-  if(id)await sb.from('devis').update(payload).eq('id',id);
-  else await sb.from('devis').insert(payload);
-  closeModal('modal-devis');toast('Devis enregistré ✓');loadDevis();
+ 
+function renderSections(){
+  const container=document.getElementById('sections-container');
+  container.innerHTML=sectionsData.map((sec,si)=>`
+    <div class="section-block" data-si="${si}">
+      <div class="section-header">
+        <div style="flex:1">
+          <input type="text" value="${esc(sec.nom)}" placeholder="Nom de la pièce (ex: Salon, Chambre 1…)" oninput="sectionsData[${si}].nom=this.value" style="border:none;background:transparent;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--text);width:100%;padding:0">
+          <input type="text" value="${esc(sec.sous_titre)}" placeholder="Sous-titre optionnel…" oninput="sectionsData[${si}].sous_titre=this.value" style="border:none;background:transparent;font-size:11px;font-family:'DM Sans',sans-serif;color:var(--muted);width:100%;padding:0;margin-top:3px">
+        </div>
+        <div class="section-actions">
+          ${si>0?`<button class="btn btn-sm" onclick="moveSection(${si},-1)">↑</button>`:''}
+          ${si<sectionsData.length-1?`<button class="btn btn-sm" onclick="moveSection(${si},1)">↓</button>`:''}
+          <button class="btn btn-sm btn-danger" onclick="removeSection(${si})">✕</button>
+        </div>
+      </div>
+      <table class="articles-table">
+        <thead><tr><th style="width:50%">Article</th><th style="width:15%">Qté</th><th style="width:20%">P.U. HT (MAD)</th><th style="width:12%">Total HT</th><th style="width:3%"></th></tr></thead>
+        <tbody>
+          ${sec.articles.map((art,ai)=>`
+          <tr data-ai="${ai}">
+            <td><input type="text" value="${esc(art.description)}" placeholder="Description de l'article…" oninput="sectionsData[${si}].articles[${ai}].description=this.value"></td>
+            <td><input type="number" value="${art.quantite}" min="0" step="0.5" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
+            <td><input type="number" value="${art.prix_unitaire}" min="0" oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Number(this.value);updateTotals()" style="text-align:right"></td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px">${fmtNum(art.quantite*art.prix_unitaire)}</td>
+            <td><button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px" onclick="removeArticle(${si},${ai})">✕</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
+      <div class="section-subtotal">Sous-total HT : <span>${fmtNum(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire,0))} MAD</span></div>
+    </div>`).join('');
+  updateTotals();
 }
-async function deleteDevis(id){if(!confirm('Supprimer ce devis ?'))return;await sb.from('devis').delete().eq('id',id);toast('Supprimé');loadDevis()}
-
-// ─── OPEN NEW ─────────────────────────────────────────────────────────────────
-function openNew(){
-  if(currentPage==='clients')openClientModal();
-  else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
-  else if(currentPage==='devis')openDevisModal();
-  else openClientModal();
+ 
+function esc(s){return(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+ 
+function addSection(){
+  sectionsData.push({id:null,nom:'',sous_titre:'',ordre:sectionsData.length,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]});
+  renderSections();
+  // Scroll to new section
+  setTimeout(()=>document.querySelector('.add-section-btn').scrollIntoView({behavior:'smooth'}),100);
 }
-
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}sectionsData.splice(si,1);renderSections();}
+function moveSection(si,dir){const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
+function addArticle(si){sectionsData[si].articles.push({id:null,description:'',quantite:1,prix_unitaire:0});renderSections();}
+function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
+ 
+function updateTotals(){
+  const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+  const tva=ht*0.2;
+  const ttc=ht+tva;
+  document.getElementById('total-ht').textContent=ht.toLocaleString('fr-FR')+' MAD';
+  document.getElementById('total-tva').textContent=tva.toLocaleString('fr-FR')+' MAD';
+  document.getElementById('total-ttc').textContent=ttc.toLocaleString('fr-FR')+' MAD';
+  // Update section subtotals
+  document.querySelectorAll('.section-subtotal span').forEach((el,i)=>{
+    if(sectionsData[i]){const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0);el.textContent=fmtNum(st)+' MAD';}
+  });
+  // Update article totals
+  document.querySelectorAll('.articles-table tbody tr').forEach(row=>{
+    const si=Number(row.closest('.section-block').dataset.si);
+    const ai=Number(row.dataset.ai);
+    if(sectionsData[si]&&sectionsData[si].articles[ai]){
+      const a=sectionsData[si].articles[ai];
+      const totalCell=row.querySelectorAll('td')[3];
+      if(totalCell)totalCell.textContent=fmtNum(a.quantite*a.prix_unitaire);
+    }
+  });
+}
+ 
+async function saveDevisBuilder(){
+  const clientId=document.getElementById('builder-client').value;
+  if(!clientId){toast('Sélectionnez un client');return}
+  const statut=document.getElementById('builder-statut').value;
+  const projetNom=document.getElementById('builder-projet').value.trim();
+ 
+  let devisId=currentDevisId;
+  if(!devisId){
+    // Create new devis
+    const ref='DEV-'+Date.now().toString().slice(-6);
+    const{data,error}=await sb.from('devis').insert({reference:ref,client_id:clientId,projet_nom:projetNom,statut,date_envoi:new Date().toISOString().split('T')[0]}).select().single();
+    if(error){toast('Erreur: '+error.message);return}
+    devisId=data.id;
+    currentDevisId=devisId;
+    document.getElementById('builder-ref').textContent=ref;
+  } else {
+    await sb.from('devis').update({client_id:clientId,projet_nom:projetNom,statut}).eq('id',devisId);
+  }
+ 
+  // Save sections & articles
+  for(let si=0;si<sectionsData.length;si++){
+    const sec=sectionsData[si];
+    let secId=sec.id;
+    if(!secId){
+      const{data}=await sb.from('devis_sections').insert({devis_id:devisId,nom:sec.nom,sous_titre:sec.sous_titre,ordre:si}).select().single();
+      secId=data.id;
+      sectionsData[si].id=secId;
+    } else {
+      await sb.from('devis_sections').update({nom:sec.nom,sous_titre:sec.sous_titre,ordre:si}).eq('id',secId);
+    }
+    // Articles
+    for(let ai=0;ai<sec.articles.length;ai++){
+      const art=sec.articles[ai];
+      if(!art.id){
+        const{data}=await sb.from('devis_articles').insert({section_id:secId,description:art.description,quantite:art.quantite,prix_unitaire:art.prix_unitaire,ordre:ai}).select().single();
+        sectionsData[si].articles[ai].id=data.id;
+      } else {
+        await sb.from('devis_articles').update({description:art.description,quantite:art.quantite,prix_unitaire:art.prix_unitaire,ordre:ai}).eq('id',art.id);
+      }
+    }
+  }
+  toast('Devis enregistré ✓');
+}
+ 
+// ─── PRINT / PDF ──────────────────────────────────────────────────────────────
+async function printDevis(){
+  await saveDevisBuilder();
+  const clientId=document.getElementById('builder-client').value;
+  const{data:client}=await sb.from('clients').select('*').eq('id',clientId).single();
+  const ref=document.getElementById('builder-ref').textContent;
+  const projet=document.getElementById('builder-projet').value;
+  const date=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
+  const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+  const tva=ht*0.2;const ttc=ht+tva;
+ 
+  const sectionsHTML=sectionsData.map(sec=>`
+    <div style="margin-bottom:28px">
+      <div style="background:#f5f3ee;padding:10px 14px;margin-bottom:0;border-radius:4px 4px 0 0">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:monospace">${sec.nom||'Section'}</div>
+        ${sec.sous_titre?`<div style="font-size:12px;color:#aaa;margin-top:2px">${sec.sous_titre}</div>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:#f5f3ee">
+            <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc">ARTICLE</th>
+            <th style="padding:8px 14px;text-align:center;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:60px">QTÉ</th>
+            <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">P.U. HT (MAD)</th>
+            <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">TOTAL HT (MAD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sec.articles.filter(a=>a.description).map((a,i)=>`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+            <td style="padding:9px 14px;border-bottom:1px solid #f0ece4">${a.description}</td>
+            <td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4">${a.quantite}</td>
+            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire).toLocaleString('fr-FR')}</td>
+            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${(a.quantite*a.prix_unitaire).toLocaleString('fr-FR')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="background:#f5f3ee;padding:8px 14px;text-align:right;font-size:12px;color:#888;border-radius:0 0 4px 4px">
+        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0).toLocaleString('fr-FR')} MAD</span>
+      </div>
+    </div>`).join('');
+ 
+  const recapHTML=sectionsData.map(sec=>{
+    const st=sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0);
+    return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
+  }).join('');
+ 
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+      body{font-family:'DM Sans',sans-serif}
+      @page{margin:20mm}
+    </style>
+    <!-- PAGE DE GARDE -->
+    <div style="page-break-after:always;min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:40px 0">
+      <div style="text-align:right;font-size:10px;font-family:monospace;color:#aaa;letter-spacing:2px">DEVIS ${new Date().getFullYear()}</div>
+      <div style="text-align:center;padding:60px 0">
+        <div style="font-size:72px;font-weight:600;letter-spacing:4px;margin-bottom:20px">${(projet||'PROJET').toUpperCase()}</div>
+        <div style="width:60px;height:2px;background:#1a1a18;margin:0 auto"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:40px;border-top:1px solid #e8e4dc">
+        <div>
+          <div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PROJET</div>
+          <div style="font-weight:600;font-size:14px">${client?.nom||'—'}</div>
+          <div style="color:#888;margin-top:4px">${client?.ville||''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PRÉPARÉ PAR</div>
+          <div style="font-weight:600;font-size:14px">Nabil Ziani — DG</div>
+          <div style="color:#888;margin-top:4px">BRUT Essentials</div>
+          <div style="color:#888">Atelier de fabrication · Design & Mobilier</div>
+          <div style="font-weight:500;margin-top:4px">+212 621 754 582</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:9px;letter-spacing:3px;color:#aaa;font-family:monospace;padding-top:20px;border-top:1px solid #e8e4dc">CONFIDENTIEL</div>
+    </div>
+    <!-- CONTENU -->
+    <div style="page-break-before:always">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #e8e4dc">
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">DEVIS — ${(projet||'PROJET').toUpperCase()}</div>
+          <div style="font-size:12px;color:#888">${client?.nom||'—'} · ${date}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#888">
+          <div style="font-family:monospace">${ref}</div>
+          <div style="font-weight:500;color:#1a1a18">Nabil Ziani — DG</div>
+          <div>BRUT Essentials · +212 621 754 582</div>
+        </div>
+      </div>
+      ${sectionsHTML}
+      <!-- RECAP -->
+      <div style="margin-top:32px;page-break-inside:avoid">
+        <div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:12px">RÉCAPITULATIF</div>
+        <table style="width:100%;border-collapse:collapse">
+          ${recapHTML}
+          <tr><td style="padding:12px 0 8px;font-weight:600">Total HT</td><td style="padding:12px 0 8px;text-align:right;font-family:monospace;font-weight:600">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr><td style="padding:4px 0;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr style="background:#1a1a18;color:#fff">
+            <td style="padding:12px 14px;font-weight:600;border-radius:4px 0 0 4px">TOTAL TTC</td>
+            <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:600;border-radius:0 4px 4px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
+          </tr>
+        </table>
+        <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;font-style:italic">Fabrication sur mesure · Atelier BRUT Essentials — Marrakech · TVA 20%</div>
+      </div>
+    </div>`;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+ 
 checkSession();
 </script>
 </body>
 </html>
+ 
+
