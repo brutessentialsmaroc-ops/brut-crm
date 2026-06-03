@@ -210,6 +210,7 @@
       <button class="nav-item" onclick="showPage('commandes',this)">◫ Commandes</button>
       <button class="nav-item" onclick="showPage('atelier',this)">⚙ Atelier</button>
       <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
+      <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
     </nav>
     <div class="sidebar-footer">
       <div class="user-email" id="user-email"></div>
@@ -303,6 +304,8 @@
       </div>
       <!-- DEVIS LIST -->
       <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
+      <!-- FACTURES -->
+      <div id="page-factures" class="hidden"><div id="factures-list"></div></div>
       <!-- DEVIS BUILDER -->
       <div id="page-devis-builder" class="hidden">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
@@ -421,7 +424,7 @@ function showPage(page,el){
   document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+page).classList.remove('hidden');
   if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
-  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis'}[page];
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande'}[page]||page;
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
@@ -433,6 +436,7 @@ function loadPage(p){
   else if(p==='commandes')loadCommandes();
   else if(p==='atelier')loadAtelier();
   else if(p==='devis')loadDevisList();
+  else if(p==='factures')loadFactures();
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -724,6 +728,8 @@ async function loadDevisList(){
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeClass(d.statut)}">${d.statut}</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();dupliquerDevis('${d.id}')">Dupliquer</button>
+        <button class="btn btn-sm" onclick="event.stopPropagation();convertirFacture('${d.id}')">→ Facture</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteDevis('${d.id}')">Suppr.</button>
       </div>
     </div>`;
@@ -977,6 +983,181 @@ async function printDevis(){
           </tr>
         </table>
         <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;font-style:italic">Fabrication sur mesure · Atelier BRUT Essentials — Marrakech · TVA 20%</div>
+      </div>
+    </div>`;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+// ─── DUPLIQUER DEVIS ──────────────────────────────────────────────────────────
+async function dupliquerDevis(id){
+  toast('Duplication en cours…');
+  // Load original
+  const{data:d}=await sb.from('devis').select('*').eq('id',id).single();
+  const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',id).order('ordre');
+  // Create new devis
+  const ref='DEV-'+Date.now().toString().slice(-6);
+  const{data:newD}=await sb.from('devis').insert({
+    reference:ref,
+    client_id:d.client_id,
+    projet_nom:(d.projet_nom||'')+'  (copie)',
+    statut:'En attente',
+    date_envoi:new Date().toISOString().split('T')[0]
+  }).select().single();
+  // Copy sections & articles
+  for(const sec of (sections||[])){
+    const{data:newSec}=await sb.from('devis_sections').insert({
+      devis_id:newD.id,nom:sec.nom,sous_titre:sec.sous_titre,ordre:sec.ordre
+    }).select().single();
+    for(const art of (sec.devis_articles||[])){
+      await sb.from('devis_articles').insert({
+        section_id:newSec.id,description:art.description,
+        quantite:art.quantite,prix_unitaire:art.prix_unitaire,ordre:art.ordre
+      });
+    }
+  }
+  toast('Devis dupliqué ✓');
+  loadDevisList();
+}
+
+// ─── FACTURES ─────────────────────────────────────────────────────────────────
+async function convertirFacture(devisId){
+  if(!confirm('Convertir ce devis en facture ?'))return;
+  const{data:d}=await sb.from('devis').select('*').eq('id',devisId).single();
+  const ref='FAC-'+Date.now().toString().slice(-6);
+  const{error}=await sb.from('factures').insert({
+    reference:ref,
+    devis_id:devisId,
+    client_id:d.client_id,
+    projet_nom:d.projet_nom,
+    statut:'Non payée',
+    date_emission:new Date().toISOString().split('T')[0],
+    date_echeance:new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0]
+  });
+  if(error){toast('Erreur: '+error.message);return;}
+  await sb.from('devis').update({statut:'Accepté'}).eq('id',devisId);
+  toast('Facture créée ✓');
+  showPage('factures',document.querySelector('.nav-item:nth-child(6)'));
+}
+
+async function loadFactures(){
+  const{data,error}=await sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').order('created_at',{ascending:false});
+  const el=document.getElementById('factures-list');
+  if(error){el.innerHTML=`<div class="empty">Table factures manquante — exécutez le SQL factures dans Supabase.</div>`;return;}
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune facture. Convertissez un devis accepté en facture.</div>';return;}
+  el.innerHTML=(data||[]).map(f=>{
+    const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+    const ttc=ht*1.2;
+    const badgeCls=f.statut==='Payée'?'badge-green':f.statut==='En retard'?'badge-red':'badge-amber';
+    return`<div class="devis-card" onclick="printFacture('${f.id}')">
+      <div class="devis-card-left">
+        <div class="devis-card-ref">${f.reference} · Émise le ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
+        <div class="devis-card-title">${f.clients?.nom||'—'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
+        <div class="devis-card-sub">Échéance : ${f.date_echeance?new Date(f.date_echeance).toLocaleDateString('fr-FR'):'—'}</div>
+      </div>
+      <div class="devis-card-right">
+        <div>
+          <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
+          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
+        </div>
+        <span class="badge ${badgeCls}">${f.statut}</span>
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();marquerPayee('${f.id}')">✓ Payée</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteFacture('${f.id}')">Suppr.</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function marquerPayee(id){
+  await sb.from('factures').update({statut:'Payée'}).eq('id',id);
+  toast('Facture marquée payée ✓');
+  loadFactures();
+}
+async function deleteFacture(id){
+  if(!confirm('Supprimer cette facture ?'))return;
+  await sb.from('factures').delete().eq('id',id);
+  toast('Supprimée');loadFactures();
+}
+
+async function printFacture(id){
+  const{data:f}=await sb.from('factures').select('*,clients(*),devis(projet_nom,devis_sections(nom,sous_titre,ordre,devis_articles(*)))').eq('id',id).single();
+  const sections=(f.devis?.devis_sections||[]).sort((a,b)=>a.ordre-b.ordre);
+  const ht=sections.reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+  const tva=ht*0.2; const ttc=ht+tva;
+  const date=f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
+  const echeance=f.date_echeance?new Date(f.date_echeance).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):'—';
+
+  const sectionsHTML=sections.map(sec=>`
+    <div style="margin-bottom:24px">
+      <div style="background:#f5f3ee;padding:8px 14px;border-radius:4px 4px 0 0">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:monospace">${sec.nom||'Section'}</div>
+        ${sec.sous_titre?`<div style="font-size:11px;color:#aaa">${sec.sous_titre}</div>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f5f3ee">
+          <th style="padding:7px 14px;text-align:left;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;font-family:monospace;border-bottom:1px solid #e8e4dc">ARTICLE</th>
+          <th style="padding:7px 14px;text-align:center;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;font-family:monospace;border-bottom:1px solid #e8e4dc;width:60px">QTÉ</th>
+          <th style="padding:7px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">P.U. HT</th>
+          <th style="padding:7px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">TOTAL HT</th>
+        </tr></thead>
+        <tbody>${(sec.devis_articles||[]).filter(a=>a.description).map((a,i)=>`
+          <tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+            <td style="padding:8px 14px;border-bottom:1px solid #f0ece4">${a.description}</td>
+            <td style="padding:8px 14px;text-align:center;border-bottom:1px solid #f0ece4">${a.quantite}</td>
+            <td style="padding:8px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire).toLocaleString('fr-FR')}</td>
+            <td style="padding:8px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${(a.quantite*a.prix_unitaire).toLocaleString('fr-FR')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="background:#f5f3ee;padding:7px 14px;text-align:right;font-size:11px;color:#888;border-radius:0 0 4px 4px">
+        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${(sec.devis_articles||[]).reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0).toLocaleString('fr-FR')} MAD</span>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:18mm}</style>
+    <!-- EN-TÊTE FACTURE -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #1a1a18">
+      <div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:3px;margin-bottom:4px">BRUT</div>
+        <div style="font-size:11px;color:#888;font-family:monospace">Atelier de fabrication · Design & Mobilier</div>
+        <div style="font-size:11px;color:#888">Route de Tahanout, Marrakech</div>
+        <div style="font-size:11px;font-weight:500;margin-top:4px">+212 621 754 582</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:22px;font-weight:600;letter-spacing:1px;color:#1a1a18">FACTURE</div>
+        <div style="font-family:monospace;font-size:13px;margin-top:4px;color:#888">${f.reference}</div>
+        <div style="font-size:12px;color:#888;margin-top:8px">Émise le : ${date}</div>
+        <div style="font-size:12px;color:#888">Échéance : ${echeance}</div>
+      </div>
+    </div>
+    <!-- CLIENT -->
+    <div style="display:flex;justify-content:space-between;margin-bottom:32px">
+      <div>
+        <div style="font-size:10px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">FACTURÉ À</div>
+        <div style="font-weight:600;font-size:15px">${f.clients?.nom||'—'}</div>
+        ${f.clients?.ville?`<div style="color:#888;font-size:12px;margin-top:2px">${f.clients.ville}</div>`:''}
+        ${f.clients?.email?`<div style="color:#888;font-size:12px">${f.clients.email}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">PROJET</div>
+        <div style="font-weight:600;font-size:14px">${f.projet_nom||f.devis?.projet_nom||'—'}</div>
+      </div>
+    </div>
+    <!-- ARTICLES -->
+    ${sectionsHTML}
+    <!-- TOTAL -->
+    <div style="margin-top:24px;page-break-inside:avoid">
+      <table style="width:100%;border-collapse:collapse;margin-left:auto;max-width:300px">
+        <tr><td style="padding:8px 0;font-size:13px">Total HT</td><td style="padding:8px 0;text-align:right;font-family:monospace;font-size:13px">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+        <tr><td style="padding:4px 0;font-size:12px;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;font-size:12px;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
+        <tr style="background:#1a1a18;color:#fff">
+          <td style="padding:12px 14px;font-weight:600;border-radius:4px 0 0 4px;font-size:14px">TOTAL TTC</td>
+          <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:600;border-radius:0 4px 4px 0;font-size:14px">${ttc.toLocaleString('fr-FR')} MAD</td>
+        </tr>
+      </table>
+      <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e8e4dc;font-size:10px;color:#aaa;text-align:center">
+        BRUT Essentials · Atelier de fabrication & Design · Marrakech · +212 621 754 582 · TVA 20%
       </div>
     </div>`;
   document.getElementById('pdf-preview').style.display='block';
