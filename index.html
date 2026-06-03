@@ -374,6 +374,12 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- LIGHTBOX -->
+<div id="lightbox" class="lightbox" style="display:none" onclick="if(event.target===this)closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
 <script>
 const SUPABASE_URL = 'https://ejftmtecehyqlaspoxfh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EsfhC7RsteRwLEQoIYqPxQ_vb3Jx10r';
