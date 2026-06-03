@@ -462,8 +462,15 @@ async function loadDashboard(){
   document.getElementById('stat-devis').textContent=(devis||[]).length;
   const recent=(commandes||[]).slice(0,5);
   document.getElementById('dash-commandes').innerHTML=recent.length?`<table><thead><tr><th>Client</th><th>Description</th><th>Statut</th></tr></thead><tbody>${recent.map(c=>`<tr><td>${c.clients?.nom||'—'}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aucune commande</div>';
-  const av=(commandes||[]).filter(c=>c.progression>0&&c.statut!=='Livré').slice(0,5);
-  document.getElementById('dash-atelier').innerHTML=av.length?av.map(c=>`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="font-weight:500">${c.description||'—'}</span><span style="color:var(--muted)">${c.progression||0}%</span></div><div class="progress-bar"><div class="progress-fill" style="width:${c.progression||0}%"></div></div></div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
+  const av=(commandes||[]).filter(c=>c.atelier_statut==='En cours').slice(0,5);
+  const colorsAv={'A lancer':'#378ADD','En cours':'#EF9F27','Terminé':'#5DCAA5'};
+  document.getElementById('dash-atelier').innerHTML=av.length?av.map(c=>`<div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:13px;font-weight:500">${c.description||'—'}</div>
+      <div style="font-size:11px;color:var(--muted)">${c.clients?.nom||'—'}</div>
+    </div>
+    <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FDF0E3;color:#8A4000;font-weight:500">En cours</span>
+  </div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
 }
 
 // ─── CLIENTS ──────────────────────────────────────────────────────────────────
