@@ -119,13 +119,33 @@
   .add-section-btn:hover{border-color:var(--text);color:var(--text);background:var(--bg)}
 
   /* KANBAN */
-  .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .kanban-col{background:var(--bg);border-radius:var(--radius-lg);padding:14px}
+  .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;height:calc(100vh - 120px)}
+  .kanban-col{background:var(--bg);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;overflow:hidden}
+  .kanban-col-body{flex:1;overflow-y:auto;min-height:60px;border-radius:var(--radius);transition:background 0.15s;padding:2px}
+  .kanban-col-body.drag-over{background:rgba(26,26,24,0.06);border:2px dashed var(--border)}
   .kanban-header{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:12px;font-family:'DM Mono',monospace;display:flex;align-items:center;justify-content:space-between}
   .kanban-count{background:var(--border);color:var(--muted);padding:2px 7px;border-radius:20px;font-size:10px}
-  .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px}
-  .kanban-card-title{font-size:13px;font-weight:500;margin-bottom:4px}
+  .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:8px;cursor:grab;transition:all 0.15s;user-select:none;overflow:hidden}
+  .kanban-card:hover{border-color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+  .kanban-card.dragging{opacity:0.35;cursor:grabbing;transform:rotate(1deg)}
+  .kanban-card-img{width:100%;height:90px;object-fit:cover;display:block}
+  .kanban-card-body{padding:10px 12px}
+  .kanban-card-title{font-size:13px;font-weight:500;margin-bottom:3px}
   .kanban-card-sub{font-size:11px;color:var(--muted)}
+  .kanban-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+  /* TICKET MODAL */
+  .ticket-modal{max-width:700px}
+  .ticket-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  .ticket-photo{position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)}
+  .ticket-photo img{width:100%;height:100%;object-fit:cover}
+  .ticket-photo-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
+  .ticket-upload{border:2px dashed var(--border);border-radius:var(--radius);cursor:pointer;font-size:12px;color:var(--muted);transition:all 0.15s;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+  .ticket-upload:hover{border-color:var(--text);color:var(--text);background:var(--bg)}
+  .comments-list{max-height:180px;overflow-y:auto;margin-bottom:10px}
+  .comment{padding:9px 12px;background:var(--bg);border-radius:var(--radius);margin-bottom:6px}
+  .comment-meta{font-size:10px;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between}
+  .comment-text{font-size:13px}
+  .comment-input{display:flex;gap:8px}
 
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .section-title{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
@@ -212,7 +232,53 @@
       <!-- COMMANDES -->
       <div id="page-commandes" class="hidden"><div class="table-wrap" id="commandes-table"><div class="loading">Chargement…</div></div></div>
       <!-- ATELIER -->
-      <div id="page-atelier" class="hidden"><div class="kanban" id="atelier-kanban"></div></div>
+      <div id="page-atelier" class="hidden">
+        <div class="kanban" id="atelier-kanban"></div>
+      </div>
+      <!-- TICKET DETAIL -->
+      <div id="page-ticket" class="hidden">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <button class="btn btn-sm" onclick="showPage('atelier',document.querySelector('.nav-item:nth-child(4)'))">← Atelier</button>
+          <span id="ticket-ref" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:20px">
+          <div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
+              <div class="form-group"><label>Description</label><textarea id="ticket-desc" rows="3"></textarea></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-group"><label>Client</label><div id="ticket-client" style="padding:9px 12px;background:var(--bg);border-radius:var(--radius);font-size:13px"></div></div>
+                <div class="form-group"><label>Montant</label><div id="ticket-montant" style="padding:9px 12px;background:var(--bg);border-radius:var(--radius);font-size:13px;font-family:'DM Mono',monospace"></div></div>
+              </div>
+              <div class="form-group"><label>Statut atelier</label>
+                <select id="ticket-statut">
+                  <option value="A lancer">À lancer</option>
+                  <option value="En cours">En cours</option>
+                  <option value="Terminé">Terminé</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="saveTicket()">Enregistrer</button>
+            </div>
+            <!-- COMMENTAIRES -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+              <div class="section-title" style="margin-bottom:12px">Commentaires</div>
+              <div class="comments-list" id="ticket-comments"></div>
+              <div class="comment-input">
+                <input type="text" id="comment-input" placeholder="Ajouter un commentaire…" style="flex:1">
+                <button class="btn btn-primary btn-sm" onclick="addComment()">Envoyer</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <!-- PHOTOS -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+              <div class="section-title" style="margin-bottom:12px">Photos</div>
+              <div class="ticket-photos" id="ticket-photos-grid"></div>
+              <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="uploadPhotos(this)">
+              <button class="btn btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="document.getElementById('photo-input').click()">+ Ajouter des photos</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- DEVIS LIST -->
       <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
       <!-- DEVIS BUILDER -->
@@ -330,7 +396,7 @@ function showPage(page,el){
   document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis'}[page];
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
-  btnNew.style.display=(page==='devis-builder')?'none':'flex';
+  btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
   loadPage(page);
 }
 function loadPage(p){
@@ -432,12 +498,147 @@ async function saveCommande(){
 async function deleteCommande(id){if(!confirm('Supprimer ?'))return;await sb.from('commandes').delete().eq('id',id);toast('Supprimée');loadPage(currentPage);}
 
 // ─── ATELIER ──────────────────────────────────────────────────────────────────
+let currentTicketId = null;
+
 async function loadAtelier(){
-  const{data}=await sb.from('commandes').select('*,clients(nom)').not('statut','eq','Livré').order('created_at',{ascending:false});
-  const groups={'En fabrication':[],'Finition':[],'En attente':[]};
-  (data||[]).forEach(c=>{if(c.statut==='En fabrication')groups['En fabrication'].push(c);else if(c.statut==='Finition')groups['Finition'].push(c);else groups['En attente'].push(c);});
-  const colors={'En fabrication':'#EF9F27','Finition':'#5DCAA5','En attente':'#378ADD'};
-  document.getElementById('atelier-kanban').innerHTML=Object.entries(groups).map(([col,items])=>`<div class="kanban-col" style="border-top:3px solid ${colors[col]}"><div class="kanban-header">${col} <span class="kanban-count">${items.length}</span></div>${items.length?items.map(c=>`<div class="kanban-card"><div class="kanban-card-title">${c.description||'—'}</div><div class="kanban-card-sub">${c.clients?.nom||'—'}</div>${c.progression>0?`<div class="progress-bar"><div class="progress-fill" style="width:${c.progression}%"></div></div><div style="font-size:10px;color:var(--muted);margin-top:4px">${c.progression}%</div>`:''}</div>`).join(''):'<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucun projet</div>'}</div>`).join('');
+  const{data}=await sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false});
+  const cols=[
+    {key:'A lancer',label:'À LANCER',color:'#378ADD'},
+    {key:'En cours',label:'EN COURS',color:'#EF9F27'},
+    {key:'Terminé',label:'TERMINÉ',color:'#5DCAA5'}
+  ];
+  const groups={'A lancer':[],'En cours':[],'Terminé':[]};
+  (data||[]).forEach(c=>{
+    const s=c.atelier_statut||'A lancer';
+    if(groups[s])groups[s].push(c); else groups['A lancer'].push(c);
+  });
+  const kanban=document.getElementById('atelier-kanban');
+  kanban.innerHTML=cols.map(col=>`
+    <div class="kanban-col" style="border-top:3px solid ${col.color}">
+      <div class="kanban-header">${col.label} <span class="kanban-count">${groups[col.key].length}</span></div>
+      <div class="kanban-col-body" data-col="${col.key}"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="dropCard(event,'${col.key}')">
+        ${groups[col.key].length?groups[col.key].map(c=>renderCard(c)).join(''):'<div style="font-size:12px;color:var(--muted);padding:12px 4px;text-align:center">Aucun projet</div>'}
+      </div>
+    </div>`).join('');
+}
+
+function renderCard(c){
+  const firstPhoto=(c.photos&&c.photos.length)?c.photos[0]:null;
+  return`<div class="kanban-card" draggable="true" data-id="${c.id}"
+    ondragstart="dragStart(event,'${c.id}')"
+    ondragend="dragEnd(event)"
+    onclick="openTicket('${c.id}')">
+    ${firstPhoto?`<img class="kanban-card-img" src="${firstPhoto}" alt="">`:''}
+    <div class="kanban-card-body">
+      <div class="kanban-card-title">${c.description||'—'}</div>
+      <div class="kanban-card-sub">${c.clients?.nom||'—'}</div>
+      ${c.montant?`<div class="kanban-card-footer"><span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)">${Number(c.montant).toLocaleString('fr-FR')} MAD</span></div>`:''}
+    </div>
+  </div>`;
+}
+
+// Drag & Drop
+let dragId=null;
+function dragStart(e,id){dragId=id;setTimeout(()=>e.target.classList.add('dragging'),0)}
+function dragEnd(e){e.target.classList.remove('dragging');document.querySelectorAll('.kanban-col-body').forEach(c=>c.classList.remove('drag-over'))}
+async function dropCard(e,col){
+  e.preventDefault();
+  document.querySelectorAll('.kanban-col-body').forEach(c=>c.classList.remove('drag-over'));
+  if(!dragId)return;
+  await sb.from('commandes').update({atelier_statut:col}).eq('id',dragId);
+  dragId=null;
+  loadAtelier();
+}
+
+// Ticket detail
+async function openTicket(id){
+  currentTicketId=id;
+  const{data:c}=await sb.from('commandes').select('*,clients(nom)').eq('id',id).single();
+  document.getElementById('ticket-ref').textContent=c.reference||'—';
+  document.getElementById('ticket-desc').value=c.description||'';
+  document.getElementById('ticket-client').textContent=c.clients?.nom||'—';
+  document.getElementById('ticket-montant').textContent=c.montant?Number(c.montant).toLocaleString('fr-FR')+' MAD':'—';
+  document.getElementById('ticket-statut').value=c.atelier_statut||'A lancer';
+  // Photos
+  renderPhotos(c.photos||[]);
+  // Comments
+  renderComments(c.commentaires||[]);
+  showPage('ticket',null);
+  document.getElementById('page-title').textContent='Détail commande';
+}
+
+function renderPhotos(photos){
+  const grid=document.getElementById('ticket-photos-grid');
+  grid.innerHTML=photos.map((url,i)=>`
+    <div class="ticket-photo">
+      <img src="${url}" alt="">
+      <button class="ticket-photo-del" onclick="deletePhoto(${i})">✕</button>
+    </div>`).join('')+`<div class="ticket-upload" onclick="document.getElementById('photo-input').click()">
+    <span style="font-size:20px">+</span><span>Photo</span></div>`;
+}
+
+async function uploadPhotos(input){
+  const files=Array.from(input.files);
+  if(!files.length)return;
+  toast('Upload en cours…');
+  const{data:c}=await sb.from('commandes').select('photos').eq('id',currentTicketId).single();
+  const photos=[...(c.photos||[])];
+  for(const file of files){
+    const ext=file.name.split('.').pop();
+    const path=`${currentTicketId}/${Date.now()}.${ext}`;
+    const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+    if(!error){
+      const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+      photos.push(publicUrl);
+    }
+  }
+  await sb.from('commandes').update({photos}).eq('id',currentTicketId);
+  renderPhotos(photos);
+  input.value='';
+  toast('Photos ajoutées ✓');
+}
+
+async function deletePhoto(idx){
+  if(!confirm('Supprimer cette photo ?'))return;
+  const{data:c}=await sb.from('commandes').select('photos').eq('id',currentTicketId).single();
+  const photos=[...(c.photos||[])];
+  photos.splice(idx,1);
+  await sb.from('commandes').update({photos}).eq('id',currentTicketId);
+  renderPhotos(photos);
+  toast('Photo supprimée');
+}
+
+function renderComments(comments){
+  const list=document.getElementById('ticket-comments');
+  if(!comments.length){list.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:12px">Aucun commentaire</div>';return}
+  list.innerHTML=comments.map(cm=>`<div class="comment">
+    <div class="comment-meta"><span>${cm.auteur||'Équipe'}</span><span>${cm.date||''}</span></div>
+    <div class="comment-text">${cm.texte}</div>
+  </div>`).join('');
+  list.scrollTop=list.scrollHeight;
+}
+
+async function addComment(){
+  const input=document.getElementById('comment-input');
+  const texte=input.value.trim();
+  if(!texte)return;
+  const{data:c}=await sb.from('commandes').select('commentaires').eq('id',currentTicketId).single();
+  const comments=[...(c.commentaires||[])];
+  const email=document.getElementById('user-email').textContent;
+  comments.push({texte,auteur:email.split('@')[0],date:new Date().toLocaleDateString('fr-FR')});
+  await sb.from('commandes').update({commentaires:comments}).eq('id',currentTicketId);
+  renderComments(comments);
+  input.value='';
+}
+
+async function saveTicket(){
+  const desc=document.getElementById('ticket-desc').value;
+  const statut=document.getElementById('ticket-statut').value;
+  await sb.from('commandes').update({description:desc,atelier_statut:statut}).eq('id',currentTicketId);
+  toast('Enregistré ✓');
 }
 
 // ─── DEVIS LIST ───────────────────────────────────────────────────────────────
