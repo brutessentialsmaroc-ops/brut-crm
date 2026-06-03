@@ -7,66 +7,54 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
-
   *{box-sizing:border-box;margin:0;padding:0}
   :root{
-    --bg:#f8f6f1;
-    --surface:#ffffff;
-    --border:#e8e4dc;
-    --text:#1a1a18;
-    --muted:#8a8880;
-    --accent:#1a1a18;
-    --green:#2d7a4f;
-    --green-bg:#edf7f1;
-    --amber:#8a5f00;
-    --amber-bg:#fdf6e3;
-    --blue:#1a4f8a;
-    --blue-bg:#eaf1fb;
-    --red:#8a2020;
-    --red-bg:#fceaea;
-    --gray:#5a5a58;
-    --gray-bg:#f1efea;
-    --radius:8px;
-    --radius-lg:12px;
+    --bg:#f8f6f1;--surface:#ffffff;--border:#e8e4dc;--text:#1a1a18;--muted:#8a8880;
+    --green:#2d7a4f;--green-bg:#edf7f1;--amber:#8a5f00;--amber-bg:#fdf6e3;
+    --blue:#1a4f8a;--blue-bg:#eaf1fb;--red:#8a2020;--red-bg:#fceaea;
+    --gray:#5a5a58;--gray-bg:#f1efea;--radius:8px;--radius-lg:12px;
   }
   body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
-  .app{display:flex;height:100vh;overflow:hidden}
 
-  /* SIDEBAR */
+  /* LOGIN */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:40px;width:100%;max-width:380px}
+  .login-logo{font-size:24px;font-weight:500;letter-spacing:2px;margin-bottom:6px}
+  .login-sub{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:32px}
+  .login-title{font-size:16px;font-weight:500;margin-bottom:20px}
+  .form-group{margin-bottom:16px}
+  label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;font-family:'DM Mono',monospace}
+  input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);transition:border 0.15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--text)}
+  .btn{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:13px;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;transition:all 0.15s;width:100%;justify-content:center}
+  .btn:hover{background:var(--bg)}
+  .btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+  .btn-primary:hover{opacity:0.85}
+  .btn-sm{padding:5px 10px;font-size:12px;width:auto}
+  .btn-danger{background:var(--red-bg);color:var(--red);border-color:transparent}
+  .login-error{background:var(--red-bg);color:var(--red);padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:16px;display:none}
+
+  /* APP */
+  .app{display:flex;height:100vh;overflow:hidden}
   .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
   .logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
-  .logo-name{font-size:20px;font-weight:500;letter-spacing:2px;color:var(--text)}
-  .logo-sub{font-size:11px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace;letter-spacing:0.5px}
+  .logo-name{font-size:20px;font-weight:500;letter-spacing:2px}
+  .logo-sub{font-size:11px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace}
   nav{padding:16px 12px;flex:1}
   .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);cursor:pointer;font-size:13px;color:var(--muted);margin-bottom:2px;transition:all 0.15s;border:none;background:none;width:100%;text-align:left}
   .nav-item:hover{background:var(--bg);color:var(--text)}
   .nav-item.active{background:var(--text);color:#fff}
-  .nav-icon{font-size:16px;width:20px;text-align:center}
-  .sidebar-footer{padding:16px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
-
-  /* MAIN */
+  .sidebar-footer{padding:16px 20px;border-top:1px solid var(--border)}
+  .user-email{font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
   .topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);flex-shrink:0}
   .topbar-title{font-size:15px;font-weight:500}
-  .topbar-actions{display:flex;gap:8px;align-items:center}
   .content{flex:1;overflow-y:auto;padding:24px}
-
-  /* BUTTONS */
-  .btn{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:13px;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;transition:all 0.15s}
-  .btn:hover{background:var(--bg)}
-  .btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
-  .btn-primary:hover{opacity:0.85}
-  .btn-sm{padding:5px 10px;font-size:12px}
-  .btn-danger{background:var(--red-bg);color:var(--red);border-color:transparent}
-
-  /* STATS */
   .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
   .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
   .stat-label{font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
   .stat-value{font-size:24px;font-weight:500}
   .stat-sub{font-size:11px;color:var(--muted);margin-top:4px}
-
-  /* TABLES */
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
   table{width:100%;border-collapse:collapse}
   th{padding:11px 16px;text-align:left;background:var(--bg);font-weight:500;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
@@ -75,36 +63,23 @@
   tbody tr:hover{background:var(--bg)}
   td .actions{display:flex;gap:6px;opacity:0;transition:opacity 0.15s}
   tbody tr:hover td .actions{opacity:1}
-
-  /* BADGES */
   .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
   .badge-green{background:var(--green-bg);color:var(--green)}
   .badge-amber{background:var(--amber-bg);color:var(--amber)}
   .badge-blue{background:var(--blue-bg);color:var(--blue)}
   .badge-gray{background:var(--gray-bg);color:var(--gray)}
   .badge-red{background:var(--red-bg);color:var(--red)}
-
-  /* AVATAR */
   .avatar{width:32px;height:32px;border-radius:50%;background:var(--blue-bg);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--blue);flex-shrink:0;font-family:'DM Mono',monospace}
   .client-cell{display:flex;align-items:center;gap:10px}
-
-  /* PROGRESS */
   .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:6px;min-width:80px}
-  .progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width 0.3s}
-
-  /* MODAL */
+  .progress-fill{height:100%;background:var(--green);border-radius:2px}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
   .modal{background:var(--surface);border-radius:var(--radius-lg);padding:28px;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;border:1px solid var(--border)}
   .modal-title{font-size:16px;font-weight:500;margin-bottom:20px}
-  .form-group{margin-bottom:16px}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;font-family:'DM Mono',monospace}
-  input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);transition:border 0.15s}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--text)}
-  textarea{resize:vertical;min-height:80px}
   .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+  .modal-footer .btn{width:auto}
+  textarea{resize:vertical;min-height:80px}
   .hidden{display:none!important}
-
-  /* KANBAN */
   .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .kanban-col{background:var(--bg);border-radius:var(--radius-lg);padding:14px}
   .kanban-header{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:12px;font-family:'DM Mono',monospace;display:flex;align-items:center;justify-content:space-between}
@@ -112,21 +87,31 @@
   .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px}
   .kanban-card-title{font-size:13px;font-weight:500;margin-bottom:4px}
   .kanban-card-sub{font-size:11px;color:var(--muted)}
-
-  /* TWO COL */
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .section-title{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace}
-
-  /* TOAST */
   .toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:var(--radius);font-size:13px;z-index:200;opacity:0;transform:translateY(8px);transition:all 0.25s;pointer-events:none}
   .toast.show{opacity:1;transform:translateY(0)}
-
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
   .loading{padding:40px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
 
+<!-- LOGIN PAGE -->
+<div id="login-page" class="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">BRUT</div>
+    <div class="login-sub">CRM · Fabrication</div>
+    <div class="login-title">Connexion</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="votre@email.com"></div>
+    <div class="form-group"><label>Mot de passe</label><input type="password" id="login-password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" onclick="login()" id="login-btn">Se connecter</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-page" class="hidden">
 <div class="app">
   <div class="sidebar">
     <div class="logo">
@@ -134,36 +119,24 @@
       <div class="logo-sub">CRM · Fabrication</div>
     </div>
     <nav>
-      <button class="nav-item active" onclick="showPage('dashboard',this)">
-        <span class="nav-icon">⊞</span> Tableau de bord
-      </button>
-      <button class="nav-item" onclick="showPage('clients',this)">
-        <span class="nav-icon">◎</span> Clients
-      </button>
-      <button class="nav-item" onclick="showPage('commandes',this)">
-        <span class="nav-icon">◫</span> Commandes
-      </button>
-      <button class="nav-item" onclick="showPage('atelier',this)">
-        <span class="nav-icon">⚙</span> Atelier
-      </button>
-      <button class="nav-item" onclick="showPage('devis',this)">
-        <span class="nav-icon">◧</span> Devis
-      </button>
+      <button class="nav-item active" onclick="showPage('dashboard',this)">⊞ Tableau de bord</button>
+      <button class="nav-item" onclick="showPage('clients',this)">◎ Clients</button>
+      <button class="nav-item" onclick="showPage('commandes',this)">◫ Commandes</button>
+      <button class="nav-item" onclick="showPage('atelier',this)">⚙ Atelier</button>
+      <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
     </nav>
-    <div class="sidebar-footer">BRUT Essentiels Maroc</div>
+    <div class="sidebar-footer">
+      <div class="user-email" id="user-email"></div>
+      <button class="btn btn-sm" onclick="logout()">Déconnexion</button>
+    </div>
   </div>
 
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="page-title">Tableau de bord</div>
-      <div class="topbar-actions">
-        <button class="btn btn-primary" id="btn-new" onclick="openNew()">+ Nouveau</button>
-      </div>
+      <button class="btn btn-primary" onclick="openNew()">+ Nouveau</button>
     </div>
-
     <div class="content">
-
-      <!-- DASHBOARD -->
       <div id="page-dashboard">
         <div class="stats-grid">
           <div class="stat"><div class="stat-label">Clients</div><div class="stat-value" id="stat-clients">—</div><div class="stat-sub">actifs</div></div>
@@ -172,39 +145,17 @@
           <div class="stat"><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">—</div><div class="stat-sub">en attente</div></div>
         </div>
         <div class="two-col">
-          <div>
-            <div class="section-title">Dernières commandes</div>
-            <div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div>
-          </div>
-          <div>
-            <div class="section-title">Avancement atelier</div>
-            <div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div>
-          </div>
+          <div><div class="section-title">Dernières commandes</div><div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div></div>
+          <div><div class="section-title">Avancement atelier</div><div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div></div>
         </div>
       </div>
-
-      <!-- CLIENTS -->
-      <div id="page-clients" class="hidden">
-        <div class="table-wrap" id="clients-table"><div class="loading">Chargement…</div></div>
-      </div>
-
-      <!-- COMMANDES -->
-      <div id="page-commandes" class="hidden">
-        <div class="table-wrap" id="commandes-table"><div class="loading">Chargement…</div></div>
-      </div>
-
-      <!-- ATELIER -->
-      <div id="page-atelier" class="hidden">
-        <div class="kanban" id="atelier-kanban"><div class="loading">Chargement…</div></div>
-      </div>
-
-      <!-- DEVIS -->
-      <div id="page-devis" class="hidden">
-        <div class="table-wrap" id="devis-table"><div class="loading">Chargement…</div></div>
-      </div>
-
+      <div id="page-clients" class="hidden"><div class="table-wrap" id="clients-table"><div class="loading">Chargement…</div></div></div>
+      <div id="page-commandes" class="hidden"><div class="table-wrap" id="commandes-table"><div class="loading">Chargement…</div></div></div>
+      <div id="page-atelier" class="hidden"><div class="kanban" id="atelier-kanban"><div class="loading">Chargement…</div></div></div>
+      <div id="page-devis" class="hidden"><div class="table-wrap" id="devis-table"><div class="loading">Chargement…</div></div></div>
     </div>
   </div>
+</div>
 </div>
 
 <!-- MODAL CLIENT -->
@@ -213,19 +164,12 @@
     <div class="modal-title" id="modal-client-title">Nouveau client</div>
     <input type="hidden" id="client-id">
     <div class="form-group"><label>Nom *</label><input type="text" id="client-nom" placeholder="Hôtel Atlas…"></div>
-    <div class="form-group"><label>Type</label>
-      <select id="client-type">
-        <option>Particulier</option><option>Hôtellerie</option><option>Commerce</option><option>Architecte</option><option>Promoteur</option>
-      </select>
-    </div>
+    <div class="form-group"><label>Type</label><select id="client-type"><option>Particulier</option><option>Hôtellerie</option><option>Commerce</option><option>Architecte</option><option>Promoteur</option></select></div>
     <div class="form-group"><label>Email</label><input type="email" id="client-email" placeholder="contact@…"></div>
     <div class="form-group"><label>Téléphone</label><input type="tel" id="client-tel" placeholder="+212 6…"></div>
     <div class="form-group"><label>Ville</label><input type="text" id="client-ville" placeholder="Marrakech"></div>
-    <div class="form-group"><label>Notes</label><textarea id="client-notes" placeholder="Informations utiles…"></textarea></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-client')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveClient()">Enregistrer</button>
-    </div>
+    <div class="form-group"><label>Notes</label><textarea id="client-notes"></textarea></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-client')">Annuler</button><button class="btn btn-primary" onclick="saveClient()">Enregistrer</button></div>
   </div>
 </div>
 
@@ -235,20 +179,13 @@
     <div class="modal-title" id="modal-commande-title">Nouvelle commande</div>
     <input type="hidden" id="commande-id">
     <div class="form-group"><label>Client *</label><select id="commande-client"></select></div>
-    <div class="form-group"><label>Description *</label><input type="text" id="commande-desc" placeholder="Mobilier chambre…"></div>
-    <div class="form-group"><label>Montant (MAD)</label><input type="number" id="commande-montant" placeholder="0"></div>
+    <div class="form-group"><label>Description *</label><input type="text" id="commande-desc"></div>
+    <div class="form-group"><label>Montant (MAD)</label><input type="number" id="commande-montant"></div>
     <div class="form-group"><label>Date de livraison</label><input type="date" id="commande-livraison"></div>
-    <div class="form-group"><label>Statut</label>
-      <select id="commande-statut">
-        <option>En attente</option><option>Devis accepté</option><option>En fabrication</option><option>Finition</option><option>Livré</option>
-      </select>
-    </div>
-    <div class="form-group"><label>Progression (%)</label><input type="number" id="commande-progression" min="0" max="100" placeholder="0"></div>
+    <div class="form-group"><label>Statut</label><select id="commande-statut"><option>En attente</option><option>Devis accepté</option><option>En fabrication</option><option>Finition</option><option>Livré</option></select></div>
+    <div class="form-group"><label>Progression (%)</label><input type="number" id="commande-progression" min="0" max="100"></div>
     <div class="form-group"><label>Notes</label><textarea id="commande-notes"></textarea></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-commande')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveCommande()">Enregistrer</button>
-    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-commande')">Annuler</button><button class="btn btn-primary" onclick="saveCommande()">Enregistrer</button></div>
   </div>
 </div>
 
@@ -258,19 +195,12 @@
     <div class="modal-title" id="modal-devis-title">Nouveau devis</div>
     <input type="hidden" id="devis-id">
     <div class="form-group"><label>Client *</label><select id="devis-client"></select></div>
-    <div class="form-group"><label>Objet *</label><input type="text" id="devis-objet" placeholder="Mobilier salon…"></div>
-    <div class="form-group"><label>Montant HT (MAD)</label><input type="number" id="devis-montant" placeholder="0"></div>
+    <div class="form-group"><label>Objet *</label><input type="text" id="devis-objet"></div>
+    <div class="form-group"><label>Montant HT (MAD)</label><input type="number" id="devis-montant"></div>
     <div class="form-group"><label>Date d'envoi</label><input type="date" id="devis-date"></div>
-    <div class="form-group"><label>Statut</label>
-      <select id="devis-statut">
-        <option>En attente</option><option>Accepté</option><option>Refusé</option>
-      </select>
-    </div>
+    <div class="form-group"><label>Statut</label><select id="devis-statut"><option>En attente</option><option>Accepté</option><option>Refusé</option></select></div>
     <div class="form-group"><label>Notes</label><textarea id="devis-notes"></textarea></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-devis')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveDevis()">Enregistrer</button>
-    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-devis')">Annuler</button><button class="btn btn-primary" onclick="saveDevis()">Enregistrer</button></div>
   </div>
 </div>
 
@@ -280,313 +210,216 @@
 const SUPABASE_URL = 'https://ejftmtecehyqlaspoxfh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EsfhC7RsteRwLEQoIYqPxQ_vb3Jx10r';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 let currentPage = 'dashboard';
-let allClients = [];
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) showApp(session.user.email);
+  else showLogin();
+}
+
+function showApp(email) {
+  document.getElementById('login-page').classList.add('hidden');
+  document.getElementById('app-page').classList.remove('hidden');
+  document.getElementById('user-email').textContent = email;
+  loadDashboard();
+}
+
+function showLogin() {
+  document.getElementById('login-page').classList.remove('hidden');
+  document.getElementById('app-page').classList.add('hidden');
+}
+
+async function login() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  err.style.display = 'none';
+  btn.textContent = 'Connexion…';
+  btn.disabled = true;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    err.textContent = 'Email ou mot de passe incorrect.';
+    err.style.display = 'block';
+    btn.textContent = 'Se connecter';
+    btn.disabled = false;
+  } else {
+    showApp(data.user.email);
+  }
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  showLogin();
+}
+
+// Enter key on login
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('login-page').classList.contains('hidden')) login();
+});
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function showPage(page, el) {
-  document.querySelectorAll('.main .content > div').forEach(d => d.classList.add('hidden'));
+  document.querySelectorAll('.content > div').forEach(d => d.classList.add('hidden'));
   document.getElementById('page-' + page).classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('page-title').textContent = {
-    dashboard:'Tableau de bord', clients:'Clients',
-    commandes:'Commandes', atelier:'Atelier', devis:'Devis'
-  }[page];
+  document.getElementById('page-title').textContent = {dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis'}[page];
   currentPage = page;
   loadPage(page);
 }
-
 function loadPage(page) {
-  if (page === 'dashboard') loadDashboard();
-  else if (page === 'clients') loadClients();
-  else if (page === 'commandes') loadCommandes();
-  else if (page === 'atelier') loadAtelier();
-  else if (page === 'devis') loadDevis();
+  if (page==='dashboard') loadDashboard();
+  else if (page==='clients') loadClients();
+  else if (page==='commandes') loadCommandes();
+  else if (page==='atelier') loadAtelier();
+  else if (page==='devis') loadDevis();
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-function initials(nom) {
-  return nom.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-}
-function badgeClass(statut) {
-  const s = (statut||'').toLowerCase();
-  if (s.includes('livré') || s.includes('accepté')) return 'badge-green';
-  if (s.includes('fabrication') || s.includes('finition')) return 'badge-amber';
-  if (s.includes('devis') || s.includes('démarrage')) return 'badge-blue';
-  if (s.includes('retard') || s.includes('refusé')) return 'badge-red';
-  return 'badge-gray';
-}
-function fmt(n) { return Number(n||0).toLocaleString('fr-FR') + ' MAD'; }
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2500);
-}
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function initials(nom){return nom.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+function badgeClass(s){s=(s||'').toLowerCase();if(s.includes('livré')||s.includes('accepté'))return 'badge-green';if(s.includes('fabrication')||s.includes('finition'))return 'badge-amber';if(s.includes('devis')||s.includes('démarrage'))return 'badge-blue';if(s.includes('retard')||s.includes('refusé'))return 'badge-red';return 'badge-gray'}
+function fmt(n){return Number(n||0).toLocaleString('fr-FR')+' MAD'}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function closeModal(id){document.getElementById(id).classList.add('hidden')}
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-async function loadDashboard() {
-  const [{ data: clients }, { data: commandes }, { data: devis }] = await Promise.all([
+async function loadDashboard(){
+  const [{data:clients},{data:commandes},{data:devis}]=await Promise.all([
     sb.from('clients').select('*'),
-    sb.from('commandes').select('*, clients(nom)').order('created_at', {ascending:false}),
+    sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente')
   ]);
-  document.getElementById('stat-clients').textContent = (clients||[]).length;
-  const enCours = (commandes||[]).filter(c=>!['Livré'].includes(c.statut));
-  document.getElementById('stat-commandes').textContent = enCours.length;
-  const ca = (commandes||[]).reduce((s,c)=>s+Number(c.montant||0),0);
-  document.getElementById('stat-ca').textContent = ca.toLocaleString('fr-FR') + ' MAD';
-  document.getElementById('stat-devis').textContent = (devis||[]).length;
-
-  const recent = (commandes||[]).slice(0,5);
-  document.getElementById('dash-commandes').innerHTML = recent.length ? `
-    <table><thead><tr><th>Client</th><th>Description</th><th>Statut</th></tr></thead><tbody>
-    ${recent.map(c=>`<tr>
-      <td>${c.clients?.nom||'—'}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td>
-      <td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td>
-    </tr>`).join('')}
-    </tbody></table>` : '<div class="empty">Aucune commande</div>';
-
-  const avancement = (commandes||[]).filter(c=>c.progression>0 && c.statut !== 'Livré').slice(0,5);
-  document.getElementById('dash-atelier').innerHTML = avancement.length ? avancement.map(c=>`
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-        <span style="font-weight:500">${c.description||'—'}</span>
-        <span style="color:var(--muted)">${c.progression||0}%</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${c.progression||0}%"></div></div>
-    </div>`).join('') : '<div class="empty">Aucun projet en cours</div>';
+  document.getElementById('stat-clients').textContent=(clients||[]).length;
+  document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
+  document.getElementById('stat-ca').textContent=((commandes||[]).reduce((s,c)=>s+Number(c.montant||0),0)).toLocaleString('fr-FR')+' MAD';
+  document.getElementById('stat-devis').textContent=(devis||[]).length;
+  const recent=(commandes||[]).slice(0,5);
+  document.getElementById('dash-commandes').innerHTML=recent.length?`<table><thead><tr><th>Client</th><th>Description</th><th>Statut</th></tr></thead><tbody>${recent.map(c=>`<tr><td>${c.clients?.nom||'—'}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aucune commande</div>';
+  const av=(commandes||[]).filter(c=>c.progression>0&&c.statut!=='Livré').slice(0,5);
+  document.getElementById('dash-atelier').innerHTML=av.length?av.map(c=>`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="font-weight:500">${c.description||'—'}</span><span style="color:var(--muted)">${c.progression||0}%</span></div><div class="progress-bar"><div class="progress-fill" style="width:${c.progression||0}%"></div></div></div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
 }
 
 // ─── CLIENTS ──────────────────────────────────────────────────────────────────
-async function loadClients() {
-  const { data } = await sb.from('clients').select('*, commandes(id, montant)').order('created_at',{ascending:false});
-  allClients = data||[];
-  const el = document.getElementById('clients-table');
-  if (!allClients.length) { el.innerHTML='<div class="empty">Aucun client. Créez-en un !</div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Client</th><th>Type</th><th>Contact</th><th>Commandes</th><th>CA total</th><th></th></tr></thead><tbody>
-  ${allClients.map(c=>{
-    const ca = (c.commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);
-    return `<tr>
-      <td><div class="client-cell"><div class="avatar">${initials(c.nom)}</div><span style="font-weight:500">${c.nom}</span></div></td>
-      <td><span class="badge badge-gray">${c.type||'—'}</span></td>
-      <td style="color:var(--muted)">${c.email||c.telephone||'—'}</td>
-      <td>${(c.commandes||[]).length}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(ca)}</td>
-      <td><div class="actions">
-        <button class="btn btn-sm" onclick="editClient('${c.id}')">Modifier</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Suppr.</button>
-      </div></td>
-    </tr>`;
-  }).join('')}
-  </tbody></table>`;
+async function loadClients(){
+  const{data}=await sb.from('clients').select('*,commandes(id,montant)').order('created_at',{ascending:false});
+  const el=document.getElementById('clients-table');
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun client. Créez-en un !</div>';return}
+  el.innerHTML=`<table><thead><tr><th>Client</th><th>Type</th><th>Contact</th><th>Commandes</th><th>CA total</th><th></th></tr></thead><tbody>${(data||[]).map(c=>{const ca=(c.commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);return`<tr><td><div class="client-cell"><div class="avatar">${initials(c.nom)}</div><span style="font-weight:500">${c.nom}</span></div></td><td><span class="badge badge-gray">${c.type||'—'}</span></td><td style="color:var(--muted)">${c.email||c.telephone||'—'}</td><td>${(c.commandes||[]).length}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(ca)}</td><td><div class="actions"><button class="btn btn-sm" onclick="editClient('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Suppr.</button></div></td></tr>`}).join('')}</tbody></table>`;
 }
+async function editClient(id){const{data}=await sb.from('clients').select('*').eq('id',id).single();openClientModal(data||{})}
+function openClientModal(data={}){
+  document.getElementById('modal-client-title').textContent=data.id?'Modifier client':'Nouveau client';
+  document.getElementById('client-id').value=data.id||'';
+  document.getElementById('client-nom').value=data.nom||'';
+  document.getElementById('client-type').value=data.type||'Particulier';
+  document.getElementById('client-email').value=data.email||'';
+  document.getElementById('client-tel').value=data.telephone||'';
+  document.getElementById('client-ville').value=data.ville||'';
+  document.getElementById('client-notes').value=data.notes||'';
+  document.getElementById('modal-client').classList.remove('hidden');
+}
+async function saveClient(){
+  const id=document.getElementById('client-id').value;
+  const nom=document.getElementById('client-nom').value.trim();
+  if(!nom){toast('Le nom est requis');return}
+  const payload={nom,type:document.getElementById('client-type').value,email:document.getElementById('client-email').value,telephone:document.getElementById('client-tel').value,ville:document.getElementById('client-ville').value,notes:document.getElementById('client-notes').value};
+  if(id)await sb.from('clients').update(payload).eq('id',id);
+  else await sb.from('clients').insert(payload);
+  closeModal('modal-client');toast('Client enregistré ✓');loadClients();
+}
+async function deleteClient(id){if(!confirm('Supprimer ce client ?'))return;await sb.from('clients').delete().eq('id',id);toast('Supprimé');loadClients()}
 
 // ─── COMMANDES ────────────────────────────────────────────────────────────────
-async function loadCommandes() {
-  const { data } = await sb.from('commandes').select('*, clients(nom)').order('created_at',{ascending:false});
-  const el = document.getElementById('commandes-table');
-  if (!(data||[]).length) { el.innerHTML='<div class="empty">Aucune commande.</div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Réf.</th><th>Client</th><th>Description</th><th>Montant</th><th>Livraison</th><th>Statut</th><th></th></tr></thead><tbody>
-  ${data.map(c=>`<tr>
-    <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.reference||'—'}</td>
-    <td>${c.clients?.nom||'—'}</td>
-    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td>
-    <td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(c.montant)}</td>
-    <td style="color:var(--muted)">${c.date_livraison ? new Date(c.date_livraison).toLocaleDateString('fr-FR') : '—'}</td>
-    <td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td>
-    <td><div class="actions">
-      <button class="btn btn-sm" onclick="editCommande('${c.id}')">Modifier</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteCommande('${c.id}')">Suppr.</button>
-    </div></td>
-  </tr>`).join('')}
-  </tbody></table>`;
+async function loadCommandes(){
+  const{data}=await sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false});
+  const el=document.getElementById('commandes-table');
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune commande.</div>';return}
+  el.innerHTML=`<table><thead><tr><th>Réf.</th><th>Client</th><th>Description</th><th>Montant</th><th>Livraison</th><th>Statut</th><th></th></tr></thead><tbody>${data.map(c=>`<tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.reference||'—'}</td><td>${c.clients?.nom||'—'}</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(c.montant)}</td><td style="color:var(--muted)">${c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td><td><div class="actions"><button class="btn btn-sm" onclick="editCommande('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteCommande('${c.id}')">Suppr.</button></div></td></tr>`).join('')}</tbody></table>`;
 }
+async function openCommandeModal(data={}){
+  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
+  const sel=document.getElementById('commande-client');
+  sel.innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  if(data.client_id)sel.value=data.client_id;
+  document.getElementById('modal-commande-title').textContent=data.id?'Modifier commande':'Nouvelle commande';
+  document.getElementById('commande-id').value=data.id||'';
+  document.getElementById('commande-desc').value=data.description||'';
+  document.getElementById('commande-montant').value=data.montant||'';
+  document.getElementById('commande-livraison').value=data.date_livraison||'';
+  document.getElementById('commande-statut').value=data.statut||'En attente';
+  document.getElementById('commande-progression').value=data.progression||0;
+  document.getElementById('commande-notes').value=data.notes||'';
+  document.getElementById('modal-commande').classList.remove('hidden');
+}
+async function editCommande(id){const{data}=await sb.from('commandes').select('*').eq('id',id).single();openCommandeModal(data||{})}
+async function saveCommande(){
+  const id=document.getElementById('commande-id').value;
+  const desc=document.getElementById('commande-desc').value.trim();
+  if(!desc){toast('La description est requise');return}
+  const ref=id?undefined:'CMD-'+Date.now().toString().slice(-6);
+  const payload={client_id:document.getElementById('commande-client').value,description:desc,montant:Number(document.getElementById('commande-montant').value)||0,date_livraison:document.getElementById('commande-livraison').value||null,statut:document.getElementById('commande-statut').value,progression:Number(document.getElementById('commande-progression').value)||0,notes:document.getElementById('commande-notes').value,...(ref?{reference:ref}:{})};
+  if(id)await sb.from('commandes').update(payload).eq('id',id);
+  else await sb.from('commandes').insert(payload);
+  closeModal('modal-commande');toast('Commande enregistrée ✓');loadPage(currentPage);
+}
+async function deleteCommande(id){if(!confirm('Supprimer cette commande ?'))return;await sb.from('commandes').delete().eq('id',id);toast('Supprimée');loadPage(currentPage)}
 
 // ─── ATELIER ──────────────────────────────────────────────────────────────────
-async function loadAtelier() {
-  const { data } = await sb.from('commandes').select('*, clients(nom)').not('statut','eq','Livré').order('created_at',{ascending:false});
-  const groups = { 'En fabrication':[], 'Finition':[], 'En attente':[] };
-  (data||[]).forEach(c => {
-    if (c.statut === 'En fabrication') groups['En fabrication'].push(c);
-    else if (c.statut === 'Finition') groups['Finition'].push(c);
-    else groups['En attente'].push(c);
-  });
-  const colors = { 'En fabrication':'#EF9F27', 'Finition':'#5DCAA5', 'En attente':'#378ADD' };
-  document.getElementById('atelier-kanban').innerHTML = Object.entries(groups).map(([col,items])=>`
-    <div class="kanban-col" style="border-top:3px solid ${colors[col]}">
-      <div class="kanban-header">${col} <span class="kanban-count">${items.length}</span></div>
-      ${items.length ? items.map(c=>`
-        <div class="kanban-card">
-          <div class="kanban-card-title">${c.description||'—'}</div>
-          <div class="kanban-card-sub">${c.clients?.nom||'—'}</div>
-          ${c.progression>0?`<div class="progress-bar"><div class="progress-fill" style="width:${c.progression}%"></div></div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">${c.progression}%</div>`:''}
-        </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucun projet</div>'}
-    </div>`).join('');
+async function loadAtelier(){
+  const{data}=await sb.from('commandes').select('*,clients(nom)').not('statut','eq','Livré').order('created_at',{ascending:false});
+  const groups={'En fabrication':[],'Finition':[],'En attente':[]};
+  (data||[]).forEach(c=>{if(c.statut==='En fabrication')groups['En fabrication'].push(c);else if(c.statut==='Finition')groups['Finition'].push(c);else groups['En attente'].push(c)});
+  const colors={'En fabrication':'#EF9F27','Finition':'#5DCAA5','En attente':'#378ADD'};
+  document.getElementById('atelier-kanban').innerHTML=Object.entries(groups).map(([col,items])=>`<div class="kanban-col" style="border-top:3px solid ${colors[col]}"><div class="kanban-header">${col} <span class="kanban-count">${items.length}</span></div>${items.length?items.map(c=>`<div class="kanban-card"><div class="kanban-card-title">${c.description||'—'}</div><div class="kanban-card-sub">${c.clients?.nom||'—'}</div>${c.progression>0?`<div class="progress-bar"><div class="progress-fill" style="width:${c.progression}%"></div></div><div style="font-size:10px;color:var(--muted);margin-top:4px">${c.progression}%</div>`:''}</div>`).join(''):'<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucun projet</div>'}</div>`).join('');
 }
 
 // ─── DEVIS ────────────────────────────────────────────────────────────────────
-async function loadDevis() {
-  const { data } = await sb.from('devis').select('*, clients(nom)').order('created_at',{ascending:false});
-  const el = document.getElementById('devis-table');
-  if (!(data||[]).length) { el.innerHTML='<div class="empty">Aucun devis.</div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Réf.</th><th>Client</th><th>Objet</th><th>Montant HT</th><th>Date</th><th>Statut</th><th></th></tr></thead><tbody>
-  ${data.map(d=>`<tr>
-    <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${d.reference||'—'}</td>
-    <td>${d.clients?.nom||'—'}</td>
-    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.objet||'—'}</td>
-    <td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(d.montant)}</td>
-    <td style="color:var(--muted)">${d.date_envoi ? new Date(d.date_envoi).toLocaleDateString('fr-FR') : '—'}</td>
-    <td><span class="badge ${badgeClass(d.statut)}">${d.statut}</span></td>
-    <td><div class="actions">
-      <button class="btn btn-sm" onclick="editDevis('${d.id}')">Modifier</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteDevis('${d.id}')">Suppr.</button>
-    </div></td>
-  </tr>`).join('')}
-  </tbody></table>`;
+async function loadDevis(){
+  const{data}=await sb.from('devis').select('*,clients(nom)').order('created_at',{ascending:false});
+  const el=document.getElementById('devis-table');
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis.</div>';return}
+  el.innerHTML=`<table><thead><tr><th>Réf.</th><th>Client</th><th>Objet</th><th>Montant HT</th><th>Date</th><th>Statut</th><th></th></tr></thead><tbody>${data.map(d=>`<tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${d.reference||'—'}</td><td>${d.clients?.nom||'—'}</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.objet||'—'}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(d.montant)}</td><td style="color:var(--muted)">${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</td><td><span class="badge ${badgeClass(d.statut)}">${d.statut}</span></td><td><div class="actions"><button class="btn btn-sm" onclick="editDevis('${d.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteDevis('${d.id}')">Suppr.</button></div></td></tr>`).join('')}</tbody></table>`;
 }
+async function openDevisModal(data={}){
+  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
+  const sel=document.getElementById('devis-client');
+  sel.innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  if(data.client_id)sel.value=data.client_id;
+  document.getElementById('modal-devis-title').textContent=data.id?'Modifier devis':'Nouveau devis';
+  document.getElementById('devis-id').value=data.id||'';
+  document.getElementById('devis-objet').value=data.objet||'';
+  document.getElementById('devis-montant').value=data.montant||'';
+  document.getElementById('devis-date').value=data.date_envoi||new Date().toISOString().split('T')[0];
+  document.getElementById('devis-statut').value=data.statut||'En attente';
+  document.getElementById('devis-notes').value=data.notes||'';
+  document.getElementById('modal-devis').classList.remove('hidden');
+}
+async function editDevis(id){const{data}=await sb.from('devis').select('*').eq('id',id).single();openDevisModal(data||{})}
+async function saveDevis(){
+  const id=document.getElementById('devis-id').value;
+  const objet=document.getElementById('devis-objet').value.trim();
+  if(!objet){toast("L'objet est requis");return}
+  const ref=id?undefined:'DEV-'+Date.now().toString().slice(-6);
+  const payload={client_id:document.getElementById('devis-client').value,objet,montant:Number(document.getElementById('devis-montant').value)||0,date_envoi:document.getElementById('devis-date').value||null,statut:document.getElementById('devis-statut').value,notes:document.getElementById('devis-notes').value,...(ref?{reference:ref}:{})};
+  if(id)await sb.from('devis').update(payload).eq('id',id);
+  else await sb.from('devis').insert(payload);
+  closeModal('modal-devis');toast('Devis enregistré ✓');loadDevis();
+}
+async function deleteDevis(id){if(!confirm('Supprimer ce devis ?'))return;await sb.from('devis').delete().eq('id',id);toast('Supprimé');loadDevis()}
 
 // ─── OPEN NEW ─────────────────────────────────────────────────────────────────
-function openNew() {
-  if (currentPage === 'clients') openClientModal();
-  else if (currentPage === 'commandes') openCommandeModal();
-  else if (currentPage === 'devis') openDevisModal();
-  else if (currentPage === 'atelier') openCommandeModal();
+function openNew(){
+  if(currentPage==='clients')openClientModal();
+  else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
+  else if(currentPage==='devis')openDevisModal();
   else openClientModal();
 }
 
-// ─── CLIENT MODAL ─────────────────────────────────────────────────────────────
-function openClientModal(data={}) {
-  document.getElementById('modal-client-title').textContent = data.id ? 'Modifier client' : 'Nouveau client';
-  document.getElementById('client-id').value = data.id||'';
-  document.getElementById('client-nom').value = data.nom||'';
-  document.getElementById('client-type').value = data.type||'Particulier';
-  document.getElementById('client-email').value = data.email||'';
-  document.getElementById('client-tel').value = data.telephone||'';
-  document.getElementById('client-ville').value = data.ville||'';
-  document.getElementById('client-notes').value = data.notes||'';
-  document.getElementById('modal-client').classList.remove('hidden');
-}
-async function editClient(id) {
-  const { data } = await sb.from('clients').select('*').eq('id',id).single();
-  openClientModal(data||{});
-}
-async function saveClient() {
-  const id = document.getElementById('client-id').value;
-  const nom = document.getElementById('client-nom').value.trim();
-  if (!nom) { toast('Le nom est requis'); return; }
-  const payload = {
-    nom, type:document.getElementById('client-type').value,
-    email:document.getElementById('client-email').value,
-    telephone:document.getElementById('client-tel').value,
-    ville:document.getElementById('client-ville').value,
-    notes:document.getElementById('client-notes').value
-  };
-  if (id) await sb.from('clients').update(payload).eq('id',id);
-  else await sb.from('clients').insert(payload);
-  closeModal('modal-client'); toast('Client enregistré ✓'); loadClients();
-}
-async function deleteClient(id) {
-  if (!confirm('Supprimer ce client et toutes ses commandes ?')) return;
-  await sb.from('clients').delete().eq('id',id);
-  toast('Client supprimé'); loadClients();
-}
-
-// ─── COMMANDE MODAL ───────────────────────────────────────────────────────────
-async function openCommandeModal(data={}) {
-  const { data: clients } = await sb.from('clients').select('id,nom').order('nom');
-  const sel = document.getElementById('commande-client');
-  sel.innerHTML = (clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  if (data.client_id) sel.value = data.client_id;
-  document.getElementById('modal-commande-title').textContent = data.id ? 'Modifier commande' : 'Nouvelle commande';
-  document.getElementById('commande-id').value = data.id||'';
-  document.getElementById('commande-desc').value = data.description||'';
-  document.getElementById('commande-montant').value = data.montant||'';
-  document.getElementById('commande-livraison').value = data.date_livraison||'';
-  document.getElementById('commande-statut').value = data.statut||'En attente';
-  document.getElementById('commande-progression').value = data.progression||0;
-  document.getElementById('commande-notes').value = data.notes||'';
-  document.getElementById('modal-commande').classList.remove('hidden');
-}
-async function editCommande(id) {
-  const { data } = await sb.from('commandes').select('*').eq('id',id).single();
-  openCommandeModal(data||{});
-}
-async function saveCommande() {
-  const id = document.getElementById('commande-id').value;
-  const desc = document.getElementById('commande-desc').value.trim();
-  if (!desc) { toast('La description est requise'); return; }
-  const ref = id ? undefined : 'CMD-' + Date.now().toString().slice(-6);
-  const payload = {
-    client_id: document.getElementById('commande-client').value,
-    description: desc,
-    montant: Number(document.getElementById('commande-montant').value)||0,
-    date_livraison: document.getElementById('commande-livraison').value||null,
-    statut: document.getElementById('commande-statut').value,
-    progression: Number(document.getElementById('commande-progression').value)||0,
-    notes: document.getElementById('commande-notes').value,
-    ...(ref ? {reference: ref} : {})
-  };
-  if (id) await sb.from('commandes').update(payload).eq('id',id);
-  else await sb.from('commandes').insert(payload);
-  closeModal('modal-commande'); toast('Commande enregistrée ✓');
-  loadPage(currentPage);
-}
-async function deleteCommande(id) {
-  if (!confirm('Supprimer cette commande ?')) return;
-  await sb.from('commandes').delete().eq('id',id);
-  toast('Commande supprimée'); loadPage(currentPage);
-}
-
-// ─── DEVIS MODAL ──────────────────────────────────────────────────────────────
-async function openDevisModal(data={}) {
-  const { data: clients } = await sb.from('clients').select('id,nom').order('nom');
-  const sel = document.getElementById('devis-client');
-  sel.innerHTML = (clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  if (data.client_id) sel.value = data.client_id;
-  document.getElementById('modal-devis-title').textContent = data.id ? 'Modifier devis' : 'Nouveau devis';
-  document.getElementById('devis-id').value = data.id||'';
-  document.getElementById('devis-objet').value = data.objet||'';
-  document.getElementById('devis-montant').value = data.montant||'';
-  document.getElementById('devis-date').value = data.date_envoi|| new Date().toISOString().split('T')[0];
-  document.getElementById('devis-statut').value = data.statut||'En attente';
-  document.getElementById('devis-notes').value = data.notes||'';
-  document.getElementById('modal-devis').classList.remove('hidden');
-}
-async function editDevis(id) {
-  const { data } = await sb.from('devis').select('*').eq('id',id).single();
-  openDevisModal(data||{});
-}
-async function saveDevis() {
-  const id = document.getElementById('devis-id').value;
-  const objet = document.getElementById('devis-objet').value.trim();
-  if (!objet) { toast("L'objet est requis"); return; }
-  const ref = id ? undefined : 'DEV-' + Date.now().toString().slice(-6);
-  const payload = {
-    client_id: document.getElementById('devis-client').value,
-    objet,
-    montant: Number(document.getElementById('devis-montant').value)||0,
-    date_envoi: document.getElementById('devis-date').value||null,
-    statut: document.getElementById('devis-statut').value,
-    notes: document.getElementById('devis-notes').value,
-    ...(ref ? {reference: ref} : {})
-  };
-  if (id) await sb.from('devis').update(payload).eq('id',id);
-  else await sb.from('devis').insert(payload);
-  closeModal('modal-devis'); toast('Devis enregistré ✓'); loadDevis();
-}
-async function deleteDevis(id) {
-  if (!confirm('Supprimer ce devis ?')) return;
-  await sb.from('devis').delete().eq('id',id);
-  toast('Devis supprimé'); loadDevis();
-}
-
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-loadDashboard();
+checkSession();
 </script>
 </body>
 </html>
