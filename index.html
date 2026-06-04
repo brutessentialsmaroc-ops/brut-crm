@@ -1317,6 +1317,7 @@ async function loadPointage(){
   const month=today.getMonth();
   const year=today.getFullYear();
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  allSalaries=sal||[];
   const lastDay1=new Date(year,month+1,0).getDate();
   const{data:pts}=await sb.from('pointages').select('*')
     .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
@@ -1429,7 +1430,7 @@ async function savePointage(){
 // ─── CONGÉS ───────────────────────────────────────────────────────────────────
 async function loadConges(){
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
-  allSalaries=allSalaries.length?allSalaries:sal||[];
+  allSalaries=sal||[];
   const{data}=await sb.from('conges').select('*,salaries(nom,prenom)').order('date_debut',{ascending:false});
   const el=document.getElementById('rh-conges');
   
@@ -1565,6 +1566,7 @@ async function loadPaie(){
   const mois=today.getMonth()+1;
   const annee=today.getFullYear();
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  allSalaries=sal||[];
   const{data:paies}=await sb.from('paie').select('*').eq('mois',mois).eq('annee',annee);
   const{data:pts}=await sb.from('pointages').select('*')
     .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
