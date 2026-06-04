@@ -1345,6 +1345,23 @@ async function loadRhSalaries(){
     </tbody></table></div>`;
 }
 
+function renderDocSlot(docType, label, data){
+  const url=(data.doc_urls||{})[docType]||'';
+  const sid=data.id||'';
+  return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center">
+    <div style="font-size:11px;font-weight:500;color:var(--muted);margin-bottom:8px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.5px">${label}</div>
+    ${url
+      ?`<div style="margin-bottom:6px"><a href="${url}" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none">&#128196; Voir</a></div>
+        <button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px" onclick="removeDoc('${docType}','${sid}')">Supprimer</button>`
+      :`<div id="doc-preview-${docType}" style="font-size:11px;color:var(--muted);margin-bottom:6px">Aucun fichier</div>`
+    }
+    <input type="file" id="doc-input-${docType}" accept=".pdf,.doc,.docx,.jpg,.png" style="display:none" onchange="uploadDoc(this,'${docType}','${sid}')">
+    <button class="btn btn-sm" style="font-size:11px;margin-top:4px;width:100%;justify-content:center" onclick="document.getElementById('doc-input-${docType}').click()">
+      ${url?'Remplacer':'+ Ajouter'}
+    </button>
+  </div>`;
+}
+
 function openSalarieModal(data={}){
   const isEdit=!!data.id;
   const html=`<div class="modal" style="max-width:580px">
@@ -1392,6 +1409,15 @@ function openSalarieModal(data={}){
       </div>
     </div>
     <div class="form-group"><label>Notes</label><textarea id="sal-notes">${data.notes||''}</textarea></div>
+    <!-- Documents -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+      <div class="section-title" style="margin-bottom:12px">Documents</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${renderDocSlot('cnss','CNSS',data)}
+        ${renderDocSlot('contrat','Contrat',data)}
+        ${renderDocSlot('fiche_poste','Fiche de poste',data)}
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
       <button class="btn btn-primary" onclick="saveSalarie()">Enregistrer</button>
@@ -1422,6 +1448,7 @@ async function saveSalarie(){
     cnss:document.getElementById('sal-cnss').value,
     photo_url:document.getElementById('sal-photo-url').value||null
   };
+  // doc_urls handled separately via uploadDoc
   // Handle pending photo for new salarie
   if(!id && window._pendingSalPhoto){
     // Will be uploaded after insert with new id
@@ -1899,6 +1926,38 @@ async function previewSalPhoto(input, salId){
     await sb.from('salaries').update({photo_url:publicUrl}).eq('id',salId);
     toast('Photo mise à jour ✓');
   }
+}
+
+async function uploadDoc(input, docType, salId){
+  const file=input.files[0];
+  if(!file)return;
+  if(!salId){toast("Enregistrez le salarié d'abord");return;}
+  toast('Upload en cours…');
+  const ext=file.name.split('.').pop();
+  const path=`salaries/docs/${salId}_${docType}.${ext}`;
+  const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+  if(error){toast('Erreur upload');return;}
+  const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+  // Load current doc_urls
+  const{data:s}=await sb.from('salaries').select('doc_urls').eq('id',salId).single();
+  const docUrls={...(s.doc_urls||{})};
+  docUrls[docType]=publicUrl;
+  await sb.from('salaries').update({doc_urls:docUrls}).eq('id',salId);
+  toast('Document enregistré ✓');
+  // Update preview
+  const prev=document.getElementById('doc-preview-'+docType);
+  if(prev) prev.innerHTML=`<a href="${publicUrl}" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none">📄 Voir le document</a>`;
+  input.value='';
+}
+
+async function removeDoc(docType, salId){
+  if(!salId||!confirm('Supprimer ce document ?'))return;
+  const{data:s}=await sb.from('salaries').select('doc_urls').eq('id',salId).single();
+  const docUrls={...(s.doc_urls||{})};
+  delete docUrls[docType];
+  await sb.from('salaries').update({doc_urls:docUrls}).eq('id',salId);
+  toast('Document supprimé');
+  editSalarie(salId);
 }
 
 async function openModifierPaie(salId, mois, annee){
