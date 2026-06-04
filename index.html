@@ -535,14 +535,15 @@ async function loadDashboard(){
   document.getElementById('dash-date').textContent=`${jours[now.getDay()]} ${now.getDate()} ${mois[now.getMonth()]} ${now.getFullYear()}`;
 
   const todayStr=now.toISOString().split('T')[0];
-  const[{data:clients},{data:commandes},{data:devis},{data:factures},{data:congesAujourd},{data:pointagesAujourd}]=await Promise.all([
+  const[r1,r2,r3,r4,r5,r6]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente'),
     sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').neq('statut','Payée'),
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
-    sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).in('statut',['Absent','Retard'])
+    sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard')
   ]);
+  const clients=r1.data, commandes=r2.data, devis=r3.data, factures=r4.data, congesAujourd=r5.data, pointagesAujourd=r6.data;
   document.getElementById('stat-clients').textContent=(clients||[]).length;
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
   // CA HT = sum of commandes montant
