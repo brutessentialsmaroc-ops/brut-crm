@@ -1734,11 +1734,12 @@ async function loadPaie(){
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
   allSalaries=sal||[];
   const{data:paies}=await sb.from('paie').select('*').eq('mois',mois).eq('annee',annee);
+  const lastDayPaie=new Date(annee,mois,0).getDate();
   const{data:pts}=await sb.from('pointages').select('*')
     .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
-    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-31`);
+    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-${String(lastDayPaie).padStart(2,'0')}`);
   const el=document.getElementById('rh-paie');
-  const moisLabel=today.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const moisLabel=new Date(annee,mois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   const paieMap={};
   (paies||[]).forEach(p=>{paieMap[p.salarie_id]=p;});
   const ptBySal={};
