@@ -1604,9 +1604,10 @@ async function loadPaie(){
         return`<tr>
           <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
-          <td style="text-align:center;color:${deducAbsAff>0?'var(--red)':'var(--muted)'}">${deducAbsAff>0?`-${deducAbsAff.toLocaleString('fr-FR')} MAD`:'—'}</td>
-          <td style="text-align:center;color:${deducRetAff>0?'var(--amber)':'var(--muted)'}">${deducRetAff>0?`-${deducRetAff.toLocaleString('fr-FR')} MAD`:'—'}</td>
-          <td style="text-align:center;color:var(--green)">${hSupMontantAff>0?`+${hSupMontantAff.toLocaleString('fr-FR')} MAD`:'—'}</td>
+          <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences}j</td>
+          <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}×</td>
+          <td style="text-align:center;color:var(--green)">${pt.hSup>0?'+'+pt.hSup+'h':'—'}</td>
+          
           <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
           <td><span class="badge ${p?.statut==='Payé'?'badge-green':'badge-amber'}">${p?.statut||'À générer'}</span></td>
           <td><div class="actions" style="opacity:1;flex-wrap:wrap;gap:4px">
