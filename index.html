@@ -244,11 +244,8 @@
       <!-- DASHBOARD -->
       <div id="page-dashboard">
         <!-- Date + Bonjour -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-          <div>
-            <div id="dash-bonjour" style="font-size:20px;font-weight:500"></div>
-            <div id="dash-date" style="font-size:13px;color:var(--muted);margin-top:2px"></div>
-          </div>
+        <div style="margin-bottom:20px">
+          <div id="dash-date" style="font-size:15px;font-weight:500"></div>
         </div>
         <!-- Stats -->
         <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
@@ -269,9 +266,13 @@
           </div>
           <button class="btn btn-sm" style="border-color:#F5C5C5;color:var(--red)" onclick="showPage('factures',document.querySelector('.nav-item:nth-child(6)'))">Voir →</button>
         </div>
-        <div class="two-col">
+        <div class="two-col" style="margin-bottom:16px">
           <div><div class="section-title">Dernières commandes</div><div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div></div>
           <div><div class="section-title">Avancement atelier</div><div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div></div>
+        </div>
+        <div>
+          <div class="section-title">Absences & congés aujourd'hui</div>
+          <div id="dash-conges-today" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
         </div>
       </div>
       <!-- CLIENTS -->
@@ -530,16 +531,17 @@ async function loadDashboard(){
   const now=new Date();
   const jours=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
   const mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-  const heure=now.getHours();
-  const bonjour=heure<12?'Bonjour':heure<18?'Bon après-midi':'Bonsoir';
-  document.getElementById('dash-bonjour').textContent=`${bonjour} 👋`;
+
   document.getElementById('dash-date').textContent=`${jours[now.getDay()]} ${now.getDate()} ${mois[now.getMonth()]} ${now.getFullYear()}`;
 
-  const[{data:clients},{data:commandes},{data:devis},{data:factures}]=await Promise.all([
+  const todayStr=now.toISOString().split('T')[0];
+  const[{data:clients},{data:commandes},{data:devis},{data:factures},{data:congesAujourd},{data:pointagesAujourd}]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente'),
-    sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').neq('statut','Payée')
+    sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').neq('statut','Payée'),
+    sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
+    sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).in('statut',['Absent','Retard'])
   ]);
   document.getElementById('stat-clients').textContent=(clients||[]).length;
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
@@ -559,6 +561,27 @@ async function loadDashboard(){
     document.getElementById('dash-factures-alert').classList.remove('hidden');
     document.getElementById('dash-factures-alert').style.display='flex';
   }
+  // Congés & absences aujourd'hui
+  const elConges=document.getElementById('dash-conges-today');
+  const absToday=[
+    ...(congesAujourd||[]).map(c=>({nom:`${c.salaries?.prenom||''} ${c.salaries?.nom||'—'}`,type:c.type_conge,statut:'Congé',badge:'badge-blue'})),
+    ...(pointagesAujourd||[]).map(p=>({nom:`${p.salaries?.prenom||''} ${p.salaries?.nom||'—'}`,type:p.note||'—',statut:p.statut,badge:p.statut==='Absent'?'badge-red':'badge-amber'}))
+  ];
+  if(absToday.length){
+    elConges.innerHTML=`<table style="width:100%;border-collapse:collapse">
+      <thead><tr><th style="padding:8px 14px;text-align:left;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.5px">Salarié</th>
+      <th style="padding:8px 14px;text-align:left;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.5px">Statut</th>
+      <th style="padding:8px 14px;text-align:left;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.5px">Motif</th></tr></thead>
+      <tbody>${absToday.map(a=>`<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:500">${a.nom}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border)"><span class="badge ${a.badge}">${a.statut}</span></td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);color:var(--muted)">${a.type}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } else {
+    elConges.innerHTML='<div style="padding:12px 0;font-size:13px;color:var(--muted)">✅ Toute l'équipe est présente aujourd'hui</div>';
+  }
+
   const recent=(commandes||[]).slice(0,5);
   document.getElementById('dash-commandes').innerHTML=recent.length?`<table><thead><tr><th>Client</th><th>Description</th><th>Statut</th></tr></thead><tbody>${recent.map(c=>`<tr><td>${c.clients?.nom||'—'}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aucune commande</div>';
   const av=(commandes||[]).filter(c=>c.atelier_statut==='En cours').slice(0,5);
