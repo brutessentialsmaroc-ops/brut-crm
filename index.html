@@ -1598,19 +1598,15 @@ async function loadPaie(){
         const deducRet=Math.round(base/jourTravail*0.5*pt.retards*100)/100;
         const hSupMontant=Math.round(base/jourTravail/8*1.25*pt.hSup*100)/100;
         const net=p?Number(p.net_a_payer):Math.max(0,base+hSupMontant-deducAbs-deducRet);
-        // Use saved paie values if exists, otherwise calculated
-        const absAff=p?Number(p.deduction_absences>0?(p.deduction_absences/(base/26)):0).toFixed(0):pt.absences;
-        const retAff=p?Number(p.deduction_retards>0?(p.deduction_retards/(base/26*0.5)):0).toFixed(0):pt.retards;
-        const hSupAff=p?Number(p.heures_sup_montant>0?(p.heures_sup_montant/(base/26/8*1.25)):0).toFixed(1):pt.hSup;
         const deducAbsAff=p?Number(p.deduction_absences):deducAbs;
         const deducRetAff=p?Number(p.deduction_retards):deducRet;
         const hSupMontantAff=p?Number(p.heures_sup_montant):hSupMontant;
         return`<tr>
           <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
-          <td style="text-align:center;color:${deducAbsAff>0?'var(--red)':'var(--muted)'}">${deducAbsAff>0?`-${absAff}j<br><span style="font-size:10px;font-family:'DM Mono',monospace">-${deducAbsAff.toLocaleString('fr-FR')}</span>`:'-0j'}</td>
-          <td style="text-align:center;color:${deducRetAff>0?'var(--amber)':'var(--muted)'}">${deducRetAff>0?`-${retAff}×<br><span style="font-size:10px;font-family:'DM Mono',monospace">-${deducRetAff.toLocaleString('fr-FR')}</span>`:'-0×'}</td>
-          <td style="text-align:center;color:var(--green)">${hSupMontantAff>0?`+${hSupAff}h<br><span style="font-size:10px;font-family:'DM Mono',monospace">+${hSupMontantAff.toLocaleString('fr-FR')}</span>`:'-'}</td>
+          <td style="text-align:center;color:${deducAbsAff>0?'var(--red)':'var(--muted)'}">${deducAbsAff>0?`-${deducAbsAff.toLocaleString('fr-FR')} MAD`:'—'}</td>
+          <td style="text-align:center;color:${deducRetAff>0?'var(--amber)':'var(--muted)'}">${deducRetAff>0?`-${deducRetAff.toLocaleString('fr-FR')} MAD`:'—'}</td>
+          <td style="text-align:center;color:var(--green)">${hSupMontantAff>0?`+${hSupMontantAff.toLocaleString('fr-FR')} MAD`:'—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
           <td><span class="badge ${p?.statut==='Payé'?'badge-green':'badge-amber'}">${p?.statut||'À générer'}</span></td>
           <td><div class="actions" style="opacity:1;flex-wrap:wrap;gap:4px">
