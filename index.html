@@ -146,6 +146,20 @@
   .comment-meta{font-size:10px;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between}
   .comment-text{font-size:13px}
   .comment-input{display:flex;gap:8px}
+  /* RH TABS */
+  .rh-tab{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:13px;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif;transition:all 0.15s}
+  .rh-tab:hover{background:var(--bg);color:var(--text)}
+  .rh-tab.active{background:var(--text);color:#fff;border-color:var(--text)}
+  /* PLANNING CONGES */
+  .planning-grid{display:grid;grid-template-columns:160px repeat(31,1fr);gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden;font-size:11px}
+  .planning-cell{background:var(--surface);padding:4px;min-height:28px;display:flex;align-items:center;justify-content:center}
+  .planning-name{background:var(--bg);padding:6px 10px;font-size:12px;font-weight:500;justify-content:flex-start}
+  .planning-day{background:var(--bg);font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+  .planning-conge{background:#FAEEDA;color:#854F0B}
+  .planning-absent{background:#FCEAEA;color:#A32D2D}
+  .planning-weekend{background:#f5f3ee}
+  /* FICHE PAIE */
+  .paie-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
   /* ETIQUETTES */
   .label-tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.3px}
   .label-urgent{background:#FCEAEA;color:#A32D2D}
@@ -211,6 +225,7 @@
       <button class="nav-item" onclick="showPage('atelier',this)">⚙ Atelier</button>
       <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
+      <button class="nav-item" onclick="showPage('rh',this)">◉ RH</button>
     </nav>
     <div class="sidebar-footer">
       <div class="user-email" id="user-email"></div>
@@ -306,6 +321,20 @@
       <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
       <!-- FACTURES -->
       <div id="page-factures" class="hidden"><div id="factures-list"></div></div>
+      <!-- RH -->
+      <div id="page-rh" class="hidden">
+        <!-- Sous-navigation RH -->
+        <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px">
+          <button class="rh-tab active" onclick="showRhTab('salaries',this)">👤 Salariés</button>
+          <button class="rh-tab" onclick="showRhTab('pointage',this)">⏱ Pointage</button>
+          <button class="rh-tab" onclick="showRhTab('conges',this)">🌴 Congés</button>
+          <button class="rh-tab" onclick="showRhTab('paie',this)">💰 Paie</button>
+        </div>
+        <div id="rh-salaries"><div class="loading">Chargement…</div></div>
+        <div id="rh-pointage" class="hidden"><div class="loading">Chargement…</div></div>
+        <div id="rh-conges" class="hidden"><div class="loading">Chargement…</div></div>
+        <div id="rh-paie" class="hidden"><div class="loading">Chargement…</div></div>
+      </div>
       <!-- DEVIS BUILDER -->
       <div id="page-devis-builder" class="hidden">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
@@ -424,7 +453,7 @@ function showPage(page,el){
   document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+page).classList.remove('hidden');
   if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
-  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande'}[page]||page;
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines'}[page]||page;
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
@@ -437,6 +466,7 @@ function loadPage(p){
   else if(p==='atelier')loadAtelier();
   else if(p==='devis')loadDevisList();
   else if(p==='factures')loadFactures();
+  else if(p==='rh'){currentRhTab='salaries';loadRhSalaries();}
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -450,6 +480,12 @@ function openNew(){
   if(currentPage==='clients')openClientModal();
   else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
   else if(currentPage==='devis')openDevisBuilder(null);
+  else if(currentPage==='rh'){
+    if(currentRhTab==='salaries')openSalarieModal();
+    else if(currentRhTab==='pointage')openPointageModal();
+    else if(currentRhTab==='conges')openCongeModal();
+    else if(currentRhTab==='paie')genererPaie();
+  }
   else openClientModal();
 }
 
@@ -1162,6 +1198,531 @@ async function printFacture(id){
     </div>`;
   document.getElementById('pdf-preview').style.display='block';
   setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+// ─── RH ──────────────────────────────────────────────────────────────────────
+let currentRhTab = 'salaries';
+let allSalaries = [];
+
+function showRhTab(tab, el){
+  currentRhTab = tab;
+  document.querySelectorAll('.rh-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['salaries','pointage','conges','paie'].forEach(t=>{
+    document.getElementById('rh-'+t).classList.toggle('hidden', t!==tab);
+  });
+  if(tab==='salaries') loadRhSalaries();
+  else if(tab==='pointage') loadPointage();
+  else if(tab==='conges') loadConges();
+  else if(tab==='paie') loadPaie();
+}
+
+// ─── SALARIÉS ─────────────────────────────────────────────────────────────────
+async function loadRhSalaries(){
+  const{data}=await sb.from('salaries').select('*').order('nom');
+  allSalaries=data||[];
+  const el=document.getElementById('rh-salaries');
+  if(!allSalaries.length){el.innerHTML='<div class="empty">Aucun salarié. Cliquez + Nouveau pour en ajouter.</div>';return;}
+  el.innerHTML=`<div class="table-wrap"><table>
+    <thead><tr><th>Salarié</th><th>Poste</th><th>Atelier</th><th>Contrat</th><th>Salaire base</th><th>Statut</th><th></th></tr></thead>
+    <tbody>${allSalaries.map(s=>`<tr>
+      <td><div class="client-cell">
+        <div class="avatar" style="background:var(--amber-bg);color:var(--amber)">${(s.prenom||s.nom||'?')[0].toUpperCase()}${(s.nom||'')[0]?.toUpperCase()||''}</div>
+        <div><div style="font-weight:500">${s.prenom||''} ${s.nom}</div><div style="font-size:11px;color:var(--muted)">${s.email||s.telephone||''}</div></div>
+      </div></td>
+      <td>${s.poste||'—'}</td>
+      <td><span class="badge badge-blue">${s.atelier||'—'}</span></td>
+      <td><span class="badge badge-gray">${s.type_contrat||'CDI'}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${s.salaire_base?Number(s.salaire_base).toLocaleString('fr-FR')+' MAD':'—'}</td>
+      <td><span class="badge ${s.statut==='Actif'?'badge-green':'badge-gray'}">${s.statut||'Actif'}</span></td>
+      <td><div class="actions">
+        <button class="btn btn-sm" onclick="editSalarie('${s.id}')">Modifier</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteSalarie('${s.id}')">Suppr.</button>
+      </div></td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function openSalarieModal(data={}){
+  const isEdit=!!data.id;
+  const html=`<div class="modal" style="max-width:580px">
+    <div class="modal-title">${isEdit?'Modifier salarié':'Nouveau salarié'}</div>
+    <input type="hidden" id="sal-id" value="${data.id||''}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Prénom</label><input id="sal-prenom" value="${data.prenom||''}"></div>
+      <div class="form-group"><label>Nom *</label><input id="sal-nom" value="${data.nom||''}"></div>
+      <div class="form-group"><label>Poste</label><input id="sal-poste" value="${data.poste||''}"></div>
+      <div class="form-group"><label>Atelier</label>
+        <select id="sal-atelier">
+          ${['Menuiserie bois','Ferronnerie','Céramique','Tapisserie','Administration','Livraison'].map(a=>`<option ${data.atelier===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Téléphone</label><input id="sal-tel" value="${data.telephone||''}"></div>
+      <div class="form-group"><label>Email</label><input id="sal-email" value="${data.email||''}"></div>
+      <div class="form-group"><label>Date d'entrée</label><input type="date" id="sal-date" value="${data.date_entree||''}"></div>
+      <div class="form-group"><label>Type contrat</label>
+        <select id="sal-contrat">
+          ${['CDI','CDD','Intérim','Stagiaire'].map(c=>`<option ${data.type_contrat===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Salaire de base (MAD)</label><input type="number" id="sal-salaire" value="${data.salaire_base||''}"></div>
+      <div class="form-group"><label>Statut</label>
+        <select id="sal-statut">
+          ${['Actif','Inactif','Suspendu'].map(s=>`<option ${data.statut===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="sal-notes">${data.notes||''}</textarea></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveSalarie()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+async function editSalarie(id){
+  const{data}=await sb.from('salaries').select('*').eq('id',id).single();
+  openSalarieModal(data||{});
+}
+async function saveSalarie(){
+  const id=document.getElementById('sal-id').value;
+  const nom=document.getElementById('sal-nom').value.trim();
+  if(!nom){toast('Le nom est requis');return;}
+  const payload={
+    nom, prenom:document.getElementById('sal-prenom').value,
+    poste:document.getElementById('sal-poste').value,
+    atelier:document.getElementById('sal-atelier').value,
+    telephone:document.getElementById('sal-tel').value,
+    email:document.getElementById('sal-email').value,
+    date_entree:document.getElementById('sal-date').value||null,
+    type_contrat:document.getElementById('sal-contrat').value,
+    salaire_base:Number(document.getElementById('sal-salaire').value)||0,
+    statut:document.getElementById('sal-statut').value,
+    notes:document.getElementById('sal-notes').value
+  };
+  if(id) await sb.from('salaries').update(payload).eq('id',id);
+  else await sb.from('salaries').insert(payload);
+  closeModal('rh-modal'); toast('Salarié enregistré ✓'); loadRhSalaries();
+}
+async function deleteSalarie(id){
+  if(!confirm('Supprimer ce salarié ?'))return;
+  await sb.from('salaries').delete().eq('id',id);
+  toast('Supprimé'); loadRhSalaries();
+}
+
+// ─── POINTAGE ─────────────────────────────────────────────────────────────────
+async function loadPointage(){
+  const today=new Date();
+  const month=today.getMonth();
+  const year=today.getFullYear();
+  const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  const{data:pts}=await sb.from('pointages').select('*')
+    .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
+    .lte('date',`${year}-${String(month+1).padStart(2,'0')}-31`);
+  const el=document.getElementById('rh-pointage');
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const ptMap={};
+  (pts||[]).forEach(p=>{ptMap[p.salarie_id+'_'+p.date]=p;});
+  const moisLabel=today.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+
+  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Férié':'⭐'};
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:500;text-transform:capitalize">${moisLabel}</div>
+      <button class="btn btn-primary btn-sm" onclick="openPointageModal()">+ Saisir pointage</button>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="border-collapse:collapse;font-size:12px;min-width:100%">
+      <thead><tr>
+        <th style="padding:8px 12px;text-align:left;background:var(--bg);border:1px solid var(--border);min-width:140px;position:sticky;left:0;z-index:2">Salarié</th>
+        ${Array.from({length:daysInMonth},(_,i)=>{
+          const d=new Date(year,month,i+1);
+          const isWeekend=d.getDay()===0||d.getDay()===6;
+          return`<th style="padding:6px 4px;text-align:center;background:${isWeekend?'#f0ece4':'var(--bg)'};border:1px solid var(--border);min-width:32px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${i+1}</th>`;
+        }).join('')}
+        <th style="padding:8px 12px;text-align:center;background:var(--bg);border:1px solid var(--border)">Abs.</th>
+        <th style="padding:8px 12px;text-align:center;background:var(--bg);border:1px solid var(--border)">H.Sup</th>
+      </tr></thead>
+      <tbody>${(sal||[]).map(s=>{
+        let absences=0; let hSup=0;
+        const cells=Array.from({length:daysInMonth},(_,i)=>{
+          const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+          const d=new Date(year,month,i+1);
+          const isWeekend=d.getDay()===0||d.getDay()===6;
+          const pt=ptMap[s.id+'_'+dateStr];
+          if(pt&&pt.statut==='Absent') absences++;
+          if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
+          const icon=pt?statusIcon[pt.statut]||'?':'';
+          const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':'#fff':'#fff';
+          return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" 
+            onclick="quickPointage('${s.id}','${dateStr}')" title="${dateStr}">${icon}</td>`;
+        }).join('');
+        return`<tr>
+          <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;white-space:nowrap">${s.prenom||''} ${s.nom}</td>
+          ${cells}
+          <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences}</td>
+          <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup:''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--muted)">
+      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span>
+      <span style="margin-left:8px;font-style:italic">Cliquez sur une case pour saisir</span>
+    </div>`;
+}
+
+async function quickPointage(salId, date){
+  const{data:existing}=await sb.from('pointages').select('*').eq('salarie_id',salId).eq('date',date).maybeSingle();
+  const statuts=['Présent','Absent','Retard','Congé'];
+  const current=existing?.statut||'';
+  const next=statuts[(statuts.indexOf(current)+1)%statuts.length];
+  if(existing){
+    await sb.from('pointages').update({statut:next}).eq('id',existing.id);
+  } else {
+    await sb.from('pointages').insert({salarie_id:salId,date,statut:next});
+  }
+  loadPointage();
+}
+
+function openPointageModal(){
+  const html=`<div class="modal">
+    <div class="modal-title">Saisir pointage</div>
+    <div class="form-group"><label>Salarié</label>
+      <select id="pt-sal">${allSalaries.map(s=>`<option value="${s.id}">${s.prenom||''} ${s.nom}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Date</label><input type="date" id="pt-date" value="${new Date().toISOString().split('T')[0]}"></div>
+    <div class="form-group"><label>Statut</label>
+      <select id="pt-statut"><option>Présent</option><option>Absent</option><option>Retard</option><option>Congé</option></select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="form-group"><label>Arrivée</label><input type="time" id="pt-arrivee"></div>
+      <div class="form-group"><label>Départ</label><input type="time" id="pt-depart"></div>
+      <div class="form-group"><label>H. Sup</label><input type="number" id="pt-hsup" min="0" step="0.5" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label>Note</label><input type="text" id="pt-note" placeholder="Motif retard, absence…"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePointage()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+async function savePointage(){
+  const salId=document.getElementById('pt-sal').value;
+  const date=document.getElementById('pt-date').value;
+  const payload={
+    salarie_id:salId, date,
+    statut:document.getElementById('pt-statut').value,
+    heure_arrivee:document.getElementById('pt-arrivee').value||null,
+    heure_depart:document.getElementById('pt-depart').value||null,
+    heures_sup:Number(document.getElementById('pt-hsup').value)||0,
+    note:document.getElementById('pt-note').value
+  };
+  await sb.from('pointages').upsert(payload,{onConflict:'salarie_id,date'});
+  closeModal('rh-modal'); toast('Pointage enregistré ✓'); loadPointage();
+}
+
+// ─── CONGÉS ───────────────────────────────────────────────────────────────────
+async function loadConges(){
+  const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  allSalaries=allSalaries.length?allSalaries:sal||[];
+  const{data}=await sb.from('conges').select('*,salaries(nom,prenom)').order('date_debut',{ascending:false});
+  const el=document.getElementById('rh-conges');
+  
+  // Planning visuel — mois courant
+  const today=new Date();
+  const year=today.getFullYear();
+  const month=today.getMonth();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const moisLabel=today.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+
+  // Build conge map
+  const congeMap={};
+  (data||[]).filter(c=>c.statut==='Approuvé').forEach(c=>{
+    const start=new Date(c.date_debut);
+    const end=new Date(c.date_fin);
+    for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+      if(d.getFullYear()===year&&d.getMonth()===month){
+        const key=c.salarie_id+'_'+d.getDate();
+        congeMap[key]=c.type_conge;
+      }
+    }
+  });
+
+  el.innerHTML=`
+    <div style="display:flex;gap:12px;margin-bottom:20px">
+      <button class="btn btn-primary btn-sm" onclick="openCongeModal()">+ Demande de congé</button>
+    </div>
+    <!-- PLANNING -->
+    <div style="margin-bottom:24px">
+      <div class="section-title" style="margin-bottom:12px">Planning — ${moisLabel}</div>
+      <div style="overflow-x:auto">
+      <table style="border-collapse:collapse;font-size:11px;min-width:100%">
+        <thead><tr>
+          <th style="padding:6px 12px;background:var(--bg);border:1px solid var(--border);min-width:140px;position:sticky;left:0">Salarié</th>
+          ${Array.from({length:daysInMonth},(_,i)=>{
+            const d=new Date(year,month,i+1);
+            const isWE=d.getDay()===0||d.getDay()===6;
+            return`<th style="padding:4px;text-align:center;background:${isWE?'#f0ece4':'var(--bg)'};border:1px solid var(--border);min-width:28px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${i+1}</th>`;
+          }).join('')}
+        </tr></thead>
+        <tbody>${(sal||[]).map(s=>`<tr>
+          <td style="padding:6px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;font-size:12px;white-space:nowrap">${s.prenom||''} ${s.nom}</td>
+          ${Array.from({length:daysInMonth},(_,i)=>{
+            const d=new Date(year,month,i+1);
+            const isWE=d.getDay()===0||d.getDay()===6;
+            const has=congeMap[s.id+'_'+(i+1)];
+            return`<td style="border:1px solid var(--border);background:${isWE?'#f5f3ee':has?'#FAEEDA':'#fff'};text-align:center;font-size:12px">${has?'🌴':''}</td>`;
+          }).join('')}
+        </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>
+    <!-- LISTE DEMANDES -->
+    <div class="section-title" style="margin-bottom:12px">Demandes de congé</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Salarié</th><th>Type</th><th>Du</th><th>Au</th><th>Jours</th><th>Motif</th><th>Statut</th><th></th></tr></thead>
+      <tbody>${(data||[]).length?(data||[]).map(c=>`<tr>
+        <td style="font-weight:500">${c.salaries?.prenom||''} ${c.salaries?.nom||'—'}</td>
+        <td><span class="badge badge-blue">${c.type_conge}</span></td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${c.date_debut?new Date(c.date_debut).toLocaleDateString('fr-FR'):'—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${c.date_fin?new Date(c.date_fin).toLocaleDateString('fr-FR'):'—'}</td>
+        <td style="text-align:center">${c.nb_jours}</td>
+        <td style="color:var(--muted)">${c.motif||'—'}</td>
+        <td><span class="badge ${c.statut==='Approuvé'?'badge-green':c.statut==='Refusé'?'badge-red':'badge-amber'}">${c.statut}</span></td>
+        <td><div class="actions" style="opacity:1">
+          ${c.statut==='En attente'?`<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="updateConge('${c.id}','Approuvé')">✓</button>
+          <button class="btn btn-sm btn-danger" onclick="updateConge('${c.id}','Refusé')">✗</button>`:''}
+          <button class="btn btn-sm btn-danger" onclick="deleteConge('${c.id}')">Suppr.</button>
+        </div></td>
+      </tr>`).join(''):'<tr><td colspan="8" class="empty">Aucune demande</td></tr>'}
+      </tbody>
+    </table></div>`;
+}
+
+function openCongeModal(){
+  const sal=allSalaries.length?allSalaries:[];
+  const html=`<div class="modal">
+    <div class="modal-title">Demande de congé</div>
+    <div class="form-group"><label>Salarié</label>
+      <select id="cg-sal">${sal.map(s=>`<option value="${s.id}">${s.prenom||''} ${s.nom}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Type de congé</label>
+      <select id="cg-type"><option>Congé payé</option><option>Maladie</option><option>Exceptionnel</option><option>Sans solde</option></select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="form-group"><label>Date début</label><input type="date" id="cg-debut"></div>
+      <div class="form-group"><label>Date fin</label><input type="date" id="cg-fin"></div>
+      <div class="form-group"><label>Nb jours</label><input type="number" id="cg-jours" min="1" value="1"></div>
+    </div>
+    <div class="form-group"><label>Motif</label><textarea id="cg-motif" rows="2"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveConge()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+  // Auto-calculate days
+  document.getElementById('cg-debut')?.addEventListener('change', calcJours);
+  document.getElementById('cg-fin')?.addEventListener('change', calcJours);
+}
+function calcJours(){
+  const d1=document.getElementById('cg-debut')?.value;
+  const d2=document.getElementById('cg-fin')?.value;
+  if(d1&&d2){
+    const diff=Math.round((new Date(d2)-new Date(d1))/(1000*60*60*24))+1;
+    document.getElementById('cg-jours').value=Math.max(1,diff);
+  }
+}
+async function saveConge(){
+  await sb.from('conges').insert({
+    salarie_id:document.getElementById('cg-sal').value,
+    type_conge:document.getElementById('cg-type').value,
+    date_debut:document.getElementById('cg-debut').value,
+    date_fin:document.getElementById('cg-fin').value,
+    nb_jours:Number(document.getElementById('cg-jours').value)||1,
+    motif:document.getElementById('cg-motif').value,
+    statut:'En attente'
+  });
+  closeModal('rh-modal'); toast('Demande enregistrée ✓'); loadConges();
+}
+async function updateConge(id,statut){
+  await sb.from('conges').update({statut}).eq('id',id);
+  toast(statut==='Approuvé'?'Congé approuvé ✓':'Congé refusé'); loadConges();
+}
+async function deleteConge(id){
+  if(!confirm('Supprimer ?'))return;
+  await sb.from('conges').delete().eq('id',id); loadConges();
+}
+
+// ─── PAIE ─────────────────────────────────────────────────────────────────────
+async function loadPaie(){
+  const today=new Date();
+  const mois=today.getMonth()+1;
+  const annee=today.getFullYear();
+  const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  const{data:paies}=await sb.from('paie').select('*').eq('mois',mois).eq('annee',annee);
+  const{data:pts}=await sb.from('pointages').select('*')
+    .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
+    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-31`);
+  const el=document.getElementById('rh-paie');
+  const moisLabel=today.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const paieMap={};
+  (paies||[]).forEach(p=>{paieMap[p.salarie_id]=p;});
+  const ptBySal={};
+  (pts||[]).forEach(p=>{if(!ptBySal[p.salarie_id])ptBySal[p.salarie_id]={absences:0,retards:0,hSup:0};
+    if(p.statut==='Absent')ptBySal[p.salarie_id].absences++;
+    if(p.statut==='Retard')ptBySal[p.salarie_id].retards++;
+    ptBySal[p.salarie_id].hSup+=Number(p.heures_sup||0);
+  });
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:500;text-transform:capitalize">Paie — ${moisLabel}</div>
+      <button class="btn btn-primary btn-sm" onclick="genererPaie()">Générer toutes les fiches</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Salarié</th><th>Base</th><th>Absences</th><th>Retards</th><th>H.Sup</th><th>Net à payer</th><th>Statut</th><th></th></tr></thead>
+      <tbody>${(sal||[]).map(s=>{
+        const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
+        const p=paieMap[s.id];
+        const base=Number(s.salaire_base||0);
+        const jourTravail=26;
+        const deducAbs=Math.round(base/jourTravail*pt.absences*100)/100;
+        const deducRet=Math.round(base/jourTravail*0.5*pt.retards*100)/100;
+        const hSupMontant=Math.round(base/jourTravail/8*1.25*pt.hSup*100)/100;
+        const net=p?Number(p.net_a_payer):Math.max(0,base+hSupMontant-deducAbs-deducRet);
+        return`<tr>
+          <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
+          <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences}j ${deducAbs>0?'('+(-deducAbs).toLocaleString('fr-FR')+')':''}</td>
+          <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}× ${deducRet>0?'('+(-deducRet).toLocaleString('fr-FR')+')':''}</td>
+          <td style="text-align:center;color:var(--green)">${pt.hSup>0?'+'+pt.hSup+'h':'-'}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
+          <td><span class="badge ${p?.statut==='Payé'?'badge-green':'badge-amber'}">${p?.statut||'À générer'}</span></td>
+          <td><div class="actions" style="opacity:1">
+            <button class="btn btn-sm" onclick="printFichePaie('${s.id}',${mois},${annee})">Fiche</button>
+            ${p?`<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="marquerPaye('${p.id}')">✓ Payé</button>`:''}
+          </div></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+async function genererPaie(){
+  toast('Génération en cours…');
+  const today=new Date();
+  const mois=today.getMonth()+1; const annee=today.getFullYear();
+  const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif');
+  const{data:pts}=await sb.from('pointages').select('*')
+    .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
+    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-31`);
+  const ptBySal={};
+  (pts||[]).forEach(p=>{if(!ptBySal[p.salarie_id])ptBySal[p.salarie_id]={absences:0,retards:0,hSup:0};
+    if(p.statut==='Absent')ptBySal[p.salarie_id].absences++;
+    if(p.statut==='Retard')ptBySal[p.salarie_id].retards++;
+    ptBySal[p.salarie_id].hSup+=Number(p.heures_sup||0);
+  });
+  for(const s of sal||[]){
+    const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
+    const base=Number(s.salaire_base||0);
+    const jourTravail=26;
+    const deducAbs=Math.round(base/jourTravail*pt.absences*100)/100;
+    const deducRet=Math.round(base/jourTravail*0.5*pt.retards*100)/100;
+    const hSupMontant=Math.round(base/jourTravail/8*1.25*pt.hSup*100)/100;
+    const net=Math.max(0,base+hSupMontant-deducAbs-deducRet);
+    await sb.from('paie').upsert({
+      salarie_id:s.id,mois,annee,
+      salaire_base:base,
+      heures_sup_montant:hSupMontant,
+      deduction_absences:deducAbs,
+      deduction_retards:deducRet,
+      net_a_payer:net,
+      statut:'En attente'
+    },{onConflict:'salarie_id,mois,annee'});
+  }
+  toast('Fiches de paie générées ✓'); loadPaie();
+}
+async function marquerPaye(id){
+  await sb.from('paie').update({statut:'Payé'}).eq('id',id);
+  toast('Marqué payé ✓'); loadPaie();
+}
+
+async function printFichePaie(salId,mois,annee){
+  const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
+  const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
+  const{data:pts}=await sb.from('pointages').select('*').eq('salarie_id',salId)
+    .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
+    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-31`);
+  const absences=(pts||[]).filter(p=>p.statut==='Absent').length;
+  const retards=(pts||[]).filter(p=>p.statut==='Retard').length;
+  const hSup=(pts||[]).reduce((s,p)=>s+Number(p.heures_sup||0),0);
+  const base=Number(s.salaire_base||0);
+  const jourTravail=26;
+  const deducAbs=Math.round(base/jourTravail*absences*100)/100;
+  const deducRet=Math.round(base/jourTravail*0.5*retards*100)/100;
+  const hSupMontant=Math.round(base/jourTravail/8*1.25*hSup*100)/100;
+  const net=p?Number(p.net_a_payer):Math.max(0,base+hSupMontant-deducAbs-deducRet);
+  const moisLabel=new Date(annee,mois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:18mm}</style>
+    <div style="border-bottom:2px solid #1a1a18;padding-bottom:20px;margin-bottom:24px;display:flex;justify-content:space-between">
+      <div><div style="font-size:24px;font-weight:600;letter-spacing:3px">BRUT</div>
+      <div style="font-size:11px;color:#888">Atelier de fabrication · Marrakech</div></div>
+      <div style="text-align:right"><div style="font-size:18px;font-weight:600">BULLETIN DE PAIE</div>
+      <div style="font-size:12px;color:#888;text-transform:capitalize">${moisLabel}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;padding:16px;background:#f8f6f1;border-radius:8px">
+      <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:6px">SALARIÉ</div>
+        <div style="font-size:16px;font-weight:600">${s.prenom||''} ${s.nom}</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">${s.poste||'—'} · ${s.atelier||'—'}</div>
+        <div style="font-size:12px;color:#888">${s.type_contrat||'CDI'} · Entrée : ${s.date_entree?new Date(s.date_entree).toLocaleDateString('fr-FR'):'—'}</div>
+      </div>
+      <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:6px">PÉRIODE</div>
+        <div style="font-size:14px;font-weight:500;text-transform:capitalize">${moisLabel}</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">Jours ouvrés : ${jourTravail}</div>
+        <div style="font-size:12px;color:#888">Absences : ${absences}j · Retards : ${retards}×</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+      <thead><tr style="background:#f8f6f1">
+        <th style="padding:10px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:1px solid #e8e4dc">RUBRIQUE</th>
+        <th style="padding:10px 14px;text-align:right;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:1px solid #e8e4dc">BASE</th>
+        <th style="padding:10px 14px;text-align:right;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:1px solid #e8e4dc">MONTANT (MAD)</th>
+      </tr></thead>
+      <tbody>
+        <tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Salaire de base</td><td style="padding:10px 14px;text-align:right;color:#888;border-bottom:1px solid #f0ece4">${jourTravail} jours</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;border-bottom:1px solid #f0ece4">+ ${base.toLocaleString('fr-FR')}</td></tr>
+        ${hSup>0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Heures supplémentaires (×1.25)</td><td style="padding:10px 14px;text-align:right;color:#888;border-bottom:1px solid #f0ece4">${hSup}h</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:#2d7a4f;border-bottom:1px solid #f0ece4">+ ${hSupMontant.toLocaleString('fr-FR')}</td></tr>`:''}
+        ${absences>0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Déduction absences</td><td style="padding:10px 14px;text-align:right;color:#888;border-bottom:1px solid #f0ece4">${absences} jour(s)</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:#a32d2d;border-bottom:1px solid #f0ece4">- ${deducAbs.toLocaleString('fr-FR')}</td></tr>`:''}
+        ${retards>0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Déduction retards</td><td style="padding:10px 14px;text-align:right;color:#888;border-bottom:1px solid #f0ece4">${retards} retard(s)</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:#a32d2d;border-bottom:1px solid #f0ece4">- ${deducRet.toLocaleString('fr-FR')}</td></tr>`:''}
+      </tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end">
+      <table style="border-collapse:collapse;min-width:280px">
+        <tr style="background:#1a1a18;color:#fff">
+          <td style="padding:14px 18px;font-weight:600;font-size:15px;border-radius:4px 0 0 4px">NET À PAYER</td>
+          <td style="padding:14px 18px;text-align:right;font-family:monospace;font-weight:600;font-size:15px;border-radius:0 4px 4px 0">${net.toLocaleString('fr-FR')} MAD</td>
+        </tr>
+      </table>
+    </div>
+    <div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px;padding-top:20px;border-top:1px solid #e8e4dc">
+      <div><div style="font-size:11px;color:#aaa;margin-bottom:30px">Signature employeur</div><div style="border-top:1px solid #1a1a18;padding-top:6px;font-size:11px;color:#888">Nabil Ziani — DG</div></div>
+      <div><div style="font-size:11px;color:#aaa;margin-bottom:30px">Signature salarié</div><div style="border-top:1px solid #1a1a18;padding-top:6px;font-size:11px;color:#888">${s.prenom||''} ${s.nom}</div></div>
+    </div>`;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+// ─── MODAL HELPER ─────────────────────────────────────────────────────────────
+function showModal(id, html){
+  let el=document.getElementById(id);
+  if(!el){el=document.createElement('div');el.id=id;el.className='overlay';el.onclick=function(e){if(e.target===el)closeModal(id);};document.body.appendChild(el);}
+  el.innerHTML=html;
+  el.classList.remove('hidden');
 }
 
 checkSession();
