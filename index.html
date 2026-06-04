@@ -1336,10 +1336,17 @@ async function deleteSalarie(id){
 }
 
 // ─── POINTAGE ─────────────────────────────────────────────────────────────────
+let currentPointageMois=new Date().getMonth();
+let currentPointageAnnee=new Date().getFullYear();
+let currentCongesMois=new Date().getMonth();
+let currentCongesAnnee=new Date().getFullYear();
+
+function navPointage(dir){currentPointageMois+=dir;if(currentPointageMois>11){currentPointageMois=0;currentPointageAnnee++;}if(currentPointageMois<0){currentPointageMois=11;currentPointageAnnee--;}loadPointage();}
+function navConges(dir){currentCongesMois+=dir;if(currentCongesMois>11){currentCongesMois=0;currentCongesAnnee++;}if(currentCongesMois<0){currentCongesMois=11;currentCongesAnnee--;}loadConges();}
+
 async function loadPointage(){
-  const today=new Date();
-  const month=today.getMonth();
-  const year=today.getFullYear();
+  const month=currentPointageMois;
+  const year=currentPointageAnnee;
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
   allSalaries=sal||[];
   const lastDay1=new Date(year,month+1,0).getDate();
@@ -1350,13 +1357,17 @@ async function loadPointage(){
   const daysInMonth=new Date(year,month+1,0).getDate();
   const ptMap={};
   (pts||[]).forEach(p=>{const d=p.date?p.date.split('T')[0]:p.date;ptMap[p.salarie_id+'_'+d]=p;});
-  const moisLabel=today.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const moisLabel=new Date(year,month,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
   const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Férié':'⭐'};
 
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:500;text-transform:capitalize">${moisLabel}</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-sm" onclick="navPointage(-1)">←</button>
+        <div style="font-size:15px;font-weight:500;text-transform:capitalize;min-width:140px;text-align:center">${moisLabel}</div>
+        <button class="btn btn-sm" onclick="navPointage(1)">→</button>
+      </div>
       <button class="btn btn-primary btn-sm" onclick="openPointageModal()">+ Saisir pointage</button>
     </div>
     <div style="overflow-x:auto">
@@ -1457,13 +1468,10 @@ async function loadConges(){
   allSalaries=sal||[];
   const{data}=await sb.from('conges').select('*,salaries(nom,prenom)').order('date_debut',{ascending:false});
   const el=document.getElementById('rh-conges');
-  
-  // Planning visuel — mois courant
-  const today=new Date();
-  const year=today.getFullYear();
-  const month=today.getMonth();
+  const year=currentCongesAnnee;
+  const month=currentCongesMois;
   const daysInMonth=new Date(year,month+1,0).getDate();
-  const moisLabel=today.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const moisLabel=new Date(year,month,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
   // Build conge map
   const congeMap={};
@@ -1484,7 +1492,11 @@ async function loadConges(){
     </div>
     <!-- PLANNING -->
     <div style="margin-bottom:24px">
-      <div class="section-title" style="margin-bottom:12px">Planning — ${moisLabel}</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <button class="btn btn-sm" onclick="navConges(-1)">←</button>
+        <div class="section-title" style="margin:0;text-transform:capitalize;min-width:140px;text-align:center">Planning — ${moisLabel}</div>
+        <button class="btn btn-sm" onclick="navConges(1)">→</button>
+      </div>
       <div style="overflow-x:auto">
       <table style="border-collapse:collapse;font-size:11px;min-width:100%">
         <thead><tr>
