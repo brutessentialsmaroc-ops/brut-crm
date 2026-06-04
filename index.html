@@ -2168,8 +2168,20 @@ async function openProspectModal(data={}){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Nom *</label><input id="pr-nom" value="${data.nom||''}" placeholder="Nom du prospect"></div>
       <div class="form-group"><label>Source</label>
-        <select id="pr-source">
-          ${['Direct','Instagram','Recommandation','Site web','Architecte','Autre'].map(s=>`<option ${data.source===s?'selected':''}>${s}</option>`).join('')}
+        <select id="pr-source" onchange="document.getElementById('source-autre-wrap').style.display=this.value==='Autre'?'block':'none'">
+          <option ${data.source==='Réseau Samir'?'selected':''}>Réseau Samir</option>
+          <option ${data.source==='Direct showroom'?'selected':''}>Direct showroom</option>
+          <option ${data.source==='BNI reco'?'selected':''}>BNI reco</option>
+          <option ${data.source==='Instagram'?'selected':''}>Instagram</option>
+          <option ${data.source==='Site web'?'selected':''}>Site web</option>
+          <option ${data.source==='Architecte partenaire'?'selected':''}>Architecte partenaire</option>
+          <option ${data.source==='Apporteur d affaires'?'selected':''}>Apporteur d affaires</option>
+          <option ${data.source==='Autre'?'selected':''}>Autre</option>
+        </select>
+      </div>
+      <div class="form-group" id="source-autre-wrap" style="display:${(data.source==='Autre')?'block':'none'}">
+        <label>Précisez la source</label>
+        <input id="pr-source-autre" value="${data.source_autre||''}" placeholder="Ex: Foire, événement…">
         </select>
       </div>
       <div class="form-group"><label>Téléphone</label><input id="pr-tel" value="${data.telephone||''}" placeholder="+212 6…"></div>
@@ -2221,6 +2233,7 @@ async function saveProspect(){
   const payload={
     nom,
     source:document.getElementById('pr-source').value,
+    source_autre:document.getElementById('pr-source-autre')?.value||null,
     telephone:document.getElementById('pr-tel').value,
     email:document.getElementById('pr-email').value,
     besoin:document.getElementById('pr-besoin').value,
