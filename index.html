@@ -1598,16 +1598,24 @@ async function loadPaie(){
         const deducRet=Math.round(base/jourTravail*0.5*pt.retards*100)/100;
         const hSupMontant=Math.round(base/jourTravail/8*1.25*pt.hSup*100)/100;
         const net=p?Number(p.net_a_payer):Math.max(0,base+hSupMontant-deducAbs-deducRet);
+        // Use saved paie values if exists, otherwise calculated
+        const absAff=p?Number(p.deduction_absences>0?(p.deduction_absences/(base/26)):0).toFixed(0):pt.absences;
+        const retAff=p?Number(p.deduction_retards>0?(p.deduction_retards/(base/26*0.5)):0).toFixed(0):pt.retards;
+        const hSupAff=p?Number(p.heures_sup_montant>0?(p.heures_sup_montant/(base/26/8*1.25)):0).toFixed(1):pt.hSup;
+        const deducAbsAff=p?Number(p.deduction_absences):deducAbs;
+        const deducRetAff=p?Number(p.deduction_retards):deducRet;
+        const hSupMontantAff=p?Number(p.heures_sup_montant):hSupMontant;
         return`<tr>
           <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
-          <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences}j ${deducAbs>0?'('+(-deducAbs).toLocaleString('fr-FR')+')':''}</td>
-          <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}× ${deducRet>0?'('+(-deducRet).toLocaleString('fr-FR')+')':''}</td>
-          <td style="text-align:center;color:var(--green)">${pt.hSup>0?'+'+pt.hSup+'h':'-'}</td>
+          <td style="text-align:center;color:${deducAbsAff>0?'var(--red)':'var(--muted)'}">${deducAbsAff>0?`-${absAff}j<br><span style="font-size:10px;font-family:'DM Mono',monospace">-${deducAbsAff.toLocaleString('fr-FR')}</span>`:'-0j'}</td>
+          <td style="text-align:center;color:${deducRetAff>0?'var(--amber)':'var(--muted)'}">${deducRetAff>0?`-${retAff}×<br><span style="font-size:10px;font-family:'DM Mono',monospace">-${deducRetAff.toLocaleString('fr-FR')}</span>`:'-0×'}</td>
+          <td style="text-align:center;color:var(--green)">${hSupMontantAff>0?`+${hSupAff}h<br><span style="font-size:10px;font-family:'DM Mono',monospace">+${hSupMontantAff.toLocaleString('fr-FR')}</span>`:'-'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
           <td><span class="badge ${p?.statut==='Payé'?'badge-green':'badge-amber'}">${p?.statut||'À générer'}</span></td>
-          <td><div class="actions" style="opacity:1">
+          <td><div class="actions" style="opacity:1;flex-wrap:wrap;gap:4px">
             <button class="btn btn-sm" onclick="printFichePaie('${s.id}',${mois},${annee})">Fiche</button>
+            <button class="btn btn-sm" onclick="openModifierPaie('${s.id}',${mois},${annee})">Modifier</button>
             ${p?`<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="marquerPaye('${p.id}')">✓ Payé</button>`:''}
           </div></td>
         </tr>`;
@@ -1729,6 +1737,81 @@ function showModal(id, html){
   if(!el){el=document.createElement('div');el.id=id;el.className='overlay';el.onclick=function(e){if(e.target===el)closeModal(id);};document.body.appendChild(el);}
   el.innerHTML=html;
   el.classList.remove('hidden');
+}
+
+async function openModifierPaie(salId, mois, annee){
+  const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
+  const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
+  const base=Number(s.salaire_base||0);
+  const html=`<div class="modal">
+    <div class="modal-title">Modifier paie — ${s.prenom||''} ${s.nom}</div>
+    <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px">
+      <strong>Salaire de base :</strong> ${base.toLocaleString('fr-FR')} MAD
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Absences (jours)</label>
+        <input type="number" id="pm-abs-j" min="0" value="${p?Math.round(Number(p.deduction_absences)/(base/26)||0):0}" oninput="calcPaieModif(${base})">
+      </div>
+      <div class="form-group"><label>Déduction absences (MAD)</label>
+        <input type="number" id="pm-abs-mad" min="0" step="0.01" value="${p?Number(p.deduction_absences).toFixed(2):0}" oninput="calcPaieModif(${base})">
+      </div>
+      <div class="form-group"><label>Retards (nombre)</label>
+        <input type="number" id="pm-ret-n" min="0" value="${p?Math.round(Number(p.deduction_retards)/(base/26*0.5)||0):0}" oninput="calcPaieModif(${base})">
+      </div>
+      <div class="form-group"><label>Déduction retards (MAD)</label>
+        <input type="number" id="pm-ret-mad" min="0" step="0.01" value="${p?Number(p.deduction_retards).toFixed(2):0}" oninput="calcPaieModif(${base})">
+      </div>
+      <div class="form-group"><label>Heures sup</label>
+        <input type="number" id="pm-hsup-h" min="0" step="0.5" value="${p?Number(p.heures_sup_montant/(base/26/8*1.25)||0).toFixed(1):0}" oninput="calcPaieModif(${base})">
+      </div>
+      <div class="form-group"><label>Montant heures sup (MAD)</label>
+        <input type="number" id="pm-hsup-mad" min="0" step="0.01" value="${p?Number(p.heures_sup_montant).toFixed(2):0}" oninput="calcPaieModif(${base})">
+      </div>
+    </div>
+    <div style="background:var(--text);color:#fff;border-radius:var(--radius);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <span style="font-weight:500">NET À PAYER</span>
+      <span id="pm-net" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600">${p?Number(p.net_a_payer).toLocaleString('fr-FR'):base.toLocaleString('fr-FR')} MAD</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePaieModif('${salId}',${mois},${annee},${base})">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+function calcPaieModif(base){
+  // Auto-calc MAD from jours/nombre
+  const absJ=Number(document.getElementById('pm-abs-j').value)||0;
+  const retN=Number(document.getElementById('pm-ret-n').value)||0;
+  const hSupH=Number(document.getElementById('pm-hsup-h').value)||0;
+  document.getElementById('pm-abs-mad').value=(base/26*absJ).toFixed(2);
+  document.getElementById('pm-ret-mad').value=(base/26*0.5*retN).toFixed(2);
+  document.getElementById('pm-hsup-mad').value=(base/26/8*1.25*hSupH).toFixed(2);
+  const net=Math.max(0,base
+    +Number(document.getElementById('pm-hsup-mad').value)
+    -Number(document.getElementById('pm-abs-mad').value)
+    -Number(document.getElementById('pm-ret-mad').value));
+  document.getElementById('pm-net').textContent=net.toLocaleString('fr-FR')+' MAD';
+}
+
+async function savePaieModif(salId,mois,annee,base){
+  const deducAbs=Number(document.getElementById('pm-abs-mad').value)||0;
+  const deducRet=Number(document.getElementById('pm-ret-mad').value)||0;
+  const hSupMontant=Number(document.getElementById('pm-hsup-mad').value)||0;
+  const net=Math.max(0,base+hSupMontant-deducAbs-deducRet);
+  await sb.from('paie').upsert({
+    salarie_id:salId,mois,annee,
+    salaire_base:base,
+    deduction_absences:deducAbs,
+    deduction_retards:deducRet,
+    heures_sup_montant:hSupMontant,
+    net_a_payer:net,
+    statut:'En attente'
+  },{onConflict:'salarie_id,mois,annee'});
+  closeModal('rh-modal');
+  toast('Paie mise à jour ✓');
+  loadPaie();
 }
 
 checkSession();
