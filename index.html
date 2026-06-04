@@ -1224,10 +1224,10 @@ async function loadRhSalaries(){
   const el=document.getElementById('rh-salaries');
   if(!allSalaries.length){el.innerHTML='<div class="empty">Aucun salarié. Cliquez + Nouveau pour en ajouter.</div>';return;}
   el.innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Salarié</th><th>Poste</th><th>Atelier</th><th>Contrat</th><th>Salaire base</th><th>Statut</th><th></th></tr></thead>
+    <thead><tr><th>Salarié</th><th>Poste</th><th>Atelier</th><th>Contrat</th><th>Salaire base</th><th>Statut</th><th>CNSS</th><th></th></tr></thead>
     <tbody>${allSalaries.map(s=>`<tr>
       <td><div class="client-cell">
-        <div class="avatar" style="background:var(--amber-bg);color:var(--amber)">${(s.prenom||s.nom||'?')[0].toUpperCase()}${(s.nom||'')[0]?.toUpperCase()||''}</div>
+        <div class="avatar" style="background:var(--amber-bg);color:var(--amber);overflow:hidden">${s.photo_url?`<img src="${s.photo_url}" style="width:100%;height:100%;object-fit:cover">`:`${(s.prenom||s.nom||'?')[0].toUpperCase()}${(s.nom||'')[0]?.toUpperCase()||''}`}</div>
         <div><div style="font-weight:500">${s.prenom||''} ${s.nom}</div><div style="font-size:11px;color:var(--muted)">${s.email||s.telephone||''}</div></div>
       </div></td>
       <td>${s.poste||'—'}</td>
@@ -1235,6 +1235,7 @@ async function loadRhSalaries(){
       <td><span class="badge badge-gray">${s.type_contrat||'CDI'}</span></td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${s.salaire_base?Number(s.salaire_base).toLocaleString('fr-FR')+' MAD':'—'}</td>
       <td><span class="badge ${s.statut==='Actif'?'badge-green':'badge-gray'}">${s.statut||'Actif'}</span></td>
+      <td><span class="badge ${s.cnss==='Validé'?'badge-green':s.cnss==='En cours'?'badge-amber':'badge-gray'}">${s.cnss||'À faire'}</span></td>
       <td><div class="actions">
         <button class="btn btn-sm" onclick="editSalarie('${s.id}')">Modifier</button>
         <button class="btn btn-sm btn-danger" onclick="deleteSalarie('${s.id}')">Suppr.</button>
@@ -1248,6 +1249,18 @@ function openSalarieModal(data={}){
   const html=`<div class="modal" style="max-width:580px">
     <div class="modal-title">${isEdit?'Modifier salarié':'Nouveau salarié'}</div>
     <input type="hidden" id="sal-id" value="${data.id||''}">
+    <!-- Photo -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:var(--radius)">
+      <div id="sal-photo-preview" style="width:64px;height:64px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500;color:var(--blue);overflow:hidden;flex-shrink:0">
+        ${data.photo_url?`<img src="${data.photo_url}" style="width:100%;height:100%;object-fit:cover">`:(data.prenom||data.nom||'?')[0].toUpperCase()}
+      </div>
+      <div>
+        <input type="file" id="sal-photo-input" accept="image/*" style="display:none" onchange="previewSalPhoto(this,'${data.id||''}')">
+        <button class="btn btn-sm" type="button" onclick="document.getElementById('sal-photo-input').click()">📷 Changer la photo</button>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG recommandé</div>
+      </div>
+      <input type="hidden" id="sal-photo-url" value="${data.photo_url||''}">
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Prénom</label><input id="sal-prenom" value="${data.prenom||''}"></div>
       <div class="form-group"><label>Nom *</label><input id="sal-nom" value="${data.nom||''}"></div>
@@ -1269,6 +1282,11 @@ function openSalarieModal(data={}){
       <div class="form-group"><label>Statut</label>
         <select id="sal-statut">
           ${['Actif','Inactif','Suspendu'].map(s=>`<option ${data.statut===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>CNSS</label>
+        <select id="sal-cnss">
+          ${['À faire','En cours','Validé'].map(c=>`<option ${data.cnss===c?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -1299,8 +1317,14 @@ async function saveSalarie(){
     type_contrat:document.getElementById('sal-contrat').value,
     salaire_base:Number(document.getElementById('sal-salaire').value)||0,
     statut:document.getElementById('sal-statut').value,
-    notes:document.getElementById('sal-notes').value
+    notes:document.getElementById('sal-notes').value,
+    cnss:document.getElementById('sal-cnss').value,
+    photo_url:document.getElementById('sal-photo-url').value||null
   };
+  // Handle pending photo for new salarie
+  if(!id && window._pendingSalPhoto){
+    // Will be uploaded after insert with new id
+  }
   if(id) await sb.from('salaries').update(payload).eq('id',id);
   else await sb.from('salaries').insert(payload);
   closeModal('rh-modal'); toast('Salarié enregistré ✓'); loadRhSalaries();
@@ -1734,6 +1758,34 @@ function showModal(id, html){
   if(!el){el=document.createElement('div');el.id=id;el.className='overlay';el.onclick=function(e){if(e.target===el)closeModal(id);};document.body.appendChild(el);}
   el.innerHTML=html;
   el.classList.remove('hidden');
+}
+
+async function previewSalPhoto(input, salId){
+  const file=input.files[0];
+  if(!file)return;
+  // Show preview immediately
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const prev=document.getElementById('sal-photo-preview');
+    prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+  };
+  reader.readAsDataURL(file);
+  // Upload to storage
+  if(!salId){
+    // Will upload on save - store file in memory
+    window._pendingSalPhoto=file;
+    return;
+  }
+  toast('Upload photo…');
+  const ext=file.name.split('.').pop();
+  const path=`salaries/${salId}.${ext}`;
+  const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+  if(!error){
+    const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+    document.getElementById('sal-photo-url').value=publicUrl;
+    await sb.from('salaries').update({photo_url:publicUrl}).eq('id',salId);
+    toast('Photo mise à jour ✓');
+  }
 }
 
 async function openModifierPaie(salId, mois, annee){
