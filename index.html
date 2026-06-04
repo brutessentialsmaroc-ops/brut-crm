@@ -238,7 +238,8 @@
     <div class="topbar">
       <div class="topbar-title" id="page-title">Tableau de bord</div>
       <div style="display:flex;gap:8px" id="topbar-actions">
-        <button class="btn btn-primary" id="btn-new" onclick="openNew()">+ Nouveau</button>
+        <button class="btn" onclick="exportExcel()" style="gap:6px">📊 Export Excel</button>
+      <button class="btn btn-primary" id="btn-new" onclick="openNew()">+ Nouveau</button>
       </div>
     </div>
     <div class="content">
@@ -1468,9 +1469,12 @@ let currentPointageMois=new Date().getMonth();
 let currentPointageAnnee=new Date().getFullYear();
 let currentCongesMois=new Date().getMonth();
 let currentCongesAnnee=new Date().getFullYear();
+let currentPaieMois=new Date().getMonth()+1;
+let currentPaieAnnee=new Date().getFullYear();
 
 function navPointage(dir){currentPointageMois+=dir;if(currentPointageMois>11){currentPointageMois=0;currentPointageAnnee++;}if(currentPointageMois<0){currentPointageMois=11;currentPointageAnnee--;}loadPointage();}
 function navConges(dir){currentCongesMois+=dir;if(currentCongesMois>11){currentCongesMois=0;currentCongesAnnee++;}if(currentCongesMois<0){currentCongesMois=11;currentCongesAnnee--;}loadConges();}
+function navPaie(dir){currentPaieMois+=dir;if(currentPaieMois>12){currentPaieMois=1;currentPaieAnnee++;}if(currentPaieMois<1){currentPaieMois=12;currentPaieAnnee--;}loadPaie();}
 
 async function loadPointage(){
   const month=currentPointageMois;
@@ -1726,9 +1730,8 @@ async function deleteConge(id){
 
 // ─── PAIE ─────────────────────────────────────────────────────────────────────
 async function loadPaie(){
-  const today=new Date();
-  const mois=today.getMonth()+1;
-  const annee=today.getFullYear();
+  const mois=currentPaieMois;
+  const annee=currentPaieAnnee;
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
   allSalaries=sal||[];
   const{data:paies}=await sb.from('paie').select('*').eq('mois',mois).eq('annee',annee);
@@ -1748,7 +1751,11 @@ async function loadPaie(){
 
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:500;text-transform:capitalize">Paie — ${moisLabel}</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-sm" onclick="navPaie(-1)">←</button>
+        <div style="font-size:15px;font-weight:500;text-transform:capitalize;min-width:140px;text-align:center">Paie — ${moisLabel}</div>
+        <button class="btn btn-sm" onclick="navPaie(1)">→</button>
+      </div>
       <button class="btn btn-primary btn-sm" onclick="genererPaie()">Générer toutes les fiches</button>
     </div>
     <div class="table-wrap"><table>
@@ -2304,6 +2311,78 @@ function removeProspectPhoto(idx){
     `<div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()">
       <span style="font-size:20px">+</span><span>Inspi</span>
     </div>`;
+}
+
+// ─── EXPORT EXCEL ────────────────────────────────────────────────────────────
+async function exportExcel(){
+  toast('Préparation export…');
+  const[{data:clients},{data:commandes},{data:devis},{data:prospects},{data:salaries},{data:factures}]=await Promise.all([
+    sb.from('clients').select('*'),
+    sb.from('commandes').select('*,clients(nom)'),
+    sb.from('devis').select('*,clients(nom)'),
+    sb.from('prospects').select('*'),
+    sb.from('salaries').select('*'),
+    sb.from('factures').select('*,clients(nom)')
+  ]);
+
+  const toCSV=(rows,cols)=>{
+    const header=cols.map(c=>c.label).join(';');
+    const lines=rows.map(r=>cols.map(c=>{
+      const v=r[c.key]??'';
+      return typeof v==='string'&&v.includes(';')?`"${v}"`:v;
+    }).join(';'));
+    return [header,...lines].join('\n');
+  };
+
+  const sheets={
+    'Clients':toCSV(clients||[],[
+      {label:'Nom',key:'nom'},{label:'Type',key:'type'},{label:'Email',key:'email'},
+      {label:'Téléphone',key:'telephone'},{label:'Ville',key:'ville'},{label:'Créé le',key:'created_at'}
+    ]),
+    'Commandes':toCSV(commandes||[],[
+      {label:'Référence',key:'reference'},{label:'Client',key:'clients'},{label:'Description',key:'description'},
+      {label:'Montant',key:'montant'},{label:'Statut',key:'statut'},{label:'Livraison',key:'date_livraison'}
+    ]),
+    'Devis':toCSV(devis||[],[
+      {label:'Référence',key:'reference'},{label:'Client',key:'clients'},{label:'Projet',key:'projet_nom'},
+      {label:'Statut',key:'statut'},{label:'Date',key:'date_envoi'}
+    ]),
+    'Prospects':toCSV(prospects||[],[
+      {label:'Nom',key:'nom'},{label:'Téléphone',key:'telephone'},{label:'Email',key:'email'},
+      {label:'Source',key:'source'},{label:'Besoin',key:'besoin'},{label:'Budget',key:'budget'},{label:'Statut',key:'statut'}
+    ]),
+    'Salariés':toCSV(salaries||[],[
+      {label:'Nom',key:'nom'},{label:'Prénom',key:'prenom'},{label:'Poste',key:'poste'},
+      {label:'Atelier',key:'atelier'},{label:'Contrat',key:'type_contrat'},{label:'Salaire base',key:'salaire_base'},{label:'CNSS',key:'cnss'}
+    ]),
+    'Factures':toCSV(factures||[],[
+      {label:'Référence',key:'reference'},{label:'Client',key:'clients'},{label:'Projet',key:'projet_nom'},
+      {label:'Statut',key:'statut'},{label:'Émise le',key:'date_emission'},{label:'Échéance',key:'date_echeance'}
+    ])
+  };
+
+  // Build multi-sheet HTML table for download
+  const date=new Date().toLocaleDateString('fr-FR').replace(/\//g,'-');
+  let html='<html><head><meta charset="UTF-8"></head><body>';
+  Object.entries(sheets).forEach(([name,csv])=>{
+    html+=`<h2>${name}</h2><table border="1">`;
+    csv.split('\n').forEach((row,i)=>{
+      html+='<tr>';
+      row.split(';').forEach(cell=>{
+        html+=i===0?`<th>${cell}</th>`:`<td>${cell}</td>`;
+      });
+      html+='</tr>';
+    });
+    html+='</table><br>';
+  });
+  html+='</body></html>';
+
+  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`BRUT-CRM-Export-${date}.xls`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Export téléchargé ✓');
 }
 
 checkSession();
