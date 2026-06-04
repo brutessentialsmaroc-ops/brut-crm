@@ -1358,7 +1358,7 @@ async function loadPointage(){
           const icon=pt?statusIcon[pt.statut]||'?':'';
           const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':'#fff':'#fff';
           return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" 
-            onclick="quickPointage('${s.id}','${dateStr}')" title="${dateStr}">${icon}</td>`;
+            onclick="quickPointage('${s.id}','${dateStr}',this)" title="${dateStr}">${icon}</td>`;
         }).join('');
         return`<tr>
           <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;white-space:nowrap">${s.prenom||''} ${s.nom}</td>
@@ -1374,7 +1374,8 @@ async function loadPointage(){
     </div>`;
 }
 
-async function quickPointage(salId, date){
+async function quickPointage(salId, date, cell){
+  if(cell){cell.style.opacity='0.3';cell.style.pointerEvents='none';}
   const{data:existing}=await sb.from('pointages').select('*').eq('salarie_id',salId).eq('date',date).maybeSingle();
   const statuts=['Présent','Absent','Retard','Congé'];
   const current=existing?.statut||'';
@@ -1384,7 +1385,7 @@ async function quickPointage(salId, date){
   } else {
     await sb.from('pointages').insert({salarie_id:salId,date,statut:next});
   }
-  loadPointage();
+  await loadPointage();
 }
 
 function openPointageModal(){
