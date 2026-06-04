@@ -286,10 +286,11 @@
               <div class="form-group"><label>Date de livraison</label><input type="date" id="ticket-livraison"></div>
               <div class="form-group"><label>Ateliers concernés</label>
                 <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">
-                  ${['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronnerie'].map(a=>`
-                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)">
-                    <input type="checkbox" id="atl-${a.toLowerCase().replace('é','e').replace('è','e')}" style="width:auto;accent-color:var(--text)"> ${a}
-                  </label>`).join('')}
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)"><input type="checkbox" id="atl-carcasse" style="width:auto"> Carcasse</label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)"><input type="checkbox" id="atl-menuiserie" style="width:auto"> Menuiserie</label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)"><input type="checkbox" id="atl-tapisserie" style="width:auto"> Tapisserie</label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)"><input type="checkbox" id="atl-ceramique" style="width:auto"> Céramique</label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)"><input type="checkbox" id="atl-ferronnerie" style="width:auto"> Ferronnerie</label>
                 </div>
               </div>
               <div class="form-group"><label>Étiquettes</label>
