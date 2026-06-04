@@ -303,6 +303,9 @@
                     <input type="checkbox" id="lbl-bloque" style="width:auto;accent-color:#3D3D3A"> <span class="label-tag label-bloque">🔒 BLOQUÉ</span></label>
                 </div>
               </div>
+              <div class="form-group"><label>Notes / Instructions atelier</label>
+                <textarea id="ticket-notes-atelier" rows="3" placeholder="Ex: Tissu velours bordeaux ref. VB-220, finition chêne naturel…"></textarea>
+              </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-primary" onclick="saveTicket()">Enregistrer</button>
                 <button class="btn" onclick="printFicheAtelier()">🖨 Fiche atelier A5</button>
@@ -666,6 +669,7 @@ async function openTicket(id){
     const el=document.getElementById('atl-'+a);
     if(el) el.checked=ateliersVal.includes(a);
   });
+  document.getElementById('ticket-notes-atelier').value=c.notes_atelier||'';
   const etiq=c.etiquettes||[];
   document.getElementById('lbl-urgent').checked=etiq.includes('urgent');
   document.getElementById('lbl-problematique').checked=etiq.includes('problematique');
@@ -761,7 +765,8 @@ async function saveTicket(){
   if(document.getElementById('lbl-bloque').checked)etiquettes.push('bloque');
   const ateliersCheck=['carcasse','menuiserie','tapisserie','ceramique','ferronnerie'];
   const ateliers=ateliersCheck.filter(a=>{const el=document.getElementById('atl-'+a);return el&&el.checked;});
-  await sb.from('commandes').update({description:desc,atelier_statut:statut,date_livraison:livraison||null,etiquettes,ateliers}).eq('id',currentTicketId);
+  const notesAtelier=document.getElementById('ticket-notes-atelier').value;
+  await sb.from('commandes').update({description:desc,atelier_statut:statut,date_livraison:livraison||null,etiquettes,ateliers,notes_atelier:notesAtelier}).eq('id',currentTicketId);
   toast('Enregistré ✓');
 }
 
@@ -1909,8 +1914,9 @@ async function printFicheAtelier(){
           }
         </div>
         <!-- Zone notes/croquis -->
-        <div style="height:28mm;border:1.5px solid #C8A97A;border-radius:4px;padding:4px;display:flex;align-items:flex-start">
-          <div style="font-size:9px;color:#C8A97A;font-weight:500;letter-spacing:0.5px">NOTES / CROQUIS</div>
+        <div style="height:28mm;border:1.5px solid #C8A97A;border-radius:4px;padding:6px;display:flex;flex-direction:column">
+          <div style="font-size:9px;color:#C8A97A;font-weight:500;letter-spacing:0.5px;margin-bottom:4px">NOTES / INSTRUCTIONS</div>
+          <div style="font-size:11px;color:#1a1a18;line-height:1.4;white-space:pre-wrap">${c.notes_atelier||''}</div>
         </div>
       </div>
       <!-- COLONNE DROITE : infos -->
