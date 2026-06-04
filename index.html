@@ -1317,9 +1317,10 @@ async function loadPointage(){
   const month=today.getMonth();
   const year=today.getFullYear();
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  const lastDay1=new Date(year,month+1,0).getDate();
   const{data:pts}=await sb.from('pointages').select('*')
     .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
-    .lte('date',`${year}-${String(month+1).padStart(2,'0')}-31`);
+    .lte('date',`${year}-${String(month+1).padStart(2,'0')}-${String(lastDay1).padStart(2,'0')}`);
   const el=document.getElementById('rh-pointage');
   const daysInMonth=new Date(year,month+1,0).getDate();
   const ptMap={};
@@ -1617,9 +1618,10 @@ async function genererPaie(){
   const today=new Date();
   const mois=today.getMonth()+1; const annee=today.getFullYear();
   const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif');
+  const lastDay4=new Date(annee,mois,0).getDate();
   const{data:pts}=await sb.from('pointages').select('*')
     .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
-    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-31`);
+    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-${String(lastDay4).padStart(2,'0')}`);
   const ptBySal={};
   (pts||[]).forEach(p=>{if(!ptBySal[p.salarie_id])ptBySal[p.salarie_id]={absences:0,retards:0,hSup:0};
     if(p.statut==='Absent')ptBySal[p.salarie_id].absences++;
@@ -1654,9 +1656,10 @@ async function marquerPaye(id){
 async function printFichePaie(salId,mois,annee){
   const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
+  const lastDay3=new Date(annee,mois,0).getDate();
   const{data:pts}=await sb.from('pointages').select('*').eq('salarie_id',salId)
     .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
-    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-31`);
+    .lte('date',`${annee}-${String(mois).padStart(2,'0')}-${String(lastDay3).padStart(2,'0')}`);
   const absences=(pts||[]).filter(p=>p.statut==='Absent').length;
   const retards=(pts||[]).filter(p=>p.statut==='Retard').length;
   const hSup=(pts||[]).reduce((s,p)=>s+Number(p.heures_sup||0),0);
