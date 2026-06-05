@@ -462,15 +462,26 @@
 
 <!-- MODAL COMMANDE -->
 <div class="overlay hidden" id="modal-commande">
-  <div class="modal">
+  <div class="modal" style="max-width:640px">
     <div class="modal-title" id="modal-commande-title">Nouvelle commande</div>
     <input type="hidden" id="commande-id">
-    <div class="form-group"><label>Client *</label><select id="commande-client"></select></div>
-    <div class="form-group"><label>Description *</label><input type="text" id="commande-desc"></div>
-    <div class="form-group"><label>Montant (MAD)</label><input type="number" id="commande-montant"></div>
-    <div class="form-group"><label>Date de livraison</label><input type="date" id="commande-livraison"></div>
-    <div class="form-group"><label>Statut</label><select id="commande-statut"><option>En attente</option><option>Devis accepté</option><option>En fabrication</option><option>Finition</option><option>Livré</option></select></div>
-    <div class="form-group"><label>Progression (%)</label><input type="number" id="commande-progression" min="0" max="100"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Client *</label><select id="commande-client"></select></div>
+      <div class="form-group"><label>Statut</label><select id="commande-statut"><option>En attente</option><option>Devis accepté</option><option>En fabrication</option><option>Finition</option><option>Livré</option></select></div>
+      <div class="form-group"><label>Date de livraison</label><input type="date" id="commande-livraison"></div>
+      <div class="form-group"><label>Progression (%)</label><input type="number" id="commande-progression" min="0" max="100" value="0"></div>
+    </div>
+    <!-- LIGNES PRODUITS -->
+    <div style="margin:8px 0 4px">
+      <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;font-family:'DM Mono',monospace">Produits / Articles</label>
+      <div id="commande-lignes"></div>
+      <button type="button" class="btn btn-sm" style="margin-top:8px;width:100%;justify-content:center" onclick="addLigneCommande()">+ Ajouter un article</button>
+    </div>
+    <div style="background:var(--text);color:#fff;border-radius:var(--radius);padding:10px 14px;display:flex;justify-content:space-between;margin:12px 0 8px">
+      <span style="font-size:13px;font-weight:500">TOTAL</span>
+      <span id="commande-total" style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">0 MAD</span>
+    </div>
+    <input type="hidden" id="commande-montant">
     <div class="form-group"><label>Facture associée</label><select id="commande-facture"><option value="">— Aucune facture —</option></select></div>
     <div class="form-group"><label>Notes</label><textarea id="commande-notes"></textarea></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-commande')">Annuler</button><button class="btn btn-primary" onclick="saveCommande()">Enregistrer</button></div>
@@ -680,12 +691,12 @@ async function openCommandeModal(data={}){
   document.getElementById('commande-facture').innerHTML='<option value="">— Aucune facture —</option>'+(factures||[]).map(f=>`<option value="${f.id}" ${data.facture_id===f.id?'selected':''}>${f.reference||''} · ${f.clients?.nom||''} ${f.projet_nom?'— '+f.projet_nom:''}</option>`).join('');
   document.getElementById('modal-commande-title').textContent=data.id?'Modifier':'Nouvelle commande';
   document.getElementById('commande-id').value=data.id||'';
-  document.getElementById('commande-desc').value=data.description||'';
-  document.getElementById('commande-montant').value=data.montant||'';
   document.getElementById('commande-livraison').value=data.date_livraison||'';
   document.getElementById('commande-statut').value=data.statut||'En attente';
   document.getElementById('commande-progression').value=data.progression||0;
   document.getElementById('commande-notes').value=data.notes||'';
+  // Init lignes
+  initCommandeLignes(data.lignes||[{desc:data.description||'',qte:1,pu:Number(data.montant||0)}]);
   document.getElementById('modal-commande').classList.remove('hidden');
 }
 async function editCommande(id){const{data}=await sb.from('commandes').select('*').eq('id',id).single();openCommandeModal(data||{});}
@@ -2308,6 +2319,54 @@ function generateFicheClient(){
 
   document.getElementById('pdf-preview').style.display='block';
   setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+// ─── LIGNES COMMANDE ─────────────────────────────────────────────────────────
+let commandeLignes = [];
+
+function initCommandeLignes(lignes){
+  commandeLignes = lignes && lignes.length ? lignes : [{desc:'',qte:1,pu:0}];
+  renderCommandeLignes();
+}
+
+function renderCommandeLignes(){
+  const container = document.getElementById('commande-lignes');
+  if(!container) return;
+  container.innerHTML = commandeLignes.map((l,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 60px 100px 20px;gap:8px;margin-bottom:6px;align-items:center">
+      <input type="text" value="${l.desc||''}" placeholder="Description article…" style="font-size:13px"
+        oninput="commandeLignes[${i}].desc=this.value">
+      <input type="number" value="${l.qte||1}" min="1" step="1" style="font-size:13px;text-align:center"
+        oninput="commandeLignes[${i}].qte=Number(this.value);updateCommandeTotal()">
+      <input type="number" value="${l.pu||0}" min="0" placeholder="Prix" style="font-size:13px;text-align:right"
+        oninput="commandeLignes[${i}].pu=Number(this.value);updateCommandeTotal()">
+      <button type="button" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0" onclick="removeLigneCommande(${i})">✕</button>
+    </div>`).join('');
+  updateCommandeTotal();
+}
+
+function addLigneCommande(){
+  commandeLignes.push({desc:'',qte:1,pu:0});
+  renderCommandeLignes();
+  // Focus last description
+  setTimeout(()=>{
+    const inputs=document.querySelectorAll('#commande-lignes input[type=text]');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  },50);
+}
+
+function removeLigneCommande(i){
+  if(commandeLignes.length<=1){toast('Gardez au moins un article');return;}
+  commandeLignes.splice(i,1);
+  renderCommandeLignes();
+}
+
+function updateCommandeTotal(){
+  const total=commandeLignes.reduce((s,l)=>s+Number(l.qte||0)*Number(l.pu||0),0);
+  const el=document.getElementById('commande-total');
+  if(el) el.textContent=total.toLocaleString('fr-FR')+' MAD';
+  const hidden=document.getElementById('commande-montant');
+  if(hidden) hidden.value=total;
 }
 
 checkSession();
