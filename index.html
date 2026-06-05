@@ -278,6 +278,39 @@
       </div>
       <!-- CLIENTS -->
       <div id="page-clients" class="hidden"><div class="table-wrap" id="clients-table"><div class="loading">Chargement…</div></div></div>
+      <!-- CLIENT DETAIL -->
+      <div id="page-client-detail" class="hidden">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <button class="btn btn-sm" onclick="showPage('clients',document.querySelector('.nav-item:nth-child(2)'))">← Clients</button>
+        </div>
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:20px">
+          <!-- Fiche client -->
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+            <div id="cd-avatar" style="width:60px;height:60px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500;color:var(--blue);margin-bottom:16px"></div>
+            <div id="cd-nom" style="font-size:18px;font-weight:500;margin-bottom:4px"></div>
+            <div id="cd-type" style="margin-bottom:16px"></div>
+            <div style="border-top:1px solid var(--border);padding-top:16px">
+              <div id="cd-email" style="font-size:13px;color:var(--muted);margin-bottom:6px"></div>
+              <div id="cd-tel" style="font-size:13px;color:var(--muted);margin-bottom:6px"></div>
+              <div id="cd-ville" style="font-size:13px;color:var(--muted);margin-bottom:6px"></div>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px">
+              <div class="section-title" style="margin-bottom:10px">CA Total</div>
+              <div id="cd-ca" style="font-size:22px;font-weight:500;font-family:'DM Mono',monospace"></div>
+            </div>
+            <div id="cd-notes" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;font-size:13px;color:var(--muted);line-height:1.5"></div>
+          </div>
+          <!-- Historique -->
+          <div>
+            <div class="section-title" style="margin-bottom:10px">Devis</div>
+            <div class="table-wrap" id="cd-devis" style="margin-bottom:20px"></div>
+            <div class="section-title" style="margin-bottom:10px">Factures</div>
+            <div class="table-wrap" id="cd-factures" style="margin-bottom:20px"></div>
+            <div class="section-title" style="margin-bottom:10px">Commandes</div>
+            <div class="table-wrap" id="cd-commandes"></div>
+          </div>
+        </div>
+      </div>
       <!-- COMMANDES -->
       <div id="page-commandes" class="hidden"><div class="table-wrap" id="commandes-table"><div class="loading">Chargement…</div></div></div>
       <!-- ATELIER -->
@@ -437,6 +470,7 @@
     <div class="form-group"><label>Date de livraison</label><input type="date" id="commande-livraison"></div>
     <div class="form-group"><label>Statut</label><select id="commande-statut"><option>En attente</option><option>Devis accepté</option><option>En fabrication</option><option>Finition</option><option>Livré</option></select></div>
     <div class="form-group"><label>Progression (%)</label><input type="number" id="commande-progression" min="0" max="100"></div>
+    <div class="form-group"><label>Facture associée</label><select id="commande-facture"><option value="">— Aucune facture —</option></select></div>
     <div class="form-group"><label>Notes</label><textarea id="commande-notes"></textarea></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-commande')">Annuler</button><button class="btn btn-primary" onclick="saveCommande()">Enregistrer</button></div>
   </div>
@@ -494,7 +528,7 @@ function showPage(page,el){
   document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+page).classList.remove('hidden');
   if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
-  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects'}[page]||page;
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client'}[page]||page;
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
@@ -608,7 +642,7 @@ async function loadClients(){
   const{data}=await sb.from('clients').select('*,commandes(id,montant)').order('created_at',{ascending:false});
   const el=document.getElementById('clients-table');
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun client.</div>';return}
-  el.innerHTML=`<table><thead><tr><th>Client</th><th>Type</th><th>Contact</th><th>Commandes</th><th>CA total</th><th></th></tr></thead><tbody>${(data||[]).map(c=>{const ca=(c.commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);return`<tr><td><div class="client-cell"><div class="avatar">${initials(c.nom)}</div><span style="font-weight:500">${c.nom}</span></div></td><td><span class="badge badge-gray">${c.type||'—'}</span></td><td style="color:var(--muted)">${c.email||c.telephone||'—'}</td><td>${(c.commandes||[]).length}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(ca)}</td><td><div class="actions"><button class="btn btn-sm" onclick="editClient('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Suppr.</button></div></td></tr>`}).join('')}</tbody></table>`;
+  el.innerHTML=`<table><thead><tr><th>Client</th><th>Type</th><th>Contact</th><th>Commandes</th><th>CA total</th><th></th></tr></thead><tbody>${(data||[]).map(c=>{const ca=(c.commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);return`<tr style="cursor:pointer" onclick="openClientDetail('${c.id}')"><td><div class="client-cell"><div class="avatar">${initials(c.nom)}</div><span style="font-weight:500">${c.nom}</span></div></td><td><span class="badge badge-gray">${c.type||'—'}</span></td><td style="color:var(--muted)">${c.email||c.telephone||'—'}</td><td>${(c.commandes||[]).length}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(ca)}</td><td><div class="actions" onclick="event.stopPropagation()"><button class="btn btn-sm" onclick="editClient('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Suppr.</button></div></td></tr>`}).join('')}</tbody></table>`;
 }
 async function editClient(id){const{data}=await sb.from('clients').select('*').eq('id',id).single();openClientModal(data||{});}
 function openClientModal(data={}){
@@ -633,12 +667,16 @@ async function loadCommandes(){
   const{data}=await sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false});
   const el=document.getElementById('commandes-table');
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune commande.</div>';return}
-  el.innerHTML=`<table><thead><tr><th>Réf.</th><th>Client</th><th>Description</th><th>Montant</th><th>Livraison</th><th>Statut</th><th></th></tr></thead><tbody>${data.map(c=>`<tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.reference||'—'}</td><td>${c.clients?.nom||'—'}</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(c.montant)}</td><td style="color:var(--muted)">${c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td><td><div class="actions"><button class="btn btn-sm" onclick="editCommande('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteCommande('${c.id}')">Suppr.</button></div></td></tr>`).join('')}</tbody></table>`;
+  el.innerHTML=`<table><thead><tr><th>Réf.</th><th>Client</th><th>Description</th><th>Montant</th><th>Livraison</th><th>Statut</th><th>Facture</th><th></th></tr></thead><tbody>${data.map(c=>`<tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${c.reference||'—'}</td><td>${c.clients?.nom||'—'}</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td style="font-family:'DM Mono',monospace;font-size:12px">${fmt(c.montant)}</td><td style="color:var(--muted)">${c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td><td><div class="actions"><button class="btn btn-sm" onclick="editCommande('${c.id}')">Modifier</button><button class="btn btn-sm btn-danger" onclick="deleteCommande('${c.id}')">Suppr.</button></div></td></tr>`).join('')}</tbody></table>`;
 }
 async function openCommandeModal(data={}){
-  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
+  const[{data:clients},{data:factures}]=await Promise.all([
+    sb.from('clients').select('id,nom').order('nom'),
+    sb.from('factures').select('id,reference,projet_nom,clients(nom)').order('created_at',{ascending:false})
+  ]);
   document.getElementById('commande-client').innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
   if(data.client_id)document.getElementById('commande-client').value=data.client_id;
+  document.getElementById('commande-facture').innerHTML='<option value="">— Aucune facture —</option>'+(factures||[]).map(f=>`<option value="${f.id}" ${data.facture_id===f.id?'selected':''}>${f.reference||''} · ${f.clients?.nom||''} ${f.projet_nom?'— '+f.projet_nom:''}</option>`).join('');
   document.getElementById('modal-commande-title').textContent=data.id?'Modifier':'Nouvelle commande';
   document.getElementById('commande-id').value=data.id||'';
   document.getElementById('commande-desc').value=data.description||'';
@@ -2383,6 +2421,69 @@ async function exportExcel(){
   a.href=url; a.download=`BRUT-CRM-Export-${date}.xls`;
   a.click(); URL.revokeObjectURL(url);
   toast('Export téléchargé ✓');
+}
+
+// ─── CLIENT DETAIL ───────────────────────────────────────────────────────────
+async function openClientDetail(id){
+  const[{data:c},{data:devis},{data:factures},{data:commandes}]=await Promise.all([
+    sb.from('clients').select('*').eq('id',id).single(),
+    sb.from('devis').select('*,devis_sections(devis_articles(quantite,prix_unitaire))').eq('client_id',id).order('created_at',{ascending:false}),
+    sb.from('factures').select('*,devis(devis_sections(devis_articles(quantite,prix_unitaire)))').eq('client_id',id).order('created_at',{ascending:false}),
+    sb.from('commandes').select('*').eq('client_id',id).order('created_at',{ascending:false})
+  ]);
+
+  // Fiche
+  document.getElementById('cd-avatar').textContent=initials(c.nom);
+  document.getElementById('cd-nom').textContent=c.nom;
+  document.getElementById('cd-type').innerHTML=`<span class="badge badge-gray">${c.type||'—'}</span>`;
+  document.getElementById('cd-email').textContent=c.email?'✉ '+c.email:'';
+  document.getElementById('cd-tel').textContent=c.telephone?'📞 '+c.telephone:'';
+  document.getElementById('cd-ville').textContent=c.ville?'📍 '+c.ville:'';
+  document.getElementById('cd-notes').textContent=c.notes||'';
+  const ca=(commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);
+  document.getElementById('cd-ca').textContent=ca.toLocaleString('fr-FR')+' MAD';
+
+  // Devis
+  const elD=document.getElementById('cd-devis');
+  if((devis||[]).length){
+    elD.innerHTML=`<table><thead><tr><th>Réf.</th><th>Projet</th><th>Montant HT</th><th>Date</th><th>Statut</th></tr></thead><tbody>
+    ${devis.map(d=>{
+      const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+      return`<tr>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${d.reference||'—'}</td>
+        <td>${d.projet_nom||'—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${ht.toLocaleString('fr-FR')} MAD</td>
+        <td style="color:var(--muted)">${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</td>
+        <td><span class="badge ${badgeClass(d.statut)}">${d.statut}</span></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  } else { elD.innerHTML='<div class="empty">Aucun devis</div>'; }
+
+  // Factures
+  const elF=document.getElementById('cd-factures');
+  if((factures||[]).length){
+    elF.innerHTML=`<table><thead><tr><th>Réf.</th><th>Projet</th><th>Montant TTC</th><th>Émise le</th><th>Statut</th></tr></thead><tbody>
+    ${factures.map(f=>{
+      const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+      return`<tr>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${f.reference||'—'}</td>
+        <td>${f.projet_nom||'—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${(ht*1.2).toLocaleString('fr-FR')} MAD</td>
+        <td style="color:var(--muted)">${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</td>
+        <td><span class="badge ${f.statut==='Payée'?'badge-green':'badge-amber'}">${f.statut}</span></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  } else { elF.innerHTML='<div class="empty">Aucune facture</div>'; }
+
+  // Commandes
+  const elC=document.getElementById('cd-commandes');
+  if((commandes||[]).length){
+    elC.innerHTML=`<table><thead><tr><th>Réf.</th><th>Description</th><th>Montant</th><th>Livraison</th><th>Statut</th></tr></thead><tbody>
+    ${commandes.map(c=>'<tr><td style="font-family:monospace;font-size:11px;color:var(--muted)">'+( c.reference||'—')+'</td><td>'+(c.description||'—')+'</td><td style="font-family:monospace;font-size:12px">'+Number(c.montant||0).toLocaleString('fr-FR')+' MAD</td><td style="color:var(--muted)">'+(c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'—')+'</td><td><span class="badge '+badgeClass(c.statut)+'">'+c.statut+'</span></td></tr>').join('')}</tbody></table>`;
+  } else { elC.innerHTML='<div class="empty">Aucune commande</div>'; }
+
+  showPage('client-detail', null);
+  document.getElementById('page-title').textContent=c.nom;
 }
 
 checkSession();
