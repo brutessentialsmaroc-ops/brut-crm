@@ -1264,11 +1264,56 @@ async function loadFactures(){
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeCls}">${f.statut}</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();editFacture('${f.id}')">Modifier</button>
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();marquerPayee('${f.id}')">✓ Payée</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteFacture('${f.id}')">Suppr.</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function editFacture(id){
+  const{data:f}=await sb.from('factures').select('*,clients(nom)').eq('id',id).single();
+  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
+  const clientOptions=(clients||[]).map(c=>`<option value="${c.id}" ${c.id===f.client_id?'selected':''}>${c.nom}</option>`).join('');
+  const html=`<div class="modal" style="max-width:480px">
+    <div class="modal-title">Modifier la facture</div>
+    <div class="form-group"><label>Référence</label><input id="ef-ref" value="${f.reference||''}"></div>
+    <div class="form-group"><label>Client</label><select id="ef-client">${clientOptions}</select></div>
+    <div class="form-group"><label>Nom du projet</label><input id="ef-projet" value="${f.projet_nom||''}"></div>
+    <div class="form-group"><label>Statut</label>
+      <select id="ef-statut">
+        <option ${f.statut==='Non payée'?'selected':''}>Non payée</option>
+        <option ${f.statut==='Payée'?'selected':''}>Payée</option>
+        <option ${f.statut==='En retard'?'selected':''}>En retard</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Date d'émission</label><input type="date" id="ef-emission" value="${f.date_emission||''}"></div>
+      <div class="form-group"><label>Date d'échéance</label><input type="date" id="ef-echeance" value="${f.date_echeance||''}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-edit-facture')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveFacture('${id}')">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('modal-edit-facture', html);
+}
+
+async function saveFacture(id){
+  const updates={
+    reference:document.getElementById('ef-ref').value,
+    client_id:document.getElementById('ef-client').value,
+    projet_nom:document.getElementById('ef-projet').value,
+    statut:document.getElementById('ef-statut').value,
+    date_emission:document.getElementById('ef-emission').value||null,
+    date_echeance:document.getElementById('ef-echeance').value||null,
+  };
+  const{error}=await sb.from('factures').update(updates).eq('id',id);
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('modal-edit-facture');
+  toast('Facture mise à jour ✓');
+  loadFactures();
 }
 
 async function marquerPayee(id){
