@@ -2500,6 +2500,7 @@ async function openProspectModal(data={}){
     </div>
     <div class="modal-footer">
       ${isEdit?`<button class="btn btn-danger btn-sm" onclick="deleteProspect('${data.id}')">Supprimer</button>`:''}
+      ${isEdit?`<button class="btn" onclick="openFicheProspect('${data.id}')">🖨 Fiche projet</button>`:''}
       <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
       <button class="btn btn-primary" onclick="saveProspect()">Enregistrer</button>
     </div>
@@ -2561,6 +2562,104 @@ function removeProspectPhoto(idx){
   const grid=document.getElementById('pr-photos-grid');
   grid.innerHTML=photos.map((url,i)=>`<div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)"><img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')"><button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button></div>`).join('')+
   `<div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()"><span style="font-size:20px">+</span><span>Inspi</span></div>`;
+}
+
+function buildProspectPhotoEditor(photos){
+  if(!photos.length) return '<div style="padding:20px;text-align:center;color:var(--muted)">Aucune photo disponible</div>';
+  return photos.map(function(url,i){
+    return '<div style="display:grid;grid-template-columns:140px 1fr;gap:14px;margin-bottom:16px;padding:14px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">'+
+      '<div><img src="'+url+'" style="width:100%;height:100px;object-fit:cover;border-radius:6px">'+
+      '<select id="fp-size-'+i+'" style="width:100%;margin-top:6px;font-size:11px;padding:4px;border:1px solid var(--border);border-radius:4px">'+
+      '<option value="large">Grande</option><option value="medium" selected>Moyenne</option><option value="small">Petite</option><option value="hidden">Masquer</option></select></div>'+
+      '<div><div class="form-group" style="margin-bottom:8px"><label>Titre</label><input id="fp-title-'+i+'" placeholder="Ex: Vue de face…" style="font-size:13px"></div>'+
+      '<div class="form-group" style="margin:0"><label>Description</label><textarea id="fp-desc-'+i+'" rows="3" style="font-size:12px;min-height:72px"></textarea></div></div></div>';
+  }).join('');
+}
+
+async function openFicheProspect(id){
+  await saveProspect();
+  const{data:p}=await sb.from('prospects').select('*').eq('id',id).single();
+  const photos=p.photos||[];
+  window._ficheProspectData=p;
+
+  const html=`<div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title">Composer la fiche projet</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Ajoutez un titre et une description pour chaque photo</div>
+    <div id="fiche-prospect-editor">
+      ${buildProspectPhotoEditor(photos)}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="generateFicheProspect()">Générer la fiche PDF</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+function generateFicheProspect(){
+  const p=window._ficheProspectData;
+  const photos=(p.photos||[]).map((url,i)=>({
+    url,
+    size:document.getElementById('fp-size-'+i)?.value||'medium',
+    title:document.getElementById('fp-title-'+i)?.value||'',
+    desc:document.getElementById('fp-desc-'+i)?.value||''
+  })).filter(ph=>ph.size!=='hidden');
+
+  const heightMap={large:'260px',medium:'190px',small:'130px'};
+
+  const photosHTML=photos.map(ph=>`
+    <div style="display:grid;grid-template-columns:${ph.size==='large'?'55%':'45%'} 1fr;gap:8mm;margin-bottom:8mm;page-break-inside:avoid">
+      <div style="border-radius:6px;overflow:hidden;border:1px solid #e8e4dc">
+        <img src="${ph.url}" style="width:100%;height:${heightMap[ph.size]};object-fit:cover;display:block">
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;padding:4mm 0">
+        ${ph.title?`<div style="font-size:13px;font-weight:600;color:#1a1a18;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${ph.title}</div>`:''}
+        ${ph.desc?`<div style="font-size:12px;color:#444;line-height:1.7;white-space:pre-wrap">${ph.desc}</div>`:''}
+      </div>
+    </div>`).join('');
+
+  closeModal('rh-modal');
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'DM Sans', sans-serif; background:#fff; }
+      @page { size: A4 portrait; margin: 14mm; }
+    </style>
+    <div style="width:182mm;background:#fff">
+      <!-- EN-TÊTE -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:6mm;border-bottom:2px solid #1a1a18;margin-bottom:7mm">
+        <div>
+          <div style="font-size:9px;color:#aaa;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;font-family:monospace">FICHE PROJET</div>
+          <div style="font-size:26px;font-weight:700;letter-spacing:1px">${p.nom||'—'}</div>
+          ${p.telephone?`<div style="font-size:13px;color:#888;margin-top:4px">📞 ${p.telephone}</div>`:''}
+          ${p.email?`<div style="font-size:12px;color:#888">✉ ${p.email}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700;letter-spacing:3px;color:#1a1a18">BRUT</div>
+          <div style="font-size:10px;color:#888;margin-top:3px;letter-spacing:1px">ATELIER DE FABRICATION</div>
+          <div style="font-size:10px;color:#888;letter-spacing:1px">MOBILIER DESIGN</div>
+          <div style="font-size:10px;color:#aaa;margin-top:4px">${new Date().toLocaleDateString('fr-FR')}</div>
+        </div>
+      </div>
+      <!-- PROJET + BESOIN -->
+      ${p.besoin?`<div style="margin-bottom:7mm;padding:5mm 6mm;background:#f8f6f1;border-radius:6px;border-left:3px solid #C8A97A">
+        <div style="font-size:9px;color:#C8A97A;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">PROJET</div>
+        <div style="font-size:14px;color:#1a1a18;line-height:1.6">${p.besoin}</div>
+        ${p.budget?`<div style="font-size:12px;color:#888;margin-top:4px">Budget estimé : ${Number(p.budget).toLocaleString('fr-FR')} MAD</div>`:''}
+      </div>`:''}
+      <!-- PHOTOS -->
+      ${photosHTML||''}
+      <!-- PIED DE PAGE -->
+      <div style="border-top:1px solid #e8e4dc;padding-top:4mm;margin-top:6mm;display:flex;justify-content:space-between;font-size:10px;color:#aaa;font-family:monospace">
+        <span>BRUT Essentials · Atelier de fabrication & Design · Marrakech</span>
+        <span>+212 621 754 582</span>
+      </div>
+    </div>`;
+
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
 }
 
 checkSession();
