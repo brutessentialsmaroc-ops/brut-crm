@@ -2536,69 +2536,119 @@ async function saveNewClientFromDevis(){
 async function printFicheClient(){
   await saveTicket();
   const{data:c}=await sb.from('commandes').select('*,clients(nom,telephone,email,ville)').eq('id',currentTicketId).single();
-  const firstPhoto=(c.photos&&c.photos.length)?c.photos[0]:null;
-  const ateliers=c.ateliers||[];
-  const allAteliers=['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronnerie'];
+  const photos=c.photos||[];
+
+  // Show photo size selector if multiple photos
+  if(photos.length>0){
+    const sizes=photos.map((_,i)=>({url:photos[i],size:i===0?'large':'small'}));
+    showFicheClientPhotoSelector(c, sizes);
+  } else {
+    renderFicheClientPDF(c, []);
+  }
+}
+
+function showFicheClientPhotoSelector(c, photoSizes){
+  const html=`<div class="modal" style="max-width:680px">
+    <div class="modal-title">Disposition des photos</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Choisissez la taille de chaque photo dans la fiche A4</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px" id="photo-size-grid">
+      ${photoSizes.map((p,i)=>`
+        <div style="text-align:center">
+          <div style="border-radius:var(--radius);overflow:hidden;margin-bottom:8px;border:1px solid var(--border)">
+            <img src="${p.url}" style="width:100%;height:100px;object-fit:cover">
+          </div>
+          <select id="photo-size-${i}" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);font-family:'DM Sans',sans-serif">
+            <option value="large" ${p.size==='large'?'selected':''}>Grande (pleine largeur)</option>
+            <option value="medium" ${p.size==='medium'?'selected':''}>Moyenne (1/2)</option>
+            <option value="small" ${p.size==='small'?'selected':''}>Petite (1/3)</option>
+            <option value="hidden">Masquer</option>
+          </select>
+        </div>`).join('')}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmFicheClient()">Générer la fiche</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+  window._ficheClientData=c;
+  window._ficheClientPhotos=photoSizes;
+}
+
+function confirmFicheClient(){
+  const photos=window._ficheClientPhotos.map((p,i)=>({
+    url:p.url,
+    size:document.getElementById('photo-size-'+i).value
+  })).filter(p=>p.size!=='hidden');
+  closeModal('rh-modal');
+  renderFicheClientPDF(window._ficheClientData, photos);
+}
+
+function renderFicheClientPDF(c, photos){
+  const colWidths={large:'100%',medium:'48%',small:'31%'};
+
+  // Group photos by rows
+  let photosHTML='';
+  let i=0;
+  while(i<photos.length){
+    const p=photos[i];
+    if(p.size==='large'){
+      photosHTML+=`<div style="width:100%;margin-bottom:8px;border-radius:6px;overflow:hidden;border:1px solid #e8e4dc">
+        <img src="${p.url}" style="width:100%;height:220px;object-fit:cover;display:block">
+      </div>`;
+      i++;
+    } else {
+      // Group medium/small side by side
+      let rowPhotos=[];
+      while(i<photos.length && photos[i].size!=='large' && rowPhotos.length<3){
+        rowPhotos.push(photos[i]); i++;
+      }
+      const h=rowPhotos[0].size==='medium'?160:130;
+      photosHTML+=`<div style="display:flex;gap:8px;margin-bottom:8px">
+        ${rowPhotos.map(rp=>`<div style="flex:1;border-radius:6px;overflow:hidden;border:1px solid #e8e4dc">
+          <img src="${rp.url}" style="width:100%;height:${h}px;object-fit:cover;display:block">
+        </div>`).join('')}
+      </div>`;
+    }
+  }
 
   document.getElementById('pdf-preview').innerHTML=`
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'DM Sans', sans-serif; }
-      @page { size: A5 landscape; margin: 10mm; }
+      body { font-family: 'DM Sans', sans-serif; background:#fff; }
+      @page { size: A4 portrait; margin: 14mm; }
     </style>
-    <div style="width:190mm;height:128mm;display:grid;grid-template-columns:85mm 1fr;gap:6mm;background:#fff">
-      <!-- COLONNE GAUCHE : photo -->
-      <div style="display:flex;flex-direction:column;gap:4mm">
-        <div style="flex:1;border-radius:6px;overflow:hidden;border:1px solid #e8e4dc;background:#f8f6f1">
-          ${firstPhoto
-            ?`<img src="${firstPhoto}" style="width:100%;height:100%;object-fit:cover">`
-            :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px">Photo du projet</div>`
-          }
+    <div style="width:182mm;background:#fff">
+      <!-- EN-TÊTE -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:8mm;border-bottom:2px solid #1a1a18;margin-bottom:8mm">
+        <div>
+          <div style="font-size:26px;font-weight:700;letter-spacing:2px">FICHE TECHNIQUE CLIENT</div>
+          <div style="font-size:11px;color:#888;margin-top:3px;font-family:monospace">${c.reference||'—'} · ${new Date().toLocaleDateString('fr-FR')}</div>
         </div>
-        <div style="height:28mm;border:1.5px solid #C8A97A;border-radius:4px;padding:6px;display:flex;flex-direction:column">
-          <div style="font-size:9px;color:#C8A97A;font-weight:500;letter-spacing:0.5px;margin-bottom:4px">NOTES / INSTRUCTIONS</div>
-          <div style="font-size:11px;color:#1a1a18;line-height:1.4;white-space:pre-wrap">${c.notes_atelier||''}</div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:600;color:#C8A97A">${c.clients?.nom||'—'}</div>
+          ${c.clients?.telephone?`<div style="font-size:12px;color:#888">📞 ${c.clients.telephone}</div>`:''}
+          ${c.clients?.email?`<div style="font-size:12px;color:#888">✉ ${c.clients.email}</div>`:''}
         </div>
       </div>
-      <!-- COLONNE DROITE -->
-      <div style="display:flex;flex-direction:column;justify-content:space-between">
+      <!-- PROJET + DESCRIPTION -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-bottom:8mm">
         <div>
-          <div style="font-size:22px;font-weight:700;letter-spacing:2px;margin-bottom:4mm;border-bottom:2px solid #1a1a18;padding-bottom:3mm">FICHE TECHNIQUE CLIENT</div>
-          <div style="margin-bottom:4mm">
-            <div style="font-size:9px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm">CLIENT</div>
-            <div style="font-size:14px;font-weight:600;color:#C8A97A">${c.clients?.nom||'—'}</div>
-            ${c.clients?.telephone?`<div style="font-size:12px;color:#888;margin-top:2px">📞 ${c.clients.telephone}</div>`:''}
-            ${c.clients?.email?`<div style="font-size:12px;color:#888;">✉ ${c.clients.email}</div>`:''}
-            ${c.clients?.ville?`<div style="font-size:12px;color:#888;">📍 ${c.clients.ville}</div>`:''}
-          </div>
-          <div style="margin-bottom:4mm">
-            <div style="font-size:9px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm">PROJET</div>
-            <div style="font-size:13px;font-weight:600">${c.description||'—'}</div>
-            ${c.montant?`<div style="font-size:12px;color:#888;margin-top:2px">${Number(c.montant).toLocaleString('fr-FR')} MAD</div>`:''}
-          </div>
-          <div style="border-top:1px solid #e8e4dc;padding-top:3mm;margin-bottom:3mm"></div>
-          <!-- Cases à cocher ateliers -->
-          <div style="display:grid;gap:2.5mm">
-            ${allAteliers.map(a=>{
-              const key=a.toLowerCase().replace('é','e').replace('è','e');
-              const checked=ateliers.includes(key);
-              return`<div style="display:flex;align-items:center;gap:6mm">
-                <div style="font-size:12px;font-weight:600;letter-spacing:0.5px;width:30mm">${a.toUpperCase()}</div>
-                <div style="width:14px;height:14px;border:2px solid #1a1a18;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  ${checked?`<div style="font-size:12px;font-weight:700;line-height:1">×</div>`:''}
-                </div>
-              </div>`;
-            }).join('')}
-          </div>
+          <div style="font-size:9px;color:#aaa;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">PROJET</div>
+          <div style="font-size:16px;font-weight:600">${c.description||'—'}</div>
         </div>
-        <!-- Ref commande -->
-        <div style="border-top:1px solid #e8e4dc;padding-top:3mm">
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:#aaa;font-family:monospace">
-            <span>${c.reference||'—'}</span>
-            <span>${new Date().toLocaleDateString('fr-FR')}</span>
-          </div>
+        <div>
+          <div style="font-size:9px;color:#C8A97A;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">DESCRIPTION PRODUIT</div>
+          <div style="font-size:12px;color:#1a1a18;line-height:1.6;white-space:pre-wrap">${c.notes_atelier||'—'}</div>
         </div>
+      </div>
+      <!-- PHOTOS -->
+      ${photosHTML||'<div style="height:40mm;border:1px dashed #e8e4dc;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px;margin-bottom:8mm">Aucune photo</div>'}
+      <!-- PIED DE PAGE -->
+      <div style="border-top:1px solid #e8e4dc;padding-top:4mm;margin-top:4mm;display:flex;justify-content:space-between;font-size:10px;color:#aaa;font-family:monospace">
+        <span>BRUT Essentials · Atelier de fabrication & Design · Marrakech</span>
+        <span>+212 621 754 582</span>
       </div>
     </div>`;
 
