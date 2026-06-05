@@ -702,10 +702,22 @@ async function openCommandeModal(data={}){
 async function editCommande(id){const{data}=await sb.from('commandes').select('*').eq('id',id).single();openCommandeModal(data||{});}
 async function saveCommande(){
   const id=document.getElementById('commande-id').value;
-  const desc=document.getElementById('commande-desc').value.trim();
-  if(!desc){toast('Description requise');return}
+  if(!commandeLignes.some(l=>l.desc&&l.desc.trim())){toast('Ajoutez au moins un article');return;}
   const ref=id?undefined:'CMD-'+Date.now().toString().slice(-6);
-  const payload={client_id:document.getElementById('commande-client').value,description:desc,montant:Number(document.getElementById('commande-montant').value)||0,date_livraison:document.getElementById('commande-livraison').value||null,statut:document.getElementById('commande-statut').value,progression:Number(document.getElementById('commande-progression').value)||0,notes:document.getElementById('commande-notes').value,...(ref?{reference:ref}:{})};
+  const total=commandeLignes.reduce((s,l)=>s+Number(l.qte||0)*Number(l.pu||0),0);
+  const desc=commandeLignes.map(l=>l.desc).filter(Boolean).join(', ');
+  const payload={
+    client_id:document.getElementById('commande-client').value,
+    description:desc,
+    montant:total,
+    lignes:commandeLignes,
+    date_livraison:document.getElementById('commande-livraison').value||null,
+    statut:document.getElementById('commande-statut').value,
+    progression:Number(document.getElementById('commande-progression').value)||0,
+    notes:document.getElementById('commande-notes').value,
+    facture_id:document.getElementById('commande-facture').value||null,
+    ...(ref?{reference:ref}:{})
+  };
   if(id)await sb.from('commandes').update(payload).eq('id',id);
   else await sb.from('commandes').insert(payload);
   closeModal('modal-commande');toast('Commande enregistrée ✓');loadPage(currentPage);
