@@ -2073,71 +2073,129 @@ async function savePaieModif(salId,mois,annee,base){
 async function printFicheAtelier(){
   await saveTicket();
   const{data:c}=await sb.from('commandes').select('*,clients(nom)').eq('id',currentTicketId).single();
-  const firstPhoto=(c.photos&&c.photos.length)?c.photos[0]:null;
+  const photos=c.photos||[];
+  window._ficheAtelierData=c;
+
   const ateliers=c.ateliers||[];
   const allAteliers=['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronnerie'];
   const livraison=c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'___/___/______';
+
+  const html=`<div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title">Composer la fiche technique atelier</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Pour chaque photo, ajoutez un titre et une description visible sur la fiche</div>
+    <div id="fiche-atelier-editor">
+      ${photos.length?photos.map((url,i)=>`
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:14px;margin-bottom:16px;padding:14px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">
+          <div>
+            <img src="${url}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;cursor:zoom-in" onclick="openLightbox('${url}')">
+            <select id="atl-size-${i}" style="width:100%;margin-top:6px;font-size:11px;padding:4px;border:1px solid var(--border);border-radius:4px;font-family:'DM Sans',sans-serif">
+              <option value="large">Grande</option>
+              <option value="medium" selected>Moyenne</option>
+              <option value="small">Petite</option>
+              <option value="hidden">Masquer</option>
+            </select>
+          </div>
+          <div>
+            <div class="form-group" style="margin-bottom:8px"><label>Titre</label><input id="atl-title-${i}" placeholder="Ex: Vue de face, Détail pied…" style="font-size:13px"></div>
+            <div class="form-group" style="margin:0"><label>Description</label><textarea id="atl-desc-${i}" rows="3" placeholder="Ex: Finition bois chêne, couture sellier…" style="font-size:12px;min-height:72px"></textarea></div>
+          </div>
+        </div>`).join('')
+      :'<div style="padding:20px;text-align:center;color:var(--muted)">Aucune photo — ajoutez des photos dans le ticket</div>'}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="generateFicheAtelier()">Générer la fiche PDF</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+function generateFicheAtelier(){
+  const c=window._ficheAtelierData;
+  const ateliers=c.ateliers||[];
+  const allAteliers=['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronnerie'];
+  const livraison=c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'___/___/______';
+
+  const photos=(c.photos||[]).map((url,i)=>({
+    url,
+    size:document.getElementById('atl-size-'+i)?.value||'medium',
+    title:document.getElementById('atl-title-'+i)?.value||'',
+    desc:document.getElementById('atl-desc-'+i)?.value||''
+  })).filter(p=>p.size!=='hidden');
+
+  const heightMap={large:'240px',medium:'180px',small:'120px'};
+
+  const photosHTML=photos.map(p=>`
+    <div style="display:grid;grid-template-columns:${p.size==='large'?'55%':'45%'} 1fr;gap:6mm;margin-bottom:6mm;page-break-inside:avoid">
+      <div style="border-radius:4px;overflow:hidden;border:1px solid #e8e4dc">
+        <img src="${p.url}" style="width:100%;height:${heightMap[p.size]};object-fit:cover;display:block">
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;padding:3mm 0">
+        ${p.title?`<div style="font-size:12px;font-weight:600;color:#1a1a18;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">${p.title}</div>`:''}
+        ${p.desc?`<div style="font-size:11px;color:#444;line-height:1.7;white-space:pre-wrap">${p.desc}</div>`:''}
+        ${!p.title&&!p.desc?`<div style="font-size:11px;color:#ccc;font-style:italic">—</div>`:''}
+      </div>
+    </div>`).join('');
+
+  closeModal('rh-modal');
 
   document.getElementById('pdf-preview').innerHTML=`
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'DM Sans', sans-serif; }
-      @page { size: A5 landscape; margin: 10mm; }
+      body { font-family: 'DM Sans', sans-serif; background:#fff; }
+      @page { size: A4 portrait; margin: 14mm; }
     </style>
-    <div style="width:190mm;height:128mm;display:grid;grid-template-columns:85mm 1fr;gap:6mm;background:#fff">
-      <!-- COLONNE GAUCHE : photos -->
-      <div style="display:flex;flex-direction:column;gap:4mm">
-        <!-- Photo principale -->
-        <div style="flex:1;border-radius:6px;overflow:hidden;border:1px solid #e8e4dc;background:#f8f6f1">
-          ${firstPhoto
-            ?`<img src="${firstPhoto}" style="width:100%;height:100%;object-fit:cover">`
-            :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px">Photo du projet</div>`
-          }
+    <div style="width:182mm;background:#fff">
+      <!-- EN-TÊTE -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:6mm;border-bottom:2px solid #1a1a18;margin-bottom:6mm">
+        <div>
+          <div style="font-size:24px;font-weight:700;letter-spacing:2px">FICHE TECHNIQUE</div>
+          <div style="font-size:11px;color:#888;margin-top:3px;font-family:monospace">${c.reference||'—'} · ${new Date().toLocaleDateString('fr-FR')}</div>
         </div>
-        <!-- Zone notes/croquis -->
-        <div style="height:28mm;border:1.5px solid #C8A97A;border-radius:4px;padding:6px;display:flex;flex-direction:column">
-          <div style="font-size:9px;color:#C8A97A;font-weight:500;letter-spacing:0.5px;margin-bottom:4px">NOTES / INSTRUCTIONS</div>
-          <div style="font-size:11px;color:#1a1a18;line-height:1.4;white-space:pre-wrap">${c.notes_atelier||''}</div>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:600;color:#C8A97A">${c.clients?.nom||'—'}</div>
+          <div style="font-size:13px;font-weight:600">${c.description||'—'}</div>
         </div>
       </div>
-      <!-- COLONNE DROITE : infos -->
-      <div style="display:flex;flex-direction:column;justify-content:space-between">
+      <!-- ATELIERS + NOTES -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-bottom:6mm;padding-bottom:5mm;border-bottom:1px solid #e8e4dc">
         <div>
-          <div style="font-size:22px;font-weight:700;letter-spacing:2px;margin-bottom:4mm;border-bottom:2px solid #1a1a18;padding-bottom:3mm">FICHE TECHNIQUE</div>
-          <div style="margin-bottom:4mm">
-            <div style="font-size:9px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm">CLIENT / PROJET</div>
-            <div style="font-size:13px;font-weight:600;color:#C8A97A">${c.clients?.nom||'—'}</div>
-            <div style="font-size:12px;font-weight:500;color:#C8A97A">${c.description||'—'}</div>
-          </div>
-          <div style="border-top:1px solid #e8e4dc;padding-top:3mm;margin-bottom:3mm"></div>
-          <!-- Cases à cocher ateliers -->
-          <div style="display:grid;gap:2.5mm">
+          <div style="font-size:9px;color:#aaa;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">ATELIERS CONCERNÉS</div>
+          <div style="display:grid;gap:3mm">
             ${allAteliers.map(a=>{
-              const key=a.toLowerCase().replace('é','e').replace('è','e');
+              const key=a.toLowerCase().replace(/é/g,'e').replace(/è/g,'e');
               const checked=ateliers.includes(key);
-              return`<div style="display:flex;align-items:center;gap:6mm">
-                <div style="font-size:12px;font-weight:600;letter-spacing:0.5px;width:30mm">${a.toUpperCase()}</div>
-                <div style="width:14px;height:14px;border:2px solid #1a1a18;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  ${checked?`<div style="font-size:12px;font-weight:700;line-height:1">×</div>`:''}
+              return`<div style="display:flex;align-items:center;gap:5mm">
+                <div style="width:13px;height:13px;border:2px solid #1a1a18;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  ${checked?'<div style="font-size:11px;font-weight:700;line-height:1">×</div>':''}
                 </div>
+                <span style="font-size:12px;font-weight:600;letter-spacing:0.3px">${a.toUpperCase()}</span>
               </div>`;
             }).join('')}
           </div>
         </div>
-        <!-- Dates -->
-        <div style="border-top:1px solid #e8e4dc;padding-top:3mm">
-          <div style="display:grid;gap:2mm">
-            <div style="display:flex;align-items:center;gap:4mm">
-              <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;width:28mm">DÉMARRAGE</div>
-              <div style="font-size:11px;border-bottom:1px solid #1a1a18;min-width:25mm;padding-bottom:1px">___/___/______</div>
+        <div>
+          <div style="font-size:9px;color:#aaa;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">NOTES / INSTRUCTIONS</div>
+          <div style="font-size:12px;color:#1a1a18;line-height:1.6;white-space:pre-wrap">${c.notes_atelier||'—'}</div>
+          <div style="margin-top:6mm">
+            <div style="display:flex;align-items:center;gap:4mm;margin-bottom:3mm">
+              <span style="font-size:11px;font-weight:700;width:26mm">DÉMARRAGE</span>
+              <span style="font-size:11px;border-bottom:1px solid #1a1a18;min-width:24mm;padding-bottom:1px">___/___/______</span>
             </div>
             <div style="display:flex;align-items:center;gap:4mm">
-              <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;width:28mm;color:#C8A97A">FIN PRÉVUE</div>
-              <div style="font-size:11px;border-bottom:1.5px solid #C8A97A;min-width:25mm;padding-bottom:1px;color:#C8A97A">${c.date_livraison?livraison:'___/___/______'}</div>
+              <span style="font-size:11px;font-weight:700;width:26mm;color:#C8A97A">FIN PRÉVUE</span>
+              <span style="font-size:11px;border-bottom:1.5px solid #C8A97A;min-width:24mm;padding-bottom:1px;color:#C8A97A">${livraison}</span>
             </div>
           </div>
         </div>
+      </div>
+      <!-- PHOTOS -->
+      ${photosHTML||''}
+      <!-- PIED DE PAGE -->
+      <div style="border-top:1px solid #e8e4dc;padding-top:4mm;margin-top:4mm;display:flex;justify-content:space-between;font-size:10px;color:#aaa;font-family:monospace">
+        <span>BRUT Essentials · Atelier de fabrication & Design · Marrakech</span>
+        <span>+212 621 754 582</span>
       </div>
     </div>`;
 
@@ -2145,393 +2203,6 @@ async function printFicheAtelier(){
   setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
 }
 
-// ─── PROSPECTS ───────────────────────────────────────────────────────────────
-const PROSPECT_COLS=[
-  {key:'Nouveau',label:'NOUVEAU',color:'#378ADD'},
-  {key:'Relancé',label:'RELANCÉ',color:'#EF9F27'},
-  {key:'Devis envoyé',label:'DEVIS ENVOYÉ',color:'#9B6DD6'},
-  {key:'Converti',label:'CONVERTI',color:'#5DCAA5'},
-  {key:'Perdu',label:'PERDU',color:'#E05A5A'}
-];
-
-async function loadProspects(){
-  const{data}=await sb.from('prospects').select('*,devis(reference,projet_nom)').order('created_at',{ascending:false});
-  const groups={};
-  PROSPECT_COLS.forEach(c=>{groups[c.key]=[];});
-  (data||[]).forEach(p=>{
-    if(groups[p.statut]!==undefined) groups[p.statut].push(p);
-    else groups['Nouveau'].push(p);
-  });
-  const kanban=document.getElementById('prospects-kanban');
-  kanban.style.gridTemplateColumns='repeat(5,1fr)';
-  kanban.innerHTML=PROSPECT_COLS.map(col=>`
-    <div class="kanban-col" style="border-top:3px solid ${col.color}">
-      <div class="kanban-header">${col.label} <span class="kanban-count">${groups[col.key].length}</span></div>
-      <div class="kanban-col-body" data-col="${col.key}"
-        ondragover="event.preventDefault();this.classList.add('drag-over')"
-        ondragleave="this.classList.remove('drag-over')"
-        ondrop="dropProspect(event,'${col.key}')">
-        ${groups[col.key].length?groups[col.key].map(p=>renderProspectCard(p)).join('')
-          :'<div style="font-size:12px;color:var(--muted);padding:12px 4px;text-align:center">Aucun prospect</div>'}
-      </div>
-    </div>`).join('');
-}
-
-function renderProspectCard(p){
-  return`<div class="kanban-card" draggable="true" data-id="${p.id}"
-    ondragstart="dragProspectStart(event,'${p.id}')"
-    ondragend="dragEnd(event)"
-    onclick="openProspectModal(${JSON.stringify(p).replace(/"/g,'&quot;')})">
-    <div class="kanban-card-body">
-      <div class="kanban-card-title">${p.nom}</div>
-      <div class="kanban-card-sub">${p.telephone||p.email||'—'}</div>
-      ${p.besoin?`<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.besoin}</div>`:''}
-      ${p.devis?`<div style="margin-top:6px"><span class="badge badge-blue" style="font-size:10px">${p.devis.reference||''} ${p.devis.projet_nom||''}</span></div>`:''}
-      ${p.budget?`<div style="margin-top:4px;font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)">${Number(p.budget).toLocaleString('fr-FR')} MAD</div>`:''}
-      ${p.photos&&p.photos.length?`<div style="display:flex;gap:4px;margin-top:6px;overflow:hidden">
-        ${p.photos.slice(0,3).map(url=>`<img src="${url}" style="width:48px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0">`).join('')}
-        ${p.photos.length>3?`<div style="width:48px;height:36px;background:var(--bg);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)">+${p.photos.length-3}</div>`:''}
-      </div>`:''}
-    </div>
-  </div>`;
-}
-
-let dragProspectId=null;
-function dragProspectStart(e,id){dragProspectId=id;setTimeout(()=>e.target.classList.add('dragging'),0);}
-async function dropProspect(e,col){
-  e.preventDefault();
-  document.querySelectorAll('.kanban-col-body').forEach(c=>c.classList.remove('drag-over'));
-  if(!dragProspectId)return;
-  await sb.from('prospects').update({statut:col}).eq('id',dragProspectId);
-  dragProspectId=null;
-  loadProspects();
-}
-
-async function openProspectModal(data={}){
-  const{data:devisList}=await sb.from('devis').select('id,reference,projet_nom,clients(nom)').order('created_at',{ascending:false});
-  const isEdit=!!data.id;
-  const html=`<div class="modal" style="max-width:540px">
-    <div class="modal-title">${isEdit?'Modifier prospect':'Nouveau prospect'}</div>
-    <input type="hidden" id="pr-id" value="${data.id||''}">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Nom *</label><input id="pr-nom" value="${data.nom||''}" placeholder="Nom du prospect"></div>
-      <div class="form-group"><label>Source</label>
-        <select id="pr-source" onchange="document.getElementById('source-autre-wrap').style.display=this.value==='Autre'?'block':'none'">
-          <option ${data.source==='Réseau Samir'?'selected':''}>Réseau Samir</option>
-          <option ${data.source==='Direct showroom'?'selected':''}>Direct showroom</option>
-          <option ${data.source==='BNI reco'?'selected':''}>BNI reco</option>
-          <option ${data.source==='Instagram'?'selected':''}>Instagram</option>
-          <option ${data.source==='Site web'?'selected':''}>Site web</option>
-          <option ${data.source==='Architecte partenaire'?'selected':''}>Architecte partenaire</option>
-          <option ${data.source==='Apporteur d affaires'?'selected':''}>Apporteur d affaires</option>
-          <option ${data.source==='Autre'?'selected':''}>Autre</option>
-        </select>
-      </div>
-      <div class="form-group" id="source-autre-wrap" style="display:${(data.source==='Autre')?'block':'none'}">
-        <label>Précisez la source</label>
-        <input id="pr-source-autre" value="${data.source_autre||''}" placeholder="Ex: Foire, événement…">
-        </select>
-      </div>
-      <div class="form-group"><label>Téléphone</label><input id="pr-tel" value="${data.telephone||''}" placeholder="+212 6…"></div>
-      <div class="form-group"><label>Email</label><input type="email" id="pr-email" value="${data.email||''}" placeholder="email@…"></div>
-    </div>
-    <div class="form-group"><label>Besoin / Projet</label><textarea id="pr-besoin" rows="2" placeholder="Mobilier salon, cuisine sur mesure…">${data.besoin||''}</textarea></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Budget estimé (MAD)</label><input type="number" id="pr-budget" value="${data.budget||''}" placeholder="0"></div>
-      <div class="form-group"><label>Statut</label>
-        <select id="pr-statut">
-          ${PROSPECT_COLS.map(c=>`<option ${data.statut===c.key?'selected':''}>${c.key}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="form-group"><label>Devis associé</label>
-      <select id="pr-devis">
-        <option value="">— Aucun devis —</option>
-        ${(devisList||[]).map(d=>`<option value="${d.id}" ${data.devis_id===d.id?'selected':''}>${d.reference||''} · ${d.clients?.nom||''} ${d.projet_nom?'— '+d.projet_nom:''}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group"><label>Notes</label><textarea id="pr-notes" rows="2">${data.notes||''}</textarea></div>
-    <div class="form-group"><label>Photos d'inspiration</label>
-      <div id="pr-photos-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
-        ${(data.photos||[]).map((url,i)=>`
-          <div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)">
-            <img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')">
-            <button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button>
-          </div>`).join('')}
-        <div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()">
-          <span style="font-size:20px">+</span><span>Inspi</span>
-        </div>
-      </div>
-      <input type="file" id="pr-photo-input" accept="image/*" multiple style="display:none" onchange="uploadProspectPhotos(this,'${data.id||''}')">
-      <input type="hidden" id="pr-photos-data" value="${JSON.stringify(data.photos||[]).replace(/"/g,'&quot;')}">
-    </div>
-    <div class="modal-footer">
-      ${isEdit?`<button class="btn btn-danger btn-sm" onclick="deleteProspect('${data.id}')">Supprimer</button>`:''}
-      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveProspect()">Enregistrer</button>
-    </div>
-  </div>`;
-  showModal('rh-modal', html);
-}
-
-async function saveProspect(){
-  const id=document.getElementById('pr-id').value;
-  const nom=document.getElementById('pr-nom').value.trim();
-  if(!nom){toast('Le nom est requis');return;}
-  const payload={
-    nom,
-    source:document.getElementById('pr-source').value,
-    source_autre:document.getElementById('pr-source-autre')?.value||null,
-    telephone:document.getElementById('pr-tel').value,
-    email:document.getElementById('pr-email').value,
-    besoin:document.getElementById('pr-besoin').value,
-    budget:Number(document.getElementById('pr-budget').value)||null,
-    statut:document.getElementById('pr-statut').value,
-    devis_id:document.getElementById('pr-devis').value||null,
-    notes:document.getElementById('pr-notes').value,
-    photos:JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'))
-  };
-  if(id) await sb.from('prospects').update(payload).eq('id',id);
-  else await sb.from('prospects').insert(payload);
-  closeModal('rh-modal');
-  toast('Prospect enregistré ✓');
-  loadProspects();
-}
-
-async function deleteProspect(id){
-  if(!confirm('Supprimer ce prospect ?'))return;
-  await sb.from('prospects').delete().eq('id',id);
-  closeModal('rh-modal');
-  toast('Supprimé');
-  loadProspects();
-}
-
-async function uploadProspectPhotos(input, prospectId){
-  const files=Array.from(input.files);
-  if(!files.length)return;
-  toast('Upload en cours…');
-  const existing=JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'));
-  const photos=[...existing];
-  for(const file of files){
-    const ext=file.name.split('.').pop();
-    const path=`prospects/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
-    if(!error){
-      const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
-      photos.push(publicUrl);
-    }
-  }
-  // Update hidden field and preview
-  document.getElementById('pr-photos-data').value=JSON.stringify(photos).replace(/"/g,'&quot;');
-  const grid=document.getElementById('pr-photos-grid');
-  grid.innerHTML=photos.map((url,i)=>`
-    <div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)">
-      <img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')">
-      <button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button>
-    </div>`).join('')+
-    `<div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()">
-      <span style="font-size:20px">+</span><span>Inspi</span>
-    </div>`;
-  if(prospectId){
-    await sb.from('prospects').update({photos}).eq('id',prospectId);
-  }
-  toast('Photos ajoutées ✓');
-  input.value='';
-}
-
-function removeProspectPhoto(idx){
-  const photos=JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'));
-  photos.splice(idx,1);
-  document.getElementById('pr-photos-data').value=JSON.stringify(photos).replace(/"/g,'&quot;');
-  const grid=document.getElementById('pr-photos-grid');
-  grid.innerHTML=photos.map((url,i)=>`
-    <div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)">
-      <img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')">
-      <button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button>
-    </div>`).join('')+
-    `<div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()">
-      <span style="font-size:20px">+</span><span>Inspi</span>
-    </div>`;
-}
-
-// ─── EXPORT EXCEL ────────────────────────────────────────────────────────────
-async function exportExcel(){
-  toast('Préparation export…');
-  const[{data:clients},{data:commandes},{data:devis},{data:prospects},{data:salaries},{data:factures}]=await Promise.all([
-    sb.from('clients').select('*'),
-    sb.from('commandes').select('*,clients(nom)'),
-    sb.from('devis').select('*,clients(nom)'),
-    sb.from('prospects').select('*'),
-    sb.from('salaries').select('*'),
-    sb.from('factures').select('*,clients(nom)')
-  ]);
-
-  const toCSV=(rows,cols)=>{
-    const header=cols.map(c=>c.label).join(';');
-    const lines=rows.map(r=>cols.map(c=>{
-      const v=r[c.key]??'';
-      return typeof v==='string'&&v.includes(';')?`"${v}"`:v;
-    }).join(';'));
-    return [header,...lines].join('\n');
-  };
-
-  const sheets={
-    'Clients':toCSV(clients||[],[
-      {label:'Nom',key:'nom'},{label:'Type',key:'type'},{label:'Email',key:'email'},
-      {label:'Téléphone',key:'telephone'},{label:'Ville',key:'ville'},{label:'Créé le',key:'created_at'}
-    ]),
-    'Commandes':toCSV(commandes||[],[
-      {label:'Référence',key:'reference'},{label:'Client',key:'clients'},{label:'Description',key:'description'},
-      {label:'Montant',key:'montant'},{label:'Statut',key:'statut'},{label:'Livraison',key:'date_livraison'}
-    ]),
-    'Devis':toCSV(devis||[],[
-      {label:'Référence',key:'reference'},{label:'Client',key:'clients'},{label:'Projet',key:'projet_nom'},
-      {label:'Statut',key:'statut'},{label:'Date',key:'date_envoi'}
-    ]),
-    'Prospects':toCSV(prospects||[],[
-      {label:'Nom',key:'nom'},{label:'Téléphone',key:'telephone'},{label:'Email',key:'email'},
-      {label:'Source',key:'source'},{label:'Besoin',key:'besoin'},{label:'Budget',key:'budget'},{label:'Statut',key:'statut'}
-    ]),
-    'Salariés':toCSV(salaries||[],[
-      {label:'Nom',key:'nom'},{label:'Prénom',key:'prenom'},{label:'Poste',key:'poste'},
-      {label:'Atelier',key:'atelier'},{label:'Contrat',key:'type_contrat'},{label:'Salaire base',key:'salaire_base'},{label:'CNSS',key:'cnss'}
-    ]),
-    'Factures':toCSV(factures||[],[
-      {label:'Référence',key:'reference'},{label:'Client',key:'clients'},{label:'Projet',key:'projet_nom'},
-      {label:'Statut',key:'statut'},{label:'Émise le',key:'date_emission'},{label:'Échéance',key:'date_echeance'}
-    ])
-  };
-
-  // Build multi-sheet HTML table for download
-  const date=new Date().toLocaleDateString('fr-FR').replace(/\//g,'-');
-  let html='<html><head><meta charset="UTF-8"></head><body>';
-  Object.entries(sheets).forEach(([name,csv])=>{
-    html+=`<h2>${name}</h2><table border="1">`;
-    csv.split('\n').forEach((row,i)=>{
-      html+='<tr>';
-      row.split(';').forEach(cell=>{
-        html+=i===0?`<th>${cell}</th>`:`<td>${cell}</td>`;
-      });
-      html+='</tr>';
-    });
-    html+='</table><br>';
-  });
-  html+='</body></html>';
-
-  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=`BRUT-CRM-Export-${date}.xls`;
-  a.click(); URL.revokeObjectURL(url);
-  toast('Export téléchargé ✓');
-}
-
-// ─── CLIENT DETAIL ───────────────────────────────────────────────────────────
-async function openClientDetail(id){
-  const[{data:c},{data:devis},{data:factures},{data:commandes}]=await Promise.all([
-    sb.from('clients').select('*').eq('id',id).single(),
-    sb.from('devis').select('*,devis_sections(devis_articles(quantite,prix_unitaire))').eq('client_id',id).order('created_at',{ascending:false}),
-    sb.from('factures').select('*,devis(devis_sections(devis_articles(quantite,prix_unitaire)))').eq('client_id',id).order('created_at',{ascending:false}),
-    sb.from('commandes').select('*').eq('client_id',id).order('created_at',{ascending:false})
-  ]);
-
-  // Fiche
-  document.getElementById('cd-avatar').textContent=initials(c.nom);
-  document.getElementById('cd-nom').textContent=c.nom;
-  document.getElementById('cd-type').innerHTML=`<span class="badge badge-gray">${c.type||'—'}</span>`;
-  document.getElementById('cd-email').textContent=c.email?'✉ '+c.email:'';
-  document.getElementById('cd-tel').textContent=c.telephone?'📞 '+c.telephone:'';
-  document.getElementById('cd-ville').textContent=c.ville?'📍 '+c.ville:'';
-  document.getElementById('cd-notes').textContent=c.notes||'';
-  const ca=(commandes||[]).reduce((s,o)=>s+Number(o.montant||0),0);
-  document.getElementById('cd-ca').textContent=ca.toLocaleString('fr-FR')+' MAD';
-
-  // Devis
-  const elD=document.getElementById('cd-devis');
-  if((devis||[]).length){
-    elD.innerHTML=`<table><thead><tr><th>Réf.</th><th>Projet</th><th>Montant HT</th><th>Date</th><th>Statut</th></tr></thead><tbody>
-    ${devis.map(d=>{
-      const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-      return`<tr>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${d.reference||'—'}</td>
-        <td>${d.projet_nom||'—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:12px">${ht.toLocaleString('fr-FR')} MAD</td>
-        <td style="color:var(--muted)">${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</td>
-        <td><span class="badge ${badgeClass(d.statut)}">${d.statut}</span></td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
-  } else { elD.innerHTML='<div class="empty">Aucun devis</div>'; }
-
-  // Factures
-  const elF=document.getElementById('cd-factures');
-  if((factures||[]).length){
-    elF.innerHTML=`<table><thead><tr><th>Réf.</th><th>Projet</th><th>Montant TTC</th><th>Émise le</th><th>Statut</th></tr></thead><tbody>
-    ${factures.map(f=>{
-      const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-      return`<tr>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${f.reference||'—'}</td>
-        <td>${f.projet_nom||'—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:12px">${(ht*1.2).toLocaleString('fr-FR')} MAD</td>
-        <td style="color:var(--muted)">${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</td>
-        <td><span class="badge ${f.statut==='Payée'?'badge-green':'badge-amber'}">${f.statut}</span></td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
-  } else { elF.innerHTML='<div class="empty">Aucune facture</div>'; }
-
-  // Commandes
-  const elC=document.getElementById('cd-commandes');
-  if((commandes||[]).length){
-    elC.innerHTML=`<table><thead><tr><th>Réf.</th><th>Description</th><th>Montant</th><th>Livraison</th><th>Statut</th></tr></thead><tbody>
-    ${commandes.map(c=>'<tr><td style="font-family:monospace;font-size:11px;color:var(--muted)">'+( c.reference||'—')+'</td><td>'+(c.description||'—')+'</td><td style="font-family:monospace;font-size:12px">'+Number(c.montant||0).toLocaleString('fr-FR')+' MAD</td><td style="color:var(--muted)">'+(c.date_livraison?new Date(c.date_livraison).toLocaleDateString('fr-FR'):'—')+'</td><td><span class="badge '+badgeClass(c.statut)+'">'+c.statut+'</span></td></tr>').join('')}</tbody></table>`;
-  } else { elC.innerHTML='<div class="empty">Aucune commande</div>'; }
-
-  showPage('client-detail', null);
-  document.getElementById('page-title').textContent=c.nom;
-}
-
-function openNewClientFromDevis(){
-  // Reset select while modal is open
-  document.getElementById('builder-client').value='';
-  // Open client modal with callback
-  const html=`<div class="modal" style="max-width:520px">
-    <div class="modal-title">Nouveau client</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Nom *</label><input id="nc-nom" placeholder="Nom du client"></div>
-      <div class="form-group"><label>Type</label>
-        <select id="nc-type"><option>Particulier</option><option>Hôtellerie</option><option>Commerce</option><option>Architecte</option><option>Promoteur</option></select>
-      </div>
-      <div class="form-group"><label>Email</label><input type="email" id="nc-email" placeholder="email@…"></div>
-      <div class="form-group"><label>Téléphone</label><input type="tel" id="nc-tel" placeholder="+212 6…"></div>
-      <div class="form-group"><label>Ville</label><input id="nc-ville" placeholder="Marrakech"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveNewClientFromDevis()">Créer et sélectionner</button>
-    </div>
-  </div>`;
-  showModal('rh-modal', html);
-}
-
-async function saveNewClientFromDevis(){
-  const nom=document.getElementById('nc-nom').value.trim();
-  if(!nom){toast('Le nom est requis');return;}
-  const{data,error}=await sb.from('clients').insert({
-    nom,
-    type:document.getElementById('nc-type').value,
-    email:document.getElementById('nc-email').value,
-    telephone:document.getElementById('nc-tel').value,
-    ville:document.getElementById('nc-ville').value
-  }).select().single();
-  if(error){toast('Erreur: '+error.message);return;}
-  // Add to select and select it
-  const sel=document.getElementById('builder-client');
-  const opt=document.createElement('option');
-  opt.value=data.id; opt.textContent=data.nom;
-  sel.appendChild(opt);
-  sel.value=data.id;
-  closeModal('rh-modal');
-  toast('Client créé et sélectionné ✓');
-}
 
 async function printFicheClient(){
   await saveTicket();
