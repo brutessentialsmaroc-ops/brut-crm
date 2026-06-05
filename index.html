@@ -364,6 +364,7 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-primary" onclick="saveTicket()">Enregistrer</button>
                 <button class="btn" onclick="printFicheAtelier()">🖨 Fiche atelier A5</button>
+                <button class="btn" onclick="printFicheClient()">🖨 Fiche technique client</button>
               </div>
             </div>
             <!-- COMMENTAIRES -->
@@ -2103,7 +2104,7 @@ async function printFicheAtelier(){
       <!-- COLONNE DROITE : infos -->
       <div style="display:flex;flex-direction:column;justify-content:space-between">
         <div>
-          <div style="font-size:22px;font-weight:700;letter-spacing:2px;margin-bottom:4mm;border-bottom:2px solid #1a1a18;padding-bottom:3mm">SUIVI ATELIER</div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:2px;margin-bottom:4mm;border-bottom:2px solid #1a1a18;padding-bottom:3mm">FICHE TECHNIQUE</div>
           <div style="margin-bottom:4mm">
             <div style="font-size:9px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm">CLIENT / PROJET</div>
             <div style="font-size:13px;font-weight:600;color:#C8A97A">${c.clients?.nom||'—'}</div>
@@ -2530,6 +2531,79 @@ async function saveNewClientFromDevis(){
   sel.value=data.id;
   closeModal('rh-modal');
   toast('Client créé et sélectionné ✓');
+}
+
+async function printFicheClient(){
+  await saveTicket();
+  const{data:c}=await sb.from('commandes').select('*,clients(nom,telephone,email,ville)').eq('id',currentTicketId).single();
+  const firstPhoto=(c.photos&&c.photos.length)?c.photos[0]:null;
+  const ateliers=c.ateliers||[];
+  const allAteliers=['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronnerie'];
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'DM Sans', sans-serif; }
+      @page { size: A5 landscape; margin: 10mm; }
+    </style>
+    <div style="width:190mm;height:128mm;display:grid;grid-template-columns:85mm 1fr;gap:6mm;background:#fff">
+      <!-- COLONNE GAUCHE : photo -->
+      <div style="display:flex;flex-direction:column;gap:4mm">
+        <div style="flex:1;border-radius:6px;overflow:hidden;border:1px solid #e8e4dc;background:#f8f6f1">
+          ${firstPhoto
+            ?`<img src="${firstPhoto}" style="width:100%;height:100%;object-fit:cover">`
+            :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px">Photo du projet</div>`
+          }
+        </div>
+        <div style="height:28mm;border:1.5px solid #C8A97A;border-radius:4px;padding:6px;display:flex;flex-direction:column">
+          <div style="font-size:9px;color:#C8A97A;font-weight:500;letter-spacing:0.5px;margin-bottom:4px">NOTES / INSTRUCTIONS</div>
+          <div style="font-size:11px;color:#1a1a18;line-height:1.4;white-space:pre-wrap">${c.notes_atelier||''}</div>
+        </div>
+      </div>
+      <!-- COLONNE DROITE -->
+      <div style="display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:2px;margin-bottom:4mm;border-bottom:2px solid #1a1a18;padding-bottom:3mm">FICHE TECHNIQUE CLIENT</div>
+          <div style="margin-bottom:4mm">
+            <div style="font-size:9px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm">CLIENT</div>
+            <div style="font-size:14px;font-weight:600;color:#C8A97A">${c.clients?.nom||'—'}</div>
+            ${c.clients?.telephone?`<div style="font-size:12px;color:#888;margin-top:2px">📞 ${c.clients.telephone}</div>`:''}
+            ${c.clients?.email?`<div style="font-size:12px;color:#888;">✉ ${c.clients.email}</div>`:''}
+            ${c.clients?.ville?`<div style="font-size:12px;color:#888;">📍 ${c.clients.ville}</div>`:''}
+          </div>
+          <div style="margin-bottom:4mm">
+            <div style="font-size:9px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm">PROJET</div>
+            <div style="font-size:13px;font-weight:600">${c.description||'—'}</div>
+            ${c.montant?`<div style="font-size:12px;color:#888;margin-top:2px">${Number(c.montant).toLocaleString('fr-FR')} MAD</div>`:''}
+          </div>
+          <div style="border-top:1px solid #e8e4dc;padding-top:3mm;margin-bottom:3mm"></div>
+          <!-- Cases à cocher ateliers -->
+          <div style="display:grid;gap:2.5mm">
+            ${allAteliers.map(a=>{
+              const key=a.toLowerCase().replace('é','e').replace('è','e');
+              const checked=ateliers.includes(key);
+              return`<div style="display:flex;align-items:center;gap:6mm">
+                <div style="font-size:12px;font-weight:600;letter-spacing:0.5px;width:30mm">${a.toUpperCase()}</div>
+                <div style="width:14px;height:14px;border:2px solid #1a1a18;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  ${checked?`<div style="font-size:12px;font-weight:700;line-height:1">×</div>`:''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        <!-- Ref commande -->
+        <div style="border-top:1px solid #e8e4dc;padding-top:3mm">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#aaa;font-family:monospace">
+            <span>${c.reference||'—'}</span>
+            <span>${new Date().toLocaleDateString('fr-FR')}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
 }
 
 checkSession();
