@@ -2381,5 +2381,187 @@ function updateCommandeTotal(){
   if(hidden) hidden.value=total;
 }
 
+// ─── PROSPECTS ───────────────────────────────────────────────────────────────
+const PROSPECT_COLS=[
+  {key:'Nouveau',label:'NOUVEAU',color:'#378ADD'},
+  {key:'Relancé',label:'RELANCÉ',color:'#EF9F27'},
+  {key:'Devis envoyé',label:'DEVIS ENVOYÉ',color:'#9B6DD6'},
+  {key:'Converti',label:'CONVERTI',color:'#5DCAA5'},
+  {key:'Perdu',label:'PERDU',color:'#E05A5A'}
+];
+
+async function loadProspects(){
+  const{data}=await sb.from('prospects').select('*,devis(reference,projet_nom)').order('created_at',{ascending:false});
+  const groups={};
+  PROSPECT_COLS.forEach(c=>{groups[c.key]=[];});
+  (data||[]).forEach(p=>{
+    if(groups[p.statut]!==undefined)groups[p.statut].push(p);
+    else groups['Nouveau'].push(p);
+  });
+  const kanban=document.getElementById('prospects-kanban');
+  kanban.style.gridTemplateColumns='repeat(5,1fr)';
+  kanban.innerHTML=PROSPECT_COLS.map(col=>`
+    <div class="kanban-col" style="border-top:3px solid ${col.color}">
+      <div class="kanban-header">${col.label} <span class="kanban-count">${groups[col.key].length}</span></div>
+      <div class="kanban-col-body" data-col="${col.key}"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="dropProspect(event,'${col.key}')">
+        ${groups[col.key].length?groups[col.key].map(p=>renderProspectCard(p)).join('')
+          :'<div style="font-size:12px;color:var(--muted);padding:12px 4px;text-align:center">Aucun prospect</div>'}
+      </div>
+    </div>`).join('');
+}
+
+function renderProspectCard(p){
+  const safeData=JSON.stringify({id:p.id,nom:p.nom,telephone:p.telephone||'',email:p.email||'',source:p.source||'',source_autre:p.source_autre||'',besoin:p.besoin||'',budget:p.budget||'',statut:p.statut||'Nouveau',devis_id:p.devis_id||'',notes:p.notes||'',photos:p.photos||[]}).replace(/"/g,'&quot;');
+  return`<div class="kanban-card" draggable="true" data-id="${p.id}"
+    ondragstart="dragProspectStart(event,'${p.id}')"
+    ondragend="dragEnd(event)"
+    onclick="openProspectModal(JSON.parse(this.dataset.prospect))"
+    data-prospect="${safeData}">
+    <div class="kanban-card-body">
+      <div class="kanban-card-title">${p.nom}</div>
+      <div class="kanban-card-sub">${p.telephone||p.email||'—'}</div>
+      ${p.besoin?`<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.besoin}</div>`:''}
+      ${p.devis?`<div style="margin-top:6px"><span class="badge badge-blue" style="font-size:10px">${p.devis.reference||''} ${p.devis.projet_nom||''}</span></div>`:''}
+      ${p.budget?`<div style="margin-top:4px;font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)">${Number(p.budget).toLocaleString('fr-FR')} MAD</div>`:''}
+      ${p.photos&&p.photos.length?`<div style="display:flex;gap:4px;margin-top:6px">
+        ${p.photos.slice(0,3).map(url=>`<img src="${url}" style="width:40px;height:30px;object-fit:cover;border-radius:3px">`).join('')}
+      </div>`:''}
+    </div>
+  </div>`;
+}
+
+let dragProspectId=null;
+function dragProspectStart(e,id){dragProspectId=id;setTimeout(()=>e.target.classList.add('dragging'),0);}
+async function dropProspect(e,col){
+  e.preventDefault();
+  document.querySelectorAll('.kanban-col-body').forEach(c=>c.classList.remove('drag-over'));
+  if(!dragProspectId)return;
+  await sb.from('prospects').update({statut:col}).eq('id',dragProspectId);
+  dragProspectId=null;
+  loadProspects();
+}
+
+async function openProspectModal(data={}){
+  const{data:devisList}=await sb.from('devis').select('id,reference,projet_nom,clients(nom)').order('created_at',{ascending:false});
+  const isEdit=!!data.id;
+  const html=`<div class="modal" style="max-width:540px">
+    <div class="modal-title">${isEdit?'Modifier prospect':'Nouveau prospect'}</div>
+    <input type="hidden" id="pr-id" value="${data.id||''}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Nom *</label><input id="pr-nom" value="${data.nom||''}" placeholder="Nom du prospect"></div>
+      <div class="form-group"><label>Source</label>
+        <select id="pr-source" onchange="document.getElementById('source-autre-wrap').style.display=this.value==='Autre'?'block':'none'">
+          <option ${data.source==='Réseau Samir'?'selected':''}>Réseau Samir</option>
+          <option ${data.source==='Direct showroom'?'selected':''}>Direct showroom</option>
+          <option ${data.source==='BNI reco'?'selected':''}>BNI reco</option>
+          <option ${data.source==='Instagram'?'selected':''}>Instagram</option>
+          <option ${data.source==='Site web'?'selected':''}>Site web</option>
+          <option ${data.source==='Architecte partenaire'?'selected':''}>Architecte partenaire</option>
+          <option ${data.source==='Apporteur d affaires'?'selected':''}>Apporteur d affaires</option>
+          <option ${data.source==='Autre'?'selected':''}>Autre</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Téléphone</label><input id="pr-tel" value="${data.telephone||''}" placeholder="+212 6…"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="pr-email" value="${data.email||''}" placeholder="email@…"></div>
+    </div>
+    <div class="form-group" id="source-autre-wrap" style="display:${data.source==='Autre'?'block':'none'}">
+      <label>Précisez la source</label><input id="pr-source-autre" value="${data.source_autre||''}" placeholder="Ex: Foire, événement…">
+    </div>
+    <div class="form-group"><label>Besoin / Projet</label><textarea id="pr-besoin" rows="2">${data.besoin||''}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Budget estimé (MAD)</label><input type="number" id="pr-budget" value="${data.budget||''}" placeholder="0"></div>
+      <div class="form-group"><label>Statut</label>
+        <select id="pr-statut">${PROSPECT_COLS.map(c=>`<option ${data.statut===c.key?'selected':''}>${c.key}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-group"><label>Devis associé</label>
+      <select id="pr-devis">
+        <option value="">— Aucun devis —</option>
+        ${(devisList||[]).map(d=>`<option value="${d.id}" ${data.devis_id===d.id?'selected':''}>${d.reference||''} · ${d.clients?.nom||''} ${d.projet_nom?'— '+d.projet_nom:''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="pr-notes">${data.notes||''}</textarea></div>
+    <div class="form-group"><label>Photos d'inspiration</label>
+      <div id="pr-photos-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+        ${(data.photos||[]).map((url,i)=>`
+          <div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)">
+            <img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')">
+            <button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button>
+          </div>`).join('')}
+        <div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()">
+          <span style="font-size:20px">+</span><span>Inspi</span>
+        </div>
+      </div>
+      <input type="file" id="pr-photo-input" accept="image/*" multiple style="display:none" onchange="uploadProspectPhotos(this,'${data.id||''}')">
+      <input type="hidden" id="pr-photos-data" value="${JSON.stringify(data.photos||[]).replace(/"/g,'&quot;')}">
+    </div>
+    <div class="modal-footer">
+      ${isEdit?`<button class="btn btn-danger btn-sm" onclick="deleteProspect('${data.id}')">Supprimer</button>`:''}
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveProspect()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+async function saveProspect(){
+  const id=document.getElementById('pr-id').value;
+  const nom=document.getElementById('pr-nom').value.trim();
+  if(!nom){toast('Le nom est requis');return;}
+  const payload={
+    nom,source:document.getElementById('pr-source').value,
+    source_autre:document.getElementById('pr-source-autre')?.value||null,
+    telephone:document.getElementById('pr-tel').value,
+    email:document.getElementById('pr-email').value,
+    besoin:document.getElementById('pr-besoin').value,
+    budget:Number(document.getElementById('pr-budget').value)||null,
+    statut:document.getElementById('pr-statut').value,
+    devis_id:document.getElementById('pr-devis').value||null,
+    notes:document.getElementById('pr-notes').value,
+    photos:JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'))
+  };
+  if(id)await sb.from('prospects').update(payload).eq('id',id);
+  else await sb.from('prospects').insert(payload);
+  closeModal('rh-modal');toast('Prospect enregistré ✓');loadProspects();
+}
+
+async function deleteProspect(id){
+  if(!confirm('Supprimer ce prospect ?'))return;
+  await sb.from('prospects').delete().eq('id',id);
+  closeModal('rh-modal');toast('Supprimé');loadProspects();
+}
+
+async function uploadProspectPhotos(input,prospectId){
+  const files=Array.from(input.files);
+  if(!files.length)return;
+  toast('Upload en cours…');
+  const existing=JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'));
+  const photos=[...existing];
+  for(const file of files){
+    const ext=file.name.split('.').pop();
+    const path=`prospects/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+    if(!error){const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);photos.push(publicUrl);}
+  }
+  document.getElementById('pr-photos-data').value=JSON.stringify(photos).replace(/"/g,'&quot;');
+  const grid=document.getElementById('pr-photos-grid');
+  grid.innerHTML=photos.map((url,i)=>`<div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)"><img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')"><button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button></div>`).join('')+
+  `<div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()"><span style="font-size:20px">+</span><span>Inspi</span></div>`;
+  if(prospectId)await sb.from('prospects').update({photos}).eq('id',prospectId);
+  toast('Photos ajoutées ✓');input.value='';
+}
+
+function removeProspectPhoto(idx){
+  const photos=JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'));
+  photos.splice(idx,1);
+  document.getElementById('pr-photos-data').value=JSON.stringify(photos).replace(/"/g,'&quot;');
+  const grid=document.getElementById('pr-photos-grid');
+  grid.innerHTML=photos.map((url,i)=>`<div style="position:relative;aspect-ratio:4/3;border-radius:var(--radius);overflow:hidden;background:var(--bg)"><img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('${url}')"><button onclick="removeProspectPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button></div>`).join('')+
+  `<div style="border:2px dashed var(--border);border-radius:var(--radius);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px;color:var(--muted)" onclick="document.getElementById('pr-photo-input').click()"><span style="font-size:20px">+</span><span>Inspi</span></div>`;
+}
+
 checkSession();
 </script>
