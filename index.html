@@ -2818,15 +2818,16 @@ function renderHierarchie(canvas){
   const levelLabels={0:'Direction',1:'Responsables',2:'Équipes'};
   const levelColors={0:'#C8A97A',1:'#378ADD',2:'#5DCAA5'};
 
-  canvas.innerHTML='<div style="display:flex;flex-direction:column;gap:32px;padding:20px">'
+  canvas.innerHTML='<div style="position:relative;min-height:600px;padding:20px" id="org-inner">'
     +Object.entries(grouped).filter(([,sals])=>sals.length).map(([level,sals])=>`
-    <div>
+    <div style="margin-bottom:32px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:${levelColors[level]};font-family:'DM Mono',monospace;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid ${levelColors[level]}">${levelLabels[level]} (${sals.length})</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px">
         ${sals.map(s=>renderOrgCard(s,levelColors[level])).join('')}
       </div>
     </div>`).join('')
     +'</div>';
+  applyOrgPositions(canvas);
   addDragToCards(canvas);
 }
 
@@ -2847,6 +2848,7 @@ function renderParAtelier(canvas){
       </div>
     </div>`).join('')
     +'</div>';
+  applyOrgPositions(canvas);
   addDragToCards(canvas);
 }
 
@@ -2864,6 +2866,18 @@ function renderOrgCard(s, color){
     </div>
     ${s.atelier?`<div style="font-size:10px;padding:2px 7px;border-radius:10px;background:${color}22;color:${color};display:inline-block">${s.atelier}</div>`:''}
   </div>`;
+}
+
+function applyOrgPositions(canvas){
+  Object.entries(orgPositions).forEach(([id,pos])=>{
+    const card=canvas.querySelector('[data-id="'+id+'"]');
+    if(card&&pos.left&&pos.top){
+      card.style.position='absolute';
+      card.style.left=pos.left;
+      card.style.top=pos.top;
+      card.style.width='200px';
+    }
+  });
 }
 
 function addDragToCards(canvas){
