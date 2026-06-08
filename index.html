@@ -2785,11 +2785,12 @@ function switchOrgView(view, el){
 }
 
 async function loadOrganigramme(){
-  const{data}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
-  orgSalaries=data||[];
-  // Load saved positions
-  const saved=localStorage.getItem('brut-org-positions');
-  orgPositions=saved?JSON.parse(saved):{};
+  const[{data:sals},{data:pos}]=await Promise.all([
+    sb.from('salaries').select('*').eq('statut','Actif').order('nom'),
+    sb.from('org_positions').select('positions').eq('id','main').maybeSingle()
+  ]);
+  orgSalaries=sals||[];
+  orgPositions=pos?.positions||{};
   renderOrganigramme();
 }
 
@@ -2900,8 +2901,8 @@ function addDragToCards(canvas){
   });
 }
 
-function saveOrgPositions(){
-  localStorage.setItem('brut-org-positions', JSON.stringify(orgPositions));
+async function saveOrgPositions(){
+  await sb.from('org_positions').upsert({id:'main',positions:orgPositions,updated_at:new Date().toISOString()});
   toast('Positions sauvegardées ✓');
 }
 
