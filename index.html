@@ -1611,11 +1611,15 @@ async function loadPointage(){
 async function quickPointage(salId, date, cell){
   if(cell){cell.style.opacity='0.3';cell.style.pointerEvents='none';}
   const{data:existing}=await sb.from('pointages').select('*').eq('salarie_id',salId).eq('date',date).maybeSingle();
-  const statuts=['Présent','Absent','Retard','Congé'];
+  const statuts=['Présent','Absent','Retard','Congé',''];
   const current=existing?.statut||'';
   const next=statuts[(statuts.indexOf(current)+1)%statuts.length];
   if(existing){
-    await sb.from('pointages').update({statut:next}).eq('id',existing.id);
+    if(next===''){
+      await sb.from('pointages').delete().eq('id',existing.id);
+    } else {
+      await sb.from('pointages').update({statut:next}).eq('id',existing.id);
+    }
   } else {
     await sb.from('pointages').insert({salarie_id:salId,date,statut:next});
   }
