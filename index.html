@@ -1554,7 +1554,7 @@ async function loadPointage(){
   (pts||[]).forEach(p=>{const d=p.date?p.date.split('T')[0]:p.date;ptMap[p.salarie_id+'_'+d]=p;});
   const moisLabel=new Date(year,month,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
-  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Férié':'⭐'};
+  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Repos':'🔵','Férié':'⭐'};
 
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -1590,7 +1590,7 @@ async function loadPointage(){
           if(pt&&pt.statut==='Absent') absences++;
           if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
           const icon=pt?statusIcon[pt.statut]||'?':'';
-          const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':'#fff':'#fff';
+          const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':'#fff':'#fff';
           return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" 
             onclick="quickPointage('${s.id}','${dateStr}',this)" title="${dateStr}">${icon}</td>`;
         }).join('');
@@ -1603,7 +1603,7 @@ async function loadPointage(){
       }).join('')}</tbody>
     </table></div>
     <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--muted)">
-      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span>
+      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span><span>🔵 Repos</span>
       <span style="margin-left:8px;font-style:italic">Cliquez sur une case pour saisir</span>
     </div>`;
 }
@@ -1611,7 +1611,7 @@ async function loadPointage(){
 async function quickPointage(salId, date, cell){
   if(cell){cell.style.opacity='0.3';cell.style.pointerEvents='none';}
   const{data:existing}=await sb.from('pointages').select('*').eq('salarie_id',salId).eq('date',date).maybeSingle();
-  const statuts=['Présent','Absent','Retard','Congé',''];
+  const statuts=['Présent','Absent','Retard','Congé','Repos',''];
   const current=existing?.statut||'';
   const next=statuts[(statuts.indexOf(current)+1)%statuts.length];
   if(existing){
