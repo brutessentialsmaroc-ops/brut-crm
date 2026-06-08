@@ -1571,8 +1571,41 @@ async function loadPointage(){
   const ptMap={};
   (pts||[]).forEach(p=>{const d=p.date?p.date.split('T')[0]:p.date;ptMap[p.salarie_id+'_'+d]=p;});
   const moisLabel=new Date(year,month,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  // Group sal by atelier
+  const ptAtelierOrder=['Administration','Menuiserie bois','Tapisserie','Céramique','Ferronnerie','Livraison'];
+  const ptGroups={};
+  (sal||[]).forEach(s=>{const k=s.atelier||'Autre';if(!ptGroups[k])ptGroups[k]=[];ptGroups[k].push(s);});
+  const ptSortedGroups=Object.keys(ptGroups).sort((a,b)=>{const ia=ptAtelierOrder.indexOf(a);const ib=ptAtelierOrder.indexOf(b);return(ia===-1?99:ia)-(ib===-1?99:ib);});
+  const ptColors={'Administration':'#C8A97A','Menuiserie bois':'#378ADD','Tapisserie':'#EF9F27','Céramique':'#5DCAA5','Ferronnerie':'#9B6DD6','Livraison':'#E05A5A'};
 
   const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Repos':'🔵','Férié':'⭐'};
+
+  const dayHeaders=Array.from({length:daysInMonth},(_,i)=>{
+    const d=new Date(year,month,i+1);
+    const isWeekend=d.getDay()===0||d.getDay()===6;
+    return`<th style="padding:6px 4px;text-align:center;background:${isWeekend?'#f0ece4':'var(--bg)'};border:1px solid var(--border);min-width:32px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${i+1}</th>`;
+  }).join('');
+
+  const buildRows=(sals)=>sals.map(s=>{
+    let absences=0; let hSup=0;
+    const cells=Array.from({length:daysInMonth},(_,i)=>{
+      const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+      const d=new Date(year,month,i+1);
+      const isWeekend=d.getDay()===0||d.getDay()===6;
+      const pt=ptMap[s.id+'_'+dateStr];
+      if(pt&&pt.statut==='Absent') absences++;
+      if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
+      const icon=pt?statusIcon[pt.statut]||'?':'';
+      const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':'#fff':'#fff';
+      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" onclick="quickPointage('${s.id}','${dateStr}',this)" title="${dateStr}">${icon}</td>`;
+    }).join('');
+    return`<tr>
+      <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;white-space:nowrap">${s.prenom||''} ${s.nom}</td>
+      ${cells}
+      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences}</td>
+      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup:''}</td>
+    </tr>`;
+  }).join('');
 
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -1587,39 +1620,22 @@ async function loadPointage(){
       </div>
     </div>
     <div style="overflow-x:auto">
-    <table style="border-collapse:collapse;font-size:12px;min-width:100%">
-      <thead><tr>
-        <th style="padding:8px 12px;text-align:left;background:var(--bg);border:1px solid var(--border);min-width:140px;position:sticky;left:0;z-index:2">Salarié</th>
-        ${Array.from({length:daysInMonth},(_,i)=>{
-          const d=new Date(year,month,i+1);
-          const isWeekend=d.getDay()===0||d.getDay()===6;
-          return`<th style="padding:6px 4px;text-align:center;background:${isWeekend?'#f0ece4':'var(--bg)'};border:1px solid var(--border);min-width:32px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${i+1}</th>`;
-        }).join('')}
-        <th style="padding:8px 12px;text-align:center;background:var(--bg);border:1px solid var(--border)">Abs.</th>
-        <th style="padding:8px 12px;text-align:center;background:var(--bg);border:1px solid var(--border)">H.Sup</th>
-      </tr></thead>
-      <tbody>${(sal||[]).map(s=>{
-        let absences=0; let hSup=0;
-        const cells=Array.from({length:daysInMonth},(_,i)=>{
-          const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
-          const d=new Date(year,month,i+1);
-          const isWeekend=d.getDay()===0||d.getDay()===6;
-          const pt=ptMap[s.id+'_'+dateStr];
-          if(pt&&pt.statut==='Absent') absences++;
-          if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
-          const icon=pt?statusIcon[pt.statut]||'?':'';
-          const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':'#fff':'#fff';
-          return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" 
-            onclick="quickPointage('${s.id}','${dateStr}',this)" title="${dateStr}">${icon}</td>`;
-        }).join('');
-        return`<tr>
-          <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;white-space:nowrap">${s.prenom||''} ${s.nom}</td>
-          ${cells}
-          <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences}</td>
-          <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup:''}</td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table></div>
+    ${ptSortedGroups.map(atelier=>{
+      const color=ptColors[atelier]||'#888';
+      return`<div style="margin-bottom:20px">
+        <div style="padding:8px 12px;background:${color}18;border-left:3px solid ${color};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${color};margin-bottom:0">${atelier} (${ptGroups[atelier].length})</div>
+        <table style="border-collapse:collapse;font-size:12px;min-width:100%">
+          <thead><tr>
+            <th style="padding:8px 12px;text-align:left;background:var(--bg);border:1px solid var(--border);min-width:140px;position:sticky;left:0;z-index:2">Salarié</th>
+            ${dayHeaders}
+            <th style="padding:8px 12px;text-align:center;background:var(--bg);border:1px solid var(--border)">Abs.</th>
+            <th style="padding:8px 12px;text-align:center;background:var(--bg);border:1px solid var(--border)">H.Sup</th>
+          </tr></thead>
+          <tbody>${buildRows(ptGroups[atelier])}</tbody>
+        </table>
+      </div>`;
+    }).join('')}
+    </div>
     <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--muted)">
       <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span><span>🔵 Repos</span>
       <span style="margin-left:8px;font-style:italic">Cliquez sur une case pour saisir</span>
