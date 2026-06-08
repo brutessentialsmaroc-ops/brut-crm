@@ -146,6 +146,14 @@
   .comment-meta{font-size:10px;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between}
   .comment-text{font-size:13px}
   .comment-input{display:flex;gap:8px}
+  /* ORGANIGRAMME */
+  .org-card{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;cursor:grab;user-select:none;min-width:160px;max-width:200px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:box-shadow 0.15s}
+  .org-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.12);border-color:var(--text)}
+  .org-card.dragging{cursor:grabbing;box-shadow:0 8px 24px rgba(0,0,0,0.18);opacity:0.9;z-index:100}
+  .org-card-avatar{width:36px;height:36px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--blue);margin-bottom:8px;overflow:hidden}
+  .org-card-nom{font-size:13px;font-weight:500;margin-bottom:2px}
+  .org-card-poste{font-size:11px;color:var(--muted);line-height:1.3}
+  .org-col-header{position:sticky;top:0;background:var(--bg);padding:8px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);margin-bottom:12px;z-index:10}
   /* RH TABS */
   .rh-tab{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:13px;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif;transition:all 0.15s}
   .rh-tab:hover{background:var(--bg);color:var(--text)}
@@ -404,11 +412,22 @@
           <button class="rh-tab" onclick="showRhTab('pointage',this)">⏱ Pointage</button>
           <button class="rh-tab" onclick="showRhTab('conges',this)">🌴 Congés</button>
           <button class="rh-tab" onclick="showRhTab('paie',this)">💰 Paie</button>
+          <button class="rh-tab" onclick="showRhTab('organigramme',this)">🏢 Organigramme</button>
         </div>
         <div id="rh-salaries"><div class="loading">Chargement…</div></div>
         <div id="rh-pointage" class="hidden"><div class="loading">Chargement…</div></div>
         <div id="rh-conges" class="hidden"><div class="loading">Chargement…</div></div>
         <div id="rh-paie" class="hidden"><div class="loading">Chargement…</div></div>
+        <div id="rh-organigramme" class="hidden">
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="rh-tab active" id="org-tab-hierarchie" onclick="switchOrgView('hierarchie',this)">Hiérarchique</button>
+            <button class="rh-tab" id="org-tab-atelier" onclick="switchOrgView('atelier',this)">Par atelier</button>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="saveOrgPositions()">💾 Sauvegarder</button>
+            </div>
+          </div>
+          <div id="org-canvas" style="position:relative;min-height:600px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:auto;padding:20px"></div>
+        </div>
       </div>
       <!-- DEVIS BUILDER -->
       <div id="page-devis-builder" class="hidden">
@@ -1373,13 +1392,14 @@ function showRhTab(tab, el){
   currentRhTab = tab;
   document.querySelectorAll('.rh-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['salaries','pointage','conges','paie'].forEach(t=>{
+  ['salaries','pointage','conges','paie','organigramme'].forEach(t=>{
     document.getElementById('rh-'+t).classList.toggle('hidden', t!==tab);
   });
   if(tab==='salaries') loadRhSalaries();
   else if(tab==='pointage') loadPointage();
   else if(tab==='conges') loadConges();
   else if(tab==='paie') loadPaie();
+  else if(tab==='organigramme') loadOrganigramme();
 }
 
 // ─── SALARIÉS ─────────────────────────────────────────────────────────────────
@@ -2749,6 +2769,140 @@ async function printEmargement(){
 
   document.getElementById('pdf-preview').style.display='block';
   setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+// ─── ORGANIGRAMME ────────────────────────────────────────────────────────────
+let orgView = 'hierarchie';
+let orgSalaries = [];
+let orgPositions = {};
+let orgDragEl = null, orgDragOffX = 0, orgDragOffY = 0;
+
+function switchOrgView(view, el){
+  orgView = view;
+  document.querySelectorAll('#rh-organigramme .rh-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderOrganigramme();
+}
+
+async function loadOrganigramme(){
+  const{data}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  orgSalaries=data||[];
+  // Load saved positions
+  const saved=localStorage.getItem('brut-org-positions');
+  orgPositions=saved?JSON.parse(saved):{};
+  renderOrganigramme();
+}
+
+function renderOrganigramme(){
+  const canvas=document.getElementById('org-canvas');
+  if(orgView==='hierarchie') renderHierarchie(canvas);
+  else renderParAtelier(canvas);
+}
+
+function renderHierarchie(canvas){
+  // Define hierarchy levels based on poste keywords
+  const levels={
+    'DG':0,'DIRECTEUR':0,
+    'RESPONSABLE':1,'MANAGER':1,'CHEF':1,
+    'OUVRIER':2,'MENUISIER':2,'TAPISSIER':2,'CERAMISTE':2,'FERRONNERIE':2,'LIVREUR':2
+  };
+  const getLevel=(poste)=>{
+    const p=(poste||'').toUpperCase();
+    for(const [k,v] of Object.entries(levels)) if(p.includes(k)) return v;
+    return 2;
+  };
+  const grouped={0:[],1:[],2:[]};
+  orgSalaries.forEach(s=>{ const l=getLevel(s.poste); (grouped[l]||(grouped[2])).push(s); });
+
+  const levelLabels={0:'Direction',1:'Responsables',2:'Équipes'};
+  const levelColors={0:'#C8A97A',1:'#378ADD',2:'#5DCAA5'};
+
+  canvas.innerHTML='<div style="display:flex;flex-direction:column;gap:32px;padding:20px">'
+    +Object.entries(grouped).filter(([,sals])=>sals.length).map(([level,sals])=>`
+    <div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:${levelColors[level]};font-family:'DM Mono',monospace;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid ${levelColors[level]}">${levelLabels[level]} (${sals.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        ${sals.map(s=>renderOrgCard(s,levelColors[level])).join('')}
+      </div>
+    </div>`).join('')
+    +'</div>';
+  addDragToCards(canvas);
+}
+
+function renderParAtelier(canvas){
+  const ateliers={};
+  orgSalaries.forEach(s=>{
+    const k=s.atelier||'Non assigné';
+    if(!ateliers[k])ateliers[k]=[];
+    ateliers[k].push(s);
+  });
+  const colors=['#378ADD','#EF9F27','#5DCAA5','#9B6DD6','#E05A5A','#C8A97A'];
+  canvas.innerHTML='<div style="display:flex;gap:20px;overflow-x:auto;padding:20px;min-height:500px">'
+    +Object.entries(ateliers).map(([atelier,sals],i)=>`
+    <div style="min-width:200px;background:rgba(0,0,0,0.02);border-radius:var(--radius-lg);border-top:3px solid ${colors[i%colors.length]};padding:14px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${colors[i%colors.length]};font-family:'DM Mono',monospace;margin-bottom:12px">${atelier} <span style="background:rgba(0,0,0,0.08);padding:1px 6px;border-radius:10px;font-size:10px">${sals.length}</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${sals.map(s=>renderOrgCard(s,colors[i%colors.length])).join('')}
+      </div>
+    </div>`).join('')
+    +'</div>';
+  addDragToCards(canvas);
+}
+
+function renderOrgCard(s, color){
+  const initials_=(s.prenom||s.nom||'?')[0].toUpperCase()+(s.nom||'')[0]?.toUpperCase()||'';
+  return`<div class="org-card" data-id="${s.id}" style="border-top:3px solid ${color}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div class="org-card-avatar" style="background:${color}22;color:${color}">
+        ${s.photo_url?`<img src="${s.photo_url}" style="width:100%;height:100%;object-fit:cover">`:`${initials_}`}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="org-card-nom">${s.prenom||''} ${s.nom}</div>
+        <div class="org-card-poste">${s.poste||'—'}</div>
+      </div>
+    </div>
+    ${s.atelier?`<div style="font-size:10px;padding:2px 7px;border-radius:10px;background:${color}22;color:${color};display:inline-block">${s.atelier}</div>`:''}
+  </div>`;
+}
+
+function addDragToCards(canvas){
+  canvas.querySelectorAll('.org-card').forEach(card=>{
+    card.addEventListener('mousedown', e=>{
+      if(e.button!==0)return;
+      const rect=card.getBoundingClientRect();
+      const canvasRect=canvas.getBoundingClientRect();
+      orgDragEl=card;
+      orgDragOffX=e.clientX-rect.left;
+      orgDragOffY=e.clientY-rect.top;
+      card.classList.add('dragging');
+      card.style.position='absolute';
+      card.style.zIndex=100;
+      card.style.left=(rect.left-canvasRect.left+canvas.scrollLeft)+'px';
+      card.style.top=(rect.top-canvasRect.top+canvas.scrollTop)+'px';
+      card.style.width=rect.width+'px';
+      e.preventDefault();
+    });
+  });
+  canvas.addEventListener('mousemove', e=>{
+    if(!orgDragEl)return;
+    const canvasRect=canvas.getBoundingClientRect();
+    const x=e.clientX-canvasRect.left-orgDragOffX+canvas.scrollLeft;
+    const y=e.clientY-canvasRect.top-orgDragOffY+canvas.scrollTop;
+    orgDragEl.style.left=Math.max(0,x)+'px';
+    orgDragEl.style.top=Math.max(0,y)+'px';
+  });
+  canvas.addEventListener('mouseup', ()=>{
+    if(!orgDragEl)return;
+    orgDragEl.classList.remove('dragging');
+    orgDragEl.style.zIndex='';
+    orgPositions[orgDragEl.dataset.id]={left:orgDragEl.style.left,top:orgDragEl.style.top};
+    orgDragEl=null;
+  });
+}
+
+function saveOrgPositions(){
+  localStorage.setItem('brut-org-positions', JSON.stringify(orgPositions));
+  toast('Positions sauvegardées ✓');
 }
 
 checkSession();
