@@ -2493,6 +2493,7 @@ function renderProspectCard(p){
       ${p.photos&&p.photos.length?`<div style="display:flex;gap:4px;margin-top:6px">
         ${p.photos.slice(0,3).map(url=>`<img src="${url}" style="width:40px;height:30px;object-fit:cover;border-radius:3px">`).join('')}
       </div>`:''}
+      ${p.pdf_url?`<div style="margin-top:4px"><span style="font-size:10px;color:var(--blue)">📄 Document joint</span></div>`:''}
     </div>
   </div>`;
 }
@@ -2549,6 +2550,19 @@ async function openProspectModal(data={}){
       </select>
     </div>
     <div class="form-group"><label>Notes</label><textarea id="pr-notes">${data.notes||''}</textarea></div>
+    <div class="form-group"><label>Document PDF</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${data.pdf_url
+          ?`<a href="${data.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:6px">📄 Voir le document</a>
+            <button class="btn btn-sm btn-danger" onclick="removeProspectPdf('${data.id||''}')">Suppr.</button>`
+          :`<span style="font-size:12px;color:var(--muted)">Aucun document</span>`
+        }
+      </div>
+      <input type="file" id="pr-pdf-input" accept=".pdf,.doc,.docx" style="display:none" onchange="uploadProspectPdf(this,'${data.id||''}')">
+      <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('pr-pdf-input').click()">
+        ${data.pdf_url?'🔄 Remplacer':'📎 Ajouter un PDF'}
+      </button>
+    </div>
     <div class="form-group"><label>Photos d'inspiration</label>
       <div id="pr-photos-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
         ${(data.photos||[]).map((url,i)=>`
@@ -2589,6 +2603,7 @@ async function saveProspect(){
     notes:document.getElementById('pr-notes').value,
     photos:JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'))
   };
+  // pdf_url handled separately via uploadProspectPdf
   if(id)await sb.from('prospects').update(payload).eq('id',id);
   else await sb.from('prospects').insert(payload);
   closeModal('rh-modal');toast('Prospect enregistré ✓');loadProspects();
@@ -2954,6 +2969,31 @@ function addDragToCards(canvas){
 async function saveOrgPositions(){
   await sb.from('org_positions').upsert({id:'main',positions:orgPositions,updated_at:new Date().toISOString()});
   toast('Positions sauvegardées ✓');
+}
+
+async function uploadProspectPdf(input, prospectId){
+  const file=input.files[0];
+  if(!file)return;
+  if(!prospectId){toast("Enregistrez le prospect d'abord");return;}
+  toast('Upload en cours…');
+  const ext=file.name.split('.').pop();
+  const path=`prospects/pdf/${prospectId}.${ext}`;
+  const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+  if(error){toast('Erreur upload');return;}
+  const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+  await sb.from('prospects').update({pdf_url:publicUrl}).eq('id',prospectId);
+  toast('Document enregistré ✓');
+  input.value='';
+  loadProspects();
+  closeModal('rh-modal');
+}
+
+async function removeProspectPdf(prospectId){
+  if(!prospectId||!confirm('Supprimer ce document ?'))return;
+  await sb.from('prospects').update({pdf_url:null}).eq('id',prospectId);
+  toast('Document supprimé');
+  loadProspects();
+  closeModal('rh-modal');
 }
 
 checkSession();
