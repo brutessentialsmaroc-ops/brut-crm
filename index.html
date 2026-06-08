@@ -147,7 +147,9 @@
   .comment-text{font-size:13px}
   .comment-input{display:flex;gap:8px}
   /* ORGANIGRAMME */
-  .org-card{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;cursor:grab;user-select:none;min-width:160px;max-width:200px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:box-shadow 0.15s}
+  .org-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;cursor:grab;user-select:none;width:200px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:box-shadow 0.15s;overflow:hidden}
+  .org-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:se-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px}
+  .org-resize-handle::after{content:'';display:block;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);border-radius:0 0 2px 0}
   .org-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.12);border-color:var(--text)}
   .org-card.dragging{cursor:grabbing;box-shadow:0 8px 24px rgba(0,0,0,0.18);opacity:0.9;z-index:100}
   .org-card-avatar{width:36px;height:36px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--blue);margin-bottom:8px;overflow:hidden}
@@ -419,12 +421,8 @@
         <div id="rh-conges" class="hidden"><div class="loading">Chargement…</div></div>
         <div id="rh-paie" class="hidden"><div class="loading">Chargement…</div></div>
         <div id="rh-organigramme" class="hidden">
-          <div style="display:flex;gap:8px;margin-bottom:16px">
-            <button class="rh-tab active" id="org-tab-hierarchie" onclick="switchOrgView('hierarchie',this)">Hiérarchique</button>
-            <button class="rh-tab" id="org-tab-atelier" onclick="switchOrgView('atelier',this)">Par atelier</button>
-            <div style="margin-left:auto;display:flex;gap:8px">
-              <button class="btn btn-sm" onclick="saveOrgPositions()">💾 Sauvegarder</button>
-            </div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button class="btn btn-sm" onclick="saveOrgPositions()">💾 Sauvegarder</button>
           </div>
           <div id="org-canvas" style="position:relative;min-height:600px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:auto;padding:20px"></div>
         </div>
@@ -2777,12 +2775,7 @@ let orgSalaries = [];
 let orgPositions = {};
 let orgDragEl = null, orgDragOffX = 0, orgDragOffY = 0;
 
-function switchOrgView(view, el){
-  orgView = view;
-  document.querySelectorAll('#rh-organigramme .rh-tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  renderOrganigramme();
-}
+
 
 async function loadOrganigramme(){
   const[{data:sals},{data:pos}]=await Promise.all([
@@ -2796,39 +2789,7 @@ async function loadOrganigramme(){
 
 function renderOrganigramme(){
   const canvas=document.getElementById('org-canvas');
-  if(orgView==='hierarchie') renderHierarchie(canvas);
-  else renderParAtelier(canvas);
-}
-
-function renderHierarchie(canvas){
-  // Define hierarchy levels based on poste keywords
-  const levels={
-    'DG':0,'DIRECTEUR':0,
-    'RESPONSABLE':1,'MANAGER':1,'CHEF':1,
-    'OUVRIER':2,'MENUISIER':2,'TAPISSIER':2,'CERAMISTE':2,'FERRONNERIE':2,'LIVREUR':2
-  };
-  const getLevel=(poste)=>{
-    const p=(poste||'').toUpperCase();
-    for(const [k,v] of Object.entries(levels)) if(p.includes(k)) return v;
-    return 2;
-  };
-  const grouped={0:[],1:[],2:[]};
-  orgSalaries.forEach(s=>{ const l=getLevel(s.poste); (grouped[l]||(grouped[2])).push(s); });
-
-  const levelLabels={0:'Direction',1:'Responsables',2:'Équipes'};
-  const levelColors={0:'#C8A97A',1:'#378ADD',2:'#5DCAA5'};
-
-  canvas.innerHTML='<div style="position:relative;min-height:600px;padding:20px" id="org-inner">'
-    +Object.entries(grouped).filter(([,sals])=>sals.length).map(([level,sals])=>`
-    <div style="margin-bottom:32px">
-      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:${levelColors[level]};font-family:'DM Mono',monospace;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid ${levelColors[level]}">${levelLabels[level]} (${sals.length})</div>
-      <div style="display:flex;flex-wrap:wrap;gap:12px">
-        ${sals.map(s=>renderOrgCard(s,levelColors[level])).join('')}
-      </div>
-    </div>`).join('')
-    +'</div>';
-  applyOrgPositions(canvas);
-  addDragToCards(canvas);
+  renderParAtelier(canvas);
 }
 
 function renderParAtelier(canvas){
@@ -2865,25 +2826,42 @@ function renderOrgCard(s, color){
       </div>
     </div>
     ${s.atelier?`<div style="font-size:10px;padding:2px 7px;border-radius:10px;background:${color}22;color:${color};display:inline-block">${s.atelier}</div>`:''}
+    <div class="org-resize-handle" data-resize="${s.id}"></div>
   </div>`;
 }
 
 function applyOrgPositions(canvas){
   Object.entries(orgPositions).forEach(([id,pos])=>{
     const card=canvas.querySelector('[data-id="'+id+'"]');
-    if(card&&pos.left&&pos.top){
-      card.style.position='absolute';
-      card.style.left=pos.left;
-      card.style.top=pos.top;
-      card.style.width='200px';
+    if(card&&pos){
+      if(pos.left&&pos.top){
+        card.style.position='absolute';
+        card.style.left=pos.left;
+        card.style.top=pos.top;
+      }
+      if(pos.width) card.style.width=pos.width;
+      if(pos.minHeight) card.style.minHeight=pos.minHeight;
     }
   });
 }
+
+let orgResizeEl=null, orgResizeStartX=0, orgResizeStartY=0, orgResizeStartW=0, orgResizeStartH=0;
 
 function addDragToCards(canvas){
   canvas.querySelectorAll('.org-card').forEach(card=>{
     card.addEventListener('mousedown', e=>{
       if(e.button!==0)return;
+      // Check if clicking resize handle
+      if(e.target.closest('.org-resize-handle')){
+        orgResizeEl=card;
+        orgResizeStartX=e.clientX;
+        orgResizeStartY=e.clientY;
+        orgResizeStartW=card.offsetWidth;
+        orgResizeStartH=card.offsetHeight;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       const rect=card.getBoundingClientRect();
       const canvasRect=canvas.getBoundingClientRect();
       orgDragEl=card;
@@ -2894,11 +2872,18 @@ function addDragToCards(canvas){
       card.style.zIndex=100;
       card.style.left=(rect.left-canvasRect.left+canvas.scrollLeft)+'px';
       card.style.top=(rect.top-canvasRect.top+canvas.scrollTop)+'px';
-      card.style.width=rect.width+'px';
       e.preventDefault();
     });
   });
+
   canvas.addEventListener('mousemove', e=>{
+    if(orgResizeEl){
+      const newW=Math.max(140, orgResizeStartW+(e.clientX-orgResizeStartX));
+      const newH=Math.max(80, orgResizeStartH+(e.clientY-orgResizeStartY));
+      orgResizeEl.style.width=newW+'px';
+      orgResizeEl.style.minHeight=newH+'px';
+      return;
+    }
     if(!orgDragEl)return;
     const canvasRect=canvas.getBoundingClientRect();
     const x=e.clientX-canvasRect.left-orgDragOffX+canvas.scrollLeft;
@@ -2906,11 +2891,23 @@ function addDragToCards(canvas){
     orgDragEl.style.left=Math.max(0,x)+'px';
     orgDragEl.style.top=Math.max(0,y)+'px';
   });
+
   canvas.addEventListener('mouseup', ()=>{
+    if(orgResizeEl){
+      const id=orgResizeEl.dataset.id;
+      if(!orgPositions[id])orgPositions[id]={};
+      orgPositions[id].width=orgResizeEl.style.width;
+      orgPositions[id].minHeight=orgResizeEl.style.minHeight;
+      orgResizeEl=null;
+      return;
+    }
     if(!orgDragEl)return;
     orgDragEl.classList.remove('dragging');
     orgDragEl.style.zIndex='';
-    orgPositions[orgDragEl.dataset.id]={left:orgDragEl.style.left,top:orgDragEl.style.top};
+    const id=orgDragEl.dataset.id;
+    if(!orgPositions[id])orgPositions[id]={};
+    orgPositions[id].left=orgDragEl.style.left;
+    orgPositions[id].top=orgDragEl.style.top;
     orgDragEl=null;
   });
 }
