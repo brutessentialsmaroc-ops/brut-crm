@@ -221,13 +221,11 @@
     <nav>
       <button class="nav-item active" onclick="showPage('dashboard',this)">⊞ Tableau de bord</button>
       <button class="nav-item" onclick="showPage('clients',this)">◎ Clients</button>
-      <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('commandes',this)">◫ Commandes</button>
       <button class="nav-item" onclick="showPage('atelier',this)">⚙ Atelier</button>
+      <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
-      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="showPage('prospects',this)">◈ Prospects</button>
-      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="showPage('rh',this)">◉ RH</button>
     </nav>
     <div class="sidebar-footer">
@@ -1264,56 +1262,11 @@ async function loadFactures(){
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeCls}">${f.statut}</span>
-        <button class="btn btn-sm" onclick="event.stopPropagation();editFacture('${f.id}')">Modifier</button>
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();marquerPayee('${f.id}')">✓ Payée</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteFacture('${f.id}')">Suppr.</button>
       </div>
     </div>`;
   }).join('');
-}
-
-async function editFacture(id){
-  const{data:f}=await sb.from('factures').select('*,clients(nom)').eq('id',id).single();
-  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
-  const clientOptions=(clients||[]).map(c=>`<option value="${c.id}" ${c.id===f.client_id?'selected':''}>${c.nom}</option>`).join('');
-  const html=`<div class="modal" style="max-width:480px">
-    <div class="modal-title">Modifier la facture</div>
-    <div class="form-group"><label>Référence</label><input id="ef-ref" value="${f.reference||''}"></div>
-    <div class="form-group"><label>Client</label><select id="ef-client">${clientOptions}</select></div>
-    <div class="form-group"><label>Nom du projet</label><input id="ef-projet" value="${f.projet_nom||''}"></div>
-    <div class="form-group"><label>Statut</label>
-      <select id="ef-statut">
-        <option ${f.statut==='Non payée'?'selected':''}>Non payée</option>
-        <option ${f.statut==='Payée'?'selected':''}>Payée</option>
-        <option ${f.statut==='En retard'?'selected':''}>En retard</option>
-      </select>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Date d'émission</label><input type="date" id="ef-emission" value="${f.date_emission||''}"></div>
-      <div class="form-group"><label>Date d'échéance</label><input type="date" id="ef-echeance" value="${f.date_echeance||''}"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-edit-facture')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveFacture('${id}')">Enregistrer</button>
-    </div>
-  </div>`;
-  showModal('modal-edit-facture', html);
-}
-
-async function saveFacture(id){
-  const updates={
-    reference:document.getElementById('ef-ref').value,
-    client_id:document.getElementById('ef-client').value,
-    projet_nom:document.getElementById('ef-projet').value,
-    statut:document.getElementById('ef-statut').value,
-    date_emission:document.getElementById('ef-emission').value||null,
-    date_echeance:document.getElementById('ef-echeance').value||null,
-  };
-  const{error}=await sb.from('factures').update(updates).eq('id',id);
-  if(error){toast('Erreur: '+error.message);return;}
-  closeModal('modal-edit-facture');
-  toast('Facture mise à jour ✓');
-  loadFactures();
 }
 
 async function marquerPayee(id){
@@ -1610,7 +1563,10 @@ async function loadPointage(){
         <div style="font-size:15px;font-weight:500;text-transform:capitalize;min-width:140px;text-align:center">${moisLabel}</div>
         <button class="btn btn-sm" onclick="navPointage(1)">→</button>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="openPointageModal()">+ Saisir pointage</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="printEmargement()">🖨 Feuille d'émargement</button>
+        <button class="btn btn-primary btn-sm" onclick="openPointageModal()">+ Saisir pointage</button>
+      </div>
     </div>
     <div style="overflow-x:auto">
     <table style="border-collapse:collapse;font-size:12px;min-width:100%">
@@ -2698,7 +2654,92 @@ function generateFicheProspect(){
       </div>`:''}
       <!-- PHOTOS -->
       ${photosHTML||''}
+      <!-- PIED DE PAGE -->
+      <div style="border-top:1px solid #e8e4dc;padding-top:4mm;margin-top:6mm;display:flex;justify-content:space-between;font-size:10px;color:#aaa;font-family:monospace">
+        <span>BRUT Essentials · Atelier de fabrication & Design · Marrakech</span>
+        <span>+212 621 754 582</span>
+      </div>
+    </div>`;
 
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+async function printEmargement(){
+  const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('atelier').then(r=>{r.data=(r.data||[]).sort((a,b)=>(a.atelier||'').localeCompare(b.atelier||'')||(a.nom||'').localeCompare(b.nom||''));return r;});
+  const today=new Date();
+  const dateStr=today.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Group by atelier
+  const groups={};
+  (sal||[]).forEach(s=>{
+    const k=s.atelier||'Autre';
+    if(!groups[k])groups[k]=[];
+    groups[k].push(s);
+  });
+
+  const rowsHTML=Object.entries(groups).map(([atelier,employes])=>`
+    <tr><td colspan="5" style="padding:6px 10px;background:#f5f3ee;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:1px solid #e0dbd2;color:#888">${atelier}</td></tr>
+    ${employes.map(s=>`<tr>
+      <td style="padding:10px 10px;border:1px solid #e0dbd2;font-size:13px;font-weight:500">${s.prenom||''} ${s.nom}</td>
+      <td style="padding:10px;border:1px solid #e0dbd2;font-size:11px;color:#888">${s.poste||'—'}</td>
+      <td style="padding:10px;border:1px solid #e0dbd2;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
+          <div style="width:14px;height:14px;border:1.5px solid #1a1a18;border-radius:2px"></div> Présent
+        </div>
+      </td>
+      <td style="padding:10px;border:1px solid #e0dbd2;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
+          <div style="width:14px;height:14px;border:1.5px solid #EF9F27;border-radius:2px"></div> Retard
+        </div>
+      </td>
+      <td style="padding:10px;border:1px solid #e0dbd2;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
+          <div style="width:14px;height:14px;border:1.5px solid #A32D2D;border-radius:2px"></div> Absent
+        </div>
+      </td>
+    </tr>`).join('')}
+  `).join('');
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'DM Sans', sans-serif; }
+      @page { size: A4 portrait; margin: 12mm; }
+    </style>
+    <div style="width:186mm">
+      <!-- EN-TÊTE -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8mm;padding-bottom:5mm;border-bottom:2px solid #1a1a18">
+        <div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:3px">BRUT</div>
+          <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase">Atelier de fabrication · Mobilier Design</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:600">FEUILLE D'ÉMARGEMENT</div>
+          <div style="font-size:12px;color:#888;margin-top:3px;text-transform:capitalize">${dateStr}</div>
+        </div>
+      </div>
+      <!-- TABLEAU -->
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="padding:8px 10px;text-align:left;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18">NOM & PRÉNOM</th>
+            <th style="padding:8px 10px;text-align:left;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18">POSTE</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">PRÉSENT</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">RETARD</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">ABSENT</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+      <!-- SIGNATURE -->
+      <div style="margin-top:10mm;display:flex;justify-content:flex-end">
+        <div style="text-align:center">
+          <div style="font-size:11px;color:#888;margin-bottom:12mm">Signature responsable</div>
+          <div style="border-top:1px solid #1a1a18;width:50mm;padding-top:4px;font-size:10px;color:#aaa">Nabil Ziani — DG</div>
+        </div>
+      </div>
     </div>`;
 
   document.getElementById('pdf-preview').style.display='block';
