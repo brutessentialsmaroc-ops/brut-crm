@@ -2462,6 +2462,7 @@ async function openProspectModal(data={}){
       <div class="form-group"><label>Source</label>
         <select id="pr-source" onchange="document.getElementById('source-autre-wrap').style.display=this.value==='Autre'?'block':'none'">
           <option ${data.source==='Réseau Samir'?'selected':''}>Réseau Samir</option>
+          <option ${data.source==='Réseau Nabil'?'selected':''}>Réseau Nabil</option>
           <option ${data.source==='Direct showroom'?'selected':''}>Direct showroom</option>
           <option ${data.source==='BNI reco'?'selected':''}>BNI reco</option>
           <option ${data.source==='Instagram'?'selected':''}>Instagram</option>
