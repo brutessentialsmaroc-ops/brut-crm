@@ -1405,26 +1405,49 @@ async function loadRhSalaries(){
   const{data}=await sb.from('salaries').select('*').order('nom');
   allSalaries=data||[];
   const el=document.getElementById('rh-salaries');
-  if(!allSalaries.length){el.innerHTML='<div class="empty">Aucun salarié. Cliquez + Nouveau pour en ajouter.</div>';return;}
-  el.innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Salarié</th><th>Poste</th><th>Atelier</th><th>Contrat</th><th>Salaire base</th><th>Statut</th><th>CNSS</th><th></th></tr></thead>
-    <tbody>${allSalaries.map(s=>`<tr>
-      <td><div class="client-cell">
-        <div class="avatar" style="background:var(--amber-bg);color:var(--amber);overflow:hidden">${s.photo_url?`<img src="${s.photo_url}" style="width:100%;height:100%;object-fit:cover">`:`${(s.prenom||s.nom||'?')[0].toUpperCase()}${(s.nom||'')[0]?.toUpperCase()||''}`}</div>
-        <div><div style="font-weight:500">${s.prenom||''} ${s.nom}</div><div style="font-size:11px;color:var(--muted)">${s.email||s.telephone||''}</div></div>
-      </div></td>
-      <td>${s.poste||'—'}</td>
-      <td><span class="badge badge-blue">${s.atelier||'—'}</span></td>
-      <td><span class="badge badge-gray">${s.type_contrat||'CDI'}</span></td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${s.salaire_base?Number(s.salaire_base).toLocaleString('fr-FR')+' MAD':'—'}</td>
-      <td><span class="badge ${s.statut==='Actif'?'badge-green':'badge-gray'}">${s.statut||'Actif'}</span></td>
-      <td><span class="badge ${s.cnss==='Validé'?'badge-green':s.cnss==='En cours'?'badge-amber':'badge-gray'}">${s.cnss||'À faire'}</span></td>
-      <td><div class="actions">
-        <button class="btn btn-sm" onclick="editSalarie('${s.id}')">Modifier</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteSalarie('${s.id}')">Suppr.</button>
-      </div></td>
-    </tr>`).join('')}
-    </tbody></table></div>`;
+  if(!allSalaries.length){el.innerHTML='<div class="empty">Aucun salarié.</div>';return;}
+
+  const atelierOrder=['Administration','Menuiserie bois','Tapisserie','Ceramique','Céramique','Ferronnerie','Livraison'];
+  const atelierColors={'Administration':'#C8A97A','Menuiserie bois':'#378ADD','Tapisserie':'#EF9F27','Ceramique':'#5DCAA5','Céramique':'#5DCAA5','Ferronnerie':'#9B6DD6','Livraison':'#E05A5A'};
+  const groups={};
+  allSalaries.forEach(s=>{const k=s.atelier||'Autre';if(!groups[k])groups[k]=[];groups[k].push(s);});
+  const sorted=Object.keys(groups).sort((a,b)=>{const ia=atelierOrder.indexOf(a);const ib=atelierOrder.indexOf(b);return(ia===-1?99:ia)-(ib===-1?99:ib);});
+
+  el.innerHTML='<div>'+sorted.map(atelier=>{
+    const color=atelierColors[atelier]||'#888';
+    const sals=groups[atelier];
+    return`<div class="table-wrap" style="margin-bottom:20px;overflow:hidden">
+      <div style="padding:10px 16px;background:${color}18;border-bottom:2px solid ${color};font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${color}">
+        ${atelier} <span style="font-weight:400;opacity:0.7">(${sals.length})</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:9px 16px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Salarié</th>
+          <th style="padding:9px 16px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Poste</th>
+          <th style="padding:9px 16px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Contrat</th>
+          <th style="padding:9px 16px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Salaire base</th>
+          <th style="padding:9px 16px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Statut</th>
+          <th style="padding:9px 16px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">CNSS</th>
+          <th style="padding:9px 16px;border-bottom:1px solid var(--border)"></th>
+        </tr></thead>
+        <tbody>${sals.map(s=>`<tr>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border)"><div class="client-cell">
+            <div class="avatar" style="background:${color}22;color:${color};overflow:hidden">${s.photo_url?`<img src="${s.photo_url}" style="width:100%;height:100%;object-fit:cover">`:`${(s.prenom||s.nom||'?')[0].toUpperCase()}${(s.nom||'')[0]?.toUpperCase()||''}`}</div>
+            <div><div style="font-weight:500">${s.prenom||''} ${s.nom}</div><div style="font-size:11px;color:var(--muted)">${s.email||s.telephone||''}</div></div>
+          </div></td>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border)">${s.poste||'—'}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border)"><span class="badge badge-gray">${s.type_contrat||'CDI'}</span></td>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:12px">${s.salaire_base?Number(s.salaire_base).toLocaleString('fr-FR')+' MAD':'—'}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border)"><span class="badge ${s.statut==='Actif'?'badge-green':'badge-gray'}">${s.statut||'Actif'}</span></td>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border)"><span class="badge ${s.cnss==='Validé'?'badge-green':s.cnss==='En cours'?'badge-amber':'badge-gray'}">${s.cnss||'À faire'}</span></td>
+          <td style="padding:12px 16px;border-bottom:1px solid var(--border)"><div class="actions">
+            <button class="btn btn-sm" onclick="editSalarie('${s.id}')">Modifier</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteSalarie('${s.id}')">Suppr.</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('')+'</div>';
 }
 
 function renderDocSlot(docType, label, data){
