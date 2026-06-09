@@ -613,13 +613,18 @@ function openNew(){
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 async function loadDashboard(){
   // Date
-  const now=new Date();
+  const now=currentDashDate||new Date();
   const jours=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
   const mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 
   document.getElementById('dash-date').textContent=`${jours[now.getDay()]} ${now.getDate()} ${mois[now.getMonth()]} ${now.getFullYear()}`;
+  // Grise la flèche → si on est sur aujourd'hui
+  const today=new Date(); today.setHours(0,0,0,0);
+  const cur=new Date(now); cur.setHours(0,0,0,0);
+  const btnNext=document.getElementById('btn-dash-next');
+  if(btnNext) btnNext.style.opacity=cur>=today?'0.3':'1';
 
-  const todayStr=now.toISOString().split('T')[0];
+  const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const[r1,r2,r3,r4,r5,r6]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
