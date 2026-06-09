@@ -3011,5 +3011,46 @@ async function removeProspectPdf(prospectId){
   closeModal('rh-modal');
 }
 
+function openNewClientFromDevis(){
+  document.getElementById('builder-client').value='';
+  const html=`<div class="modal" style="max-width:520px">
+    <div class="modal-title">Nouveau client</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Nom *</label><input id="nc-nom" placeholder="Nom du client"></div>
+      <div class="form-group"><label>Type</label>
+        <select id="nc-type"><option>Particulier</option><option>Hôtellerie</option><option>Commerce</option><option>Architecte</option><option>Promoteur</option></select>
+      </div>
+      <div class="form-group"><label>Email</label><input type="email" id="nc-email" placeholder="email@…"></div>
+      <div class="form-group"><label>Téléphone</label><input type="tel" id="nc-tel" placeholder="+212 6…"></div>
+      <div class="form-group"><label>Ville</label><input id="nc-ville" placeholder="Marrakech"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveNewClientFromDevis()">Créer et sélectionner</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+async function saveNewClientFromDevis(){
+  const nom=document.getElementById('nc-nom').value.trim();
+  if(!nom){toast('Le nom est requis');return;}
+  const{data,error}=await sb.from('clients').insert({
+    nom,
+    type:document.getElementById('nc-type').value,
+    email:document.getElementById('nc-email').value,
+    telephone:document.getElementById('nc-tel').value,
+    ville:document.getElementById('nc-ville').value
+  }).select().single();
+  if(error){toast('Erreur: '+error.message);return;}
+  const sel=document.getElementById('builder-client');
+  const opt=document.createElement('option');
+  opt.value=data.id; opt.textContent=data.nom;
+  sel.appendChild(opt);
+  sel.value=data.id;
+  closeModal('rh-modal');
+  toast('Client créé et sélectionné ✓');
+}
+
 checkSession();
 </script>
