@@ -3593,66 +3593,154 @@ async function openSuiviFiche(id){
     .eq('id',id).single();
   const {data:updates}=await sb.from('projets_updates')
     .select('*').eq('projet_id',id).order('created_at',{ascending:false});
+  const {data:articles}=await sb.from('projets_articles')
+    .select('*').eq('projet_id',id).order('ordre',{ascending:true});
   const st=SUIVI_STATUTS[p.statut]||SUIVI_STATUTS['En cours'];
   fiche.innerHTML=`
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
       <button class="btn" onclick="loadSuivi()">← Retour</button>
       <div style="flex:1;min-width:0">
         <div style="font-size:20px;font-weight:700">${p.nom}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px">
           Gestionnaire : <strong>${p.gestionnaire}</strong>${p.suppleant?' · Suppléant : '+p.suppleant:''}
-          ${p.date_debut?' · Début : '+new Date(p.date_debut).toLocaleDateString('fr-FR'):''}
-          ${p.date_cible?' · Cible : '+new Date(p.date_cible).toLocaleDateString('fr-FR'):''}
+          ${p.date_cible?' · Cible : '+new Date(p.date_cible+'T12:00:00').toLocaleDateString('fr-FR'):''}
         </div>
+        ${p.description?`<div style="font-size:13px;color:#555;margin-top:6px;line-height:1.5">${p.description}</div>`:''}
       </div>
       <span style="background:${st.bg};color:${st.color};padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">${st.icon} ${p.statut}</span>
       <button class="btn btn-sm" onclick="openSuiviModal('${id}')">✏️ Modifier</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
-      <div>
-        <!-- FIL DE MISES À JOUR -->
-        <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px">Mises à jour (${updates?.length||0})</div>
-          <div id="suivi-updates-list" style="max-height:500px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px">
-            ${(updates||[]).map(u=>renderUpdate(u)).join('')}
-            ${!updates?.length?`<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px">Aucune mise à jour — soyez le premier !</div>`:''}
+
+    <!-- ONGLETS -->
+    <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0">
+      <button class="rh-tab active" id="stab-articles" onclick="showSuiviTab('articles',this)" style="font-size:13px">📦 Articles (${articles?.length||0})</button>
+      <button class="rh-tab" id="stab-commentaires" onclick="showSuiviTab('commentaires',this)" style="font-size:13px">💬 Commentaires (${updates?.length||0})</button>
+      <button class="rh-tab" id="stab-infos" onclick="showSuiviTab('infos',this)" style="font-size:13px">📎 Infos</button>
+    </div>
+
+    <!-- ONGLET ARTICLES -->
+    <div id="stab-content-articles">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <div id="suivi-articles-list">
+          ${(articles||[]).length===0
+            ?`<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">Aucun article — ajoutez vos pièces ci-dessous</div>`
+            :(articles||[]).map(a=>renderArticleSuivi(a)).join('')}
+        </div>
+        <div style="padding:14px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;gap:8px;align-items:center">
+          <input id="sa-nom" placeholder="Nom de l'article (ex: Canapé 3 places…)" style="flex:1;font-size:13px">
+          <button class="btn btn-primary btn-sm" onclick="addArticleSuivi('${id}')">+ Ajouter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ONGLET COMMENTAIRES -->
+    <div id="stab-content-commentaires" class="hidden">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <div id="suivi-updates-list" style="max-height:460px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+          ${(updates||[]).map(u=>renderUpdate(u)).join('')}
+          ${!updates?.length?`<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px">Aucun commentaire — soyez le premier !</div>`:''}
+        </div>
+        <div style="padding:14px 16px;border-top:1px solid var(--border);background:var(--bg)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <select id="su-auteur" style="font-size:12px">
+              ${SUIVI_GESTIONNAIRES.map(g=>`<option>${g}</option>`).join('')}
+            </select>
+            <select id="su-type" style="font-size:12px">
+              ${UPDATE_TYPES.map(t=>`<option>${t}</option>`).join('')}
+            </select>
           </div>
-          <!-- SAISIE -->
-          <div style="padding:14px 16px;border-top:1px solid var(--border);background:var(--bg)">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-              <select id="su-auteur" style="font-size:12px">
-                ${SUIVI_GESTIONNAIRES.map(g=>`<option>${g}</option>`).join('')}
-              </select>
-              <select id="su-type" style="font-size:12px">
-                ${UPDATE_TYPES.map(t=>`<option>${t}</option>`).join('')}
-              </select>
-            </div>
-            <div style="display:flex;gap:8px">
-              <textarea id="su-texte" placeholder="Votre mise à jour…" rows="2" style="flex:1;font-size:13px;resize:none"></textarea>
-              <button class="btn btn-primary" onclick="addSuiviUpdate('${id}')" style="align-self:flex-end">Envoyer</button>
-            </div>
+          <div style="display:flex;gap:8px">
+            <textarea id="su-texte" placeholder="Votre commentaire…" rows="2" style="flex:1;font-size:13px;resize:none"></textarea>
+            <button class="btn btn-primary" onclick="addSuiviUpdate('${id}')" style="align-self:flex-end">Envoyer</button>
           </div>
         </div>
       </div>
-      <!-- SIDEBAR DROITE -->
-      <div style="display:flex;flex-direction:column;gap:14px">
+    </div>
+
+    <!-- ONGLET INFOS -->
+    <div id="stab-content-infos" class="hidden">
+      <div style="display:flex;flex-direction:column;gap:12px">
         ${p.commandes||p.devis?`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Lié à</div>
           ${p.commandes?`<div style="font-size:13px">📦 <strong>${p.commandes.reference}</strong>${p.commandes.clients?.nom?' · '+p.commandes.clients.nom:''}</div>`:''}
-          ${p.devis?`<div style="font-size:13px">📄 <strong>${p.devis.reference}</strong>${p.devis.projet_nom?' · '+p.devis.projet_nom:''}</div>`:''}
+          ${p.devis?`<div style="font-size:13px;margin-top:4px">📄 <strong>${p.devis.reference}</strong>${p.devis.projet_nom?' · '+p.devis.projet_nom:''}</div>`:''}
         </div>`:''}
         ${p.pdf_url?`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Document</div>
-          <a href="${p.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none">📎 Fiche technique</a>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Fiche technique</div>
+          <a href="${p.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none">📎 Voir le document</a>
         </div>`:''}
         ${p.photos&&p.photos.length?`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Photos</div>
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
-            ${p.photos.map(url=>`<img src="${url}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;cursor:pointer" onclick="openLightbox('${url}')">`).join('')}
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+            ${p.photos.map(url=>`<img src="${url}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;cursor:pointer">`).join('')}
           </div>
         </div>`:''}
       </div>
     </div>`;
+}
+}
+
+function showSuiviTab(tab, el){
+  ['articles','commentaires','infos'].forEach(t=>{
+    document.getElementById('stab-content-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('stab-'+t).classList.toggle('active', t===tab);
+  });
+}
+
+const ARTICLE_STATUTS=[
+  {key:'Pas encore lancé',   color:'#9CA3AF', bg:'#F3F4F6'},
+  {key:'En cours de fabrication', color:'#3B82F6', bg:'#EFF6FF'},
+  {key:'Bloqué matière première', color:'#EF4444', bg:'#FEF2F2'},
+  {key:'Attente validation client',color:'#F59E0B', bg:'#FFFBEB'},
+  {key:'Terminé',            color:'#10B981', bg:'#F0FDF4'},
+];
+
+function renderArticleSuivi(a){
+  const st=ARTICLE_STATUTS.find(s=>s.key===a.statut)||ARTICLE_STATUTS[0];
+  const options=ARTICLE_STATUTS.map(s=>`<option value="${s.key}" ${a.statut===s.key?'selected':''}>${s.key}</option>`).join('');
+  return`<div id="article-row-${a.id}" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+    <div style="flex:1;font-size:13px;font-weight:500">${a.nom}</div>
+    <select onchange="updateArticleStatut('${a.id}',this.value,this)"
+      style="font-size:12px;padding:4px 8px;border-radius:20px;border:1px solid ${st.color};background:${st.bg};color:${st.color};font-weight:600;cursor:pointer;max-width:220px">
+      ${options}
+    </select>
+    <button onclick="deleteArticleSuivi('${a.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px" title="Supprimer">✕</button>
+  </div>`;
+}
+
+async function addArticleSuivi(projetId){
+  const nom=document.getElementById('sa-nom').value.trim();
+  if(!nom){toast('Saisissez un nom');return;}
+  const {data:existing}=await sb.from('projets_articles').select('ordre').eq('projet_id',projetId).order('ordre',{ascending:false}).limit(1);
+  const ordre=(existing?.[0]?.ordre||0)+1;
+  const{data:a,error}=await sb.from('projets_articles').insert({projet_id:projetId,nom,statut:'Pas encore lancé',ordre}).select().single();
+  if(error){toast('Erreur: '+error.message);return;}
+  document.getElementById('sa-nom').value='';
+  const list=document.getElementById('suivi-articles-list');
+  // Remove empty state
+  if(list.innerHTML.includes('Aucun article'))list.innerHTML='';
+  const div=document.createElement('div');
+  div.innerHTML=renderArticleSuivi(a);
+  list.insertBefore(div.firstChild, list.querySelector('div:last-child')||null);
+  // Update tab count
+  document.getElementById('stab-articles').textContent='📦 Articles ('+list.querySelectorAll('[id^=article-row]').length+')';
+  toast('Article ajouté ✓');
+}
+
+async function updateArticleStatut(id,statut,select){
+  await sb.from('projets_articles').update({statut}).eq('id',id);
+  const st=ARTICLE_STATUTS.find(s=>s.key===statut)||ARTICLE_STATUTS[0];
+  select.style.borderColor=st.color;
+  select.style.background=st.bg;
+  select.style.color=st.color;
+  toast('Statut mis à jour ✓');
+}
+
+async function deleteArticleSuivi(id){
+  if(!confirm('Supprimer cet article ?'))return;
+  await sb.from('projets_articles').delete().eq('id',id);
+  document.getElementById('article-row-'+id)?.remove();
+  toast('Supprimé');
 }
 
 function renderUpdate(u){
@@ -3700,6 +3788,7 @@ async function openSuiviModal(id=null){
     <div class="modal-title">${id?'Modifier projet':'Nouveau projet de suivi'}</div>
     <input type="hidden" id="sp-id" value="${id||''}">
     <div class="form-group"><label>Nom du projet *</label><input id="sp-nom" value="${data.nom||''}" placeholder="Ex: Villa AIA — Salon"></div>
+    <div class="form-group"><label>Description</label><textarea id="sp-description" rows="3" placeholder="Contexte, objectifs, contraintes…">${data.description||''}</textarea></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Gestionnaire *</label>
         <select id="sp-gestionnaire">
@@ -3769,6 +3858,7 @@ async function saveSuiviProjet(){
   if(!nom){toast('Nom requis');return;}
   const payload={
     nom,
+    description:document.getElementById('sp-description').value||null,
     gestionnaire:document.getElementById('sp-gestionnaire').value,
     suppleant:document.getElementById('sp-suppleant').value||null,
     statut:document.getElementById('sp-statut').value,
