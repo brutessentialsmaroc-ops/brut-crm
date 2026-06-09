@@ -3565,19 +3565,64 @@ function renderSuiviCard(p){
   const lastDate=last?new Date(last.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}):'—';
   const ref=p.devis?.reference||p.commandes?.reference||'';
   const client=p.commandes?.clients?.nom||p.devis?.projet_nom||'';
-  return`<div onclick="openSuiviFiche('${p.id}')" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='none'">
+  const statutOptions=Object.entries(SUIVI_STATUTS).map(([key,s])=>
+    `<div onclick="event.stopPropagation();updateSuiviStatut('${p.id}','${key}',this.closest('.suivi-card'))"
+      style="padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;color:${s.color}"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">
+      ${s.icon} ${key}
+    </div>`).join('');
+  return`<div class="suivi-card" onclick="openSuiviFiche('${p.id}')" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='none'">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
       <div style="font-weight:600;font-size:13px;line-height:1.3">${p.nom}</div>
-      <span style="background:${st.bg};color:${st.color};font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0">${st.icon} ${p.statut}</span>
+      <div style="position:relative;flex-shrink:0" onclick="event.stopPropagation()">
+        <span id="statut-badge-${p.id}" onclick="toggleSuiviStatutMenu('${p.id}')"
+          style="background:${st.bg};color:${st.color};font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;border:1px solid ${st.color}33;user-select:none">
+          ${st.icon} ${p.statut} ▾
+        </span>
+        <div id="statut-menu-${p.id}" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:200px">
+          ${statutOptions}
+        </div>
+      </div>
     </div>
     ${client?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">👤 ${client}</div>`:''}
     ${ref?`<div style="font-size:10px;color:var(--blue);margin-bottom:6px;font-family:'DM Mono',monospace">${ref}</div>`:''}
     ${last?`<div style="font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;margin-top:6px">
-      <span style="color:var(--muted)">${last.type||'💬'}</span> <span style="color:#444">${last.texte.length>60?last.texte.slice(0,60)+'…':last.texte}</span>
+      <span>${last.type||'💬'}</span> <span style="color:#444">${last.texte.length>60?last.texte.slice(0,60)+'…':last.texte}</span>
       <div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace">${lastDate} · ${last.auteur}</div>
     </div>`:`<div style="font-size:11px;color:var(--muted);font-style:italic">Aucune mise à jour</div>`}
     ${p.suppleant?`<div style="font-size:10px;color:var(--muted);margin-top:6px">Suppléant : ${p.suppleant}</div>`:''}
   </div>`;
+}
+
+function toggleSuiviStatutMenu(id){
+  // Ferme tous les autres menus ouverts
+  document.querySelectorAll('[id^=statut-menu-]').forEach(m=>{
+    if(m.id!=='statut-menu-'+id) m.style.display='none';
+  });
+  const menu=document.getElementById('statut-menu-'+id);
+  menu.style.display=menu.style.display==='none'?'block':'none';
+  // Ferme au clic ailleurs
+  if(menu.style.display==='block'){
+    setTimeout(()=>{
+      document.addEventListener('click',function close(){
+        menu.style.display='none';
+        document.removeEventListener('click',close);
+      },{once:true});
+    },0);
+  }
+}
+
+async function updateSuiviStatut(id, statut, card){
+  const{error}=await sb.from('projets_suivi').update({statut}).eq('id',id);
+  if(error){toast('Erreur: '+error.message);return;}
+  document.getElementById('statut-menu-'+id).style.display='none';
+  const st=SUIVI_STATUTS[statut]||SUIVI_STATUTS['En cours'];
+  const badge=document.getElementById('statut-badge-'+id);
+  badge.style.background=st.bg;
+  badge.style.color=st.color;
+  badge.style.borderColor=st.color+'33';
+  badge.textContent=`${st.icon} ${statut} ▾`;
+  toast('Statut mis à jour ✓');
 }
 
 async function openSuiviFiche(id){
