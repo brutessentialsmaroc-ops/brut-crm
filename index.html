@@ -233,11 +233,13 @@
     <nav>
       <button class="nav-item active" onclick="showPage('dashboard',this)">⊞ Tableau de bord</button>
       <button class="nav-item" onclick="showPage('clients',this)">◎ Clients</button>
+      <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('commandes',this)">◫ Commandes</button>
       <button class="nav-item" onclick="showPage('atelier',this)">⚙ Atelier</button>
-      <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
+      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="showPage('prospects',this)">◈ Prospects</button>
+      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="showPage('achats',this)">◎ Achats</button>
       <button class="nav-item" onclick="showPage('rh',this)">◉ RH</button>
     </nav>
@@ -1313,11 +1315,56 @@ async function loadFactures(){
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeCls}">${f.statut}</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();editFacture('${f.id}')">Modifier</button>
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();marquerPayee('${f.id}')">✓ Payée</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteFacture('${f.id}')">Suppr.</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function editFacture(id){
+  const{data:f}=await sb.from('factures').select('*,clients(nom)').eq('id',id).single();
+  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
+  const clientOptions=(clients||[]).map(c=>`<option value="${c.id}" ${c.id===f.client_id?'selected':''}>${c.nom}</option>`).join('');
+  const html=`<div class="modal" style="max-width:480px">
+    <div class="modal-title">Modifier la facture</div>
+    <div class="form-group"><label>Référence</label><input id="ef-ref" value="${f.reference||''}"></div>
+    <div class="form-group"><label>Client</label><select id="ef-client">${clientOptions}</select></div>
+    <div class="form-group"><label>Nom du projet</label><input id="ef-projet" value="${f.projet_nom||''}"></div>
+    <div class="form-group"><label>Statut</label>
+      <select id="ef-statut">
+        <option ${f.statut==='Non payée'?'selected':''}>Non payée</option>
+        <option ${f.statut==='Payée'?'selected':''}>Payée</option>
+        <option ${f.statut==='En retard'?'selected':''}>En retard</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Date d'émission</label><input type="date" id="ef-emission" value="${f.date_emission||''}"></div>
+      <div class="form-group"><label>Date d'échéance</label><input type="date" id="ef-echeance" value="${f.date_echeance||''}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-edit-facture')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveFacture('${id}')">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('modal-edit-facture', html);
+}
+
+async function saveFacture(id){
+  const updates={
+    reference:document.getElementById('ef-ref').value,
+    client_id:document.getElementById('ef-client').value,
+    projet_nom:document.getElementById('ef-projet').value,
+    statut:document.getElementById('ef-statut').value,
+    date_emission:document.getElementById('ef-emission').value||null,
+    date_echeance:document.getElementById('ef-echeance').value||null,
+  };
+  const{error}=await sb.from('factures').update(updates).eq('id',id);
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('modal-edit-facture');
+  toast('Facture mise à jour ✓');
+  loadFactures();
 }
 
 async function marquerPayee(id){
@@ -1654,7 +1701,7 @@ async function loadPointage(){
       if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
       const icon=pt?statusIcon[pt.statut]||'?':'';
       const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':'#fff':'#fff';
-      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" onclick="quickPointage('${s.id}','${dateStr}',this)" title="${dateStr}">${icon}</td>`;
+      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" onclick="openPointageDetail('${s.id}','${(s.prenom||"")+" "+s.nom}','${dateStr}')" title="${pt?(pt.statut+(pt.heure_arrivee?" · "+pt.heure_arrivee:"")+(pt.heures_sup>0?" · +"+pt.heures_sup+"h sup":"")):dateStr}">${icon}</td>`;
     }).join('');
     return`<tr>
       <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;white-space:nowrap">${s.prenom||''} ${s.nom}</td>
@@ -1699,6 +1746,61 @@ async function loadPointage(){
     </div>`;
 }
 
+async function openPointageDetail(salId, salNom, date){
+  const{data:existing}=await sb.from('pointages').select('*').eq('salarie_id',salId).eq('date',date).maybeSingle();
+  const dateLabel=new Date(date+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  const html=`<div class="modal" style="max-width:400px">
+    <div class="modal-title">${salNom}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;text-transform:capitalize">${dateLabel}</div>
+    <input type="hidden" id="pd-sal-id" value="${salId}">
+    <input type="hidden" id="pd-date" value="${date}">
+    <div class="form-group"><label>Statut</label>
+      <select id="pd-statut">
+        <option value="">— Aucun —</option>
+        <option ${existing?.statut==='Présent'?'selected':''}>Présent</option>
+        <option ${existing?.statut==='Absent'?'selected':''}>Absent</option>
+        <option ${existing?.statut==='Retard'?'selected':''}>Retard</option>
+        <option ${existing?.statut==='Congé'?'selected':''}>Congé</option>
+        <option ${existing?.statut==='Repos'?'selected':''}>Repos</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="form-group"><label>Arrivée</label><input type="time" id="pd-arrivee" value="${existing?.heure_arrivee||''}"></div>
+      <div class="form-group"><label>Départ</label><input type="time" id="pd-depart" value="${existing?.heure_depart||''}"></div>
+      <div class="form-group"><label>H. Sup</label><input type="number" id="pd-hsup" min="0" step="0.5" value="${existing?.heures_sup||0}"></div>
+    </div>
+    <div class="form-group"><label>Note</label><input type="text" id="pd-note" value="${existing?.note||''}" placeholder="Motif retard, absence…"></div>
+    <div class="modal-footer">
+      ${existing?`<button class="btn btn-sm btn-danger" onclick="deletePointageDetail('${existing.id}')">Supprimer</button>`:''}
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePointageDetail()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+async function savePointageDetail(){
+  const salId=document.getElementById('pd-sal-id').value;
+  const date=document.getElementById('pd-date').value;
+  const statut=document.getElementById('pd-statut').value;
+  if(!statut){toast('Choisissez un statut');return;}
+  const payload={
+    salarie_id:salId, date, statut,
+    heure_arrivee:document.getElementById('pd-arrivee').value||null,
+    heure_depart:document.getElementById('pd-depart').value||null,
+    heures_sup:Number(document.getElementById('pd-hsup').value)||0,
+    note:document.getElementById('pd-note').value
+  };
+  await sb.from('pointages').upsert(payload,{onConflict:'salarie_id,date'});
+  closeModal('rh-modal'); toast('Pointage enregistré ✓'); loadPointage();
+}
+
+async function deletePointageDetail(id){
+  if(!confirm('Supprimer ce pointage ?'))return;
+  await sb.from('pointages').delete().eq('id',id);
+  closeModal('rh-modal'); toast('Supprimé'); loadPointage();
+}
+
 async function quickPointage(salId, date, cell){
   if(cell){cell.style.opacity='0.3';cell.style.pointerEvents='none';}
   const{data:existing}=await sb.from('pointages').select('*').eq('salarie_id',salId).eq('date',date).maybeSingle();
@@ -1716,6 +1818,7 @@ async function quickPointage(salId, date, cell){
   }
   await loadPointage();
 }
+
 
 function openPointageModal(){
   const html=`<div class="modal">
@@ -2584,7 +2687,21 @@ async function openProspectModal(data={}){
       </select>
     </div>
     <div class="form-group"><label>Notes</label><textarea id="pr-notes">${data.notes||''}</textarea></div>
-    <div class="form-group"><label>Document PDF</label>
+    <div class="form-group">
+      <label>Commentaires d'appel</label>
+      <div id="pr-comments-list" style="margin-bottom:8px;max-height:180px;overflow-y:auto">
+        ${(data.commentaires||[]).slice().reverse().map(c=>`
+          <div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px">
+            <div style="color:var(--muted);margin-bottom:3px;font-family:'DM Mono',monospace;font-size:10px">${new Date(c.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+            <div>${c.texte}</div>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="pr-new-comment" placeholder="Ajouter un commentaire d'appel…" style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')addProspectComment()">
+        <button class="btn btn-sm" onclick="addProspectComment()">+</button>
+      </div>
+      <input type="hidden" id="pr-comments-data" value="${JSON.stringify(data.commentaires||[]).replace(/"/g,'&quot;')}">
+    </div>
       <div style="display:flex;align-items:center;gap:10px">
         ${data.pdf_url
           ?`<a href="${data.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:6px">📄 Voir le document</a>
@@ -2635,6 +2752,7 @@ async function saveProspect(){
     statut:document.getElementById('pr-statut').value,
     devis_id:document.getElementById('pr-devis').value||null,
     notes:document.getElementById('pr-notes').value,
+    commentaires:JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"')),
     photos:JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'))
   };
   // pdf_url handled separately via uploadProspectPdf
@@ -2647,6 +2765,23 @@ async function deleteProspect(id){
   if(!confirm('Supprimer ce prospect ?'))return;
   await sb.from('prospects').delete().eq('id',id);
   closeModal('rh-modal');toast('Supprimé');loadProspects();
+}
+
+function addProspectComment(){
+  const input=document.getElementById('pr-new-comment');
+  const texte=input.value.trim();
+  if(!texte)return;
+  const comments=JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"'));
+  const newComment={date:new Date().toISOString(),texte};
+  comments.push(newComment);
+  document.getElementById('pr-comments-data').value=JSON.stringify(comments).replace(/"/g,'&quot;');
+  const list=document.getElementById('pr-comments-list');
+  const div=document.createElement('div');
+  div.style.cssText='padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px';
+  const now=new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  div.innerHTML=`<div style="color:var(--muted);margin-bottom:3px;font-family:'DM Mono',monospace;font-size:10px">${now}</div><div>${texte}</div>`;
+  list.insertBefore(div, list.firstChild);
+  input.value='';
 }
 
 async function uploadProspectPhotos(input,prospectId){
