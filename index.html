@@ -3909,15 +3909,19 @@ async function addSuiviUpdate(projetId){
   const{error}=await sb.from('projets_updates').insert({projet_id:projetId,auteur,type,texte});
   if(error){toast('Erreur: '+error.message);return;}
   document.getElementById('su-texte').value='';
-  toast('Mise à jour ajoutée ✓');
-  // Ajouter dans le fil sans rechargement complet
+  toast('Commentaire ajouté ✓');
+  // Ajoute dans le fil sans rechargement
   const list=document.getElementById('suivi-updates-list');
+  const newUpdate={auteur,type,texte,created_at:new Date().toISOString()};
   const div=document.createElement('div');
-  div.innerHTML=renderUpdate({auteur,type,texte,created_at:new Date().toISOString()});
-  if(list.children.length&&list.children[0].textContent.includes('Aucune'))list.innerHTML='';
-  list.insertBefore(div.firstChild,list.firstChild);
-  // update compteur
-  const title=list.closest('.overflow-hidden')?.querySelector('.font-semibold');
+  div.innerHTML=renderUpdate(newUpdate);
+  // Supprime le message "Aucun commentaire" si présent
+  [...list.children].forEach(c=>{if(c.textContent.includes('Aucun commentaire'))c.remove();});
+  list.insertBefore(div.firstChild, list.firstChild);
+  // Met à jour le compteur de l'onglet
+  const count=list.querySelectorAll('[style*="border-left"]').length;
+  const tabBtn=document.getElementById('stab-commentaires');
+  if(tabBtn) tabBtn.textContent=`💬 Commentaires (${count})`;
 }
 
 async function openSuiviModal(id=null){
