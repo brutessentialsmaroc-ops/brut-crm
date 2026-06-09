@@ -2704,6 +2704,7 @@ async function openProspectModal(data={}){
     </div>
     <div class="form-group">
       <label>Document PDF</label>
+      <div id="pr-pdf-section">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         ${data.pdf_url
           ?`<a href="${data.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:6px">📄 Voir le document</a>
@@ -2715,6 +2716,7 @@ async function openProspectModal(data={}){
       <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('pr-pdf-input').click()">
         ${data.pdf_url?'🔄 Remplacer':'📎 Ajouter un PDF'}
       </button>
+      </div>
     </div>
     <div class="form-group"><label>Photos d'inspiration</label>
       <div id="pr-photos-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
@@ -3145,26 +3147,40 @@ async function saveOrgPositions(){
 async function uploadProspectPdf(input, prospectId){
   const file=input.files[0];
   if(!file)return;
-  if(!prospectId){toast("Enregistrez le prospect d'abord");return;}
+  if(!prospectId){toast("Enregistrez le prospect d'abord pour joindre un PDF");return;}
   toast('Upload en cours…');
   const ext=file.name.split('.').pop();
-  const path=`prospects/pdf/${prospectId}.${ext}`;
+  const path=`prospects/pdf/${prospectId}_${Date.now()}.${ext}`;
   const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
-  if(error){toast('Erreur upload');return;}
+  if(error){toast('Erreur upload: '+error.message);return;}
   const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
   await sb.from('prospects').update({pdf_url:publicUrl}).eq('id',prospectId);
   toast('Document enregistré ✓');
   input.value='';
-  loadProspects();
-  closeModal('rh-modal');
+  // Mettre à jour l'affichage dans la modale sans la fermer
+  const pdfSection=document.getElementById('pr-pdf-section');
+  if(pdfSection){
+    pdfSection.innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="${publicUrl}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:6px">📄 ${file.name}</a>
+      <button class="btn btn-sm btn-danger" onclick="removeProspectPdf('${prospectId}')">Suppr.</button>
+    </div>
+    <input type="file" id="pr-pdf-input" accept=".pdf,.doc,.docx" style="display:none" onchange="uploadProspectPdf(this,'${prospectId}')">
+    <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('pr-pdf-input').click()">🔄 Remplacer</button>`;
+  }
 }
 
 async function removeProspectPdf(prospectId){
   if(!prospectId||!confirm('Supprimer ce document ?'))return;
   await sb.from('prospects').update({pdf_url:null}).eq('id',prospectId);
   toast('Document supprimé');
-  loadProspects();
-  closeModal('rh-modal');
+  const pdfSection=document.getElementById('pr-pdf-section');
+  if(pdfSection){
+    pdfSection.innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--muted)">Aucun document</span>
+    </div>
+    <input type="file" id="pr-pdf-input" accept=".pdf,.doc,.docx" style="display:none" onchange="uploadProspectPdf(this,'${prospectId}')">
+    <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('pr-pdf-input').click()">📎 Ajouter un PDF</button>`;
+  }
 }
 
 function openNewClientFromDevis(){
