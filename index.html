@@ -3541,7 +3541,7 @@ async function loadSuivi(){
   document.getElementById('suivi-main').classList.remove('hidden');
   const {data:projets}=await sb.from('projets_suivi')
     .select('*,commandes(reference,clients(nom)),devis(reference,projet_nom),projets_updates(id,auteur,type,texte,created_at)')
-    .order('created_at',{ascending:false});
+    .order('ordre',{ascending:true});
   const kanban=document.getElementById('suivi-kanban');
   kanban.innerHTML=SUIVI_GESTIONNAIRES.map(g=>{
     const mine=(projets||[]).filter(p=>p.gestionnaire===g);
@@ -3550,9 +3550,10 @@ async function loadSuivi(){
         <div style="font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase">${g}</div>
         <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--muted)">${mine.length}</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="suivi-col" data-gestionnaire="${g}" style="display:flex;flex-direction:column;gap:10px;min-height:60px"
+        ondragover="suividragOver(event)" ondrop="suividrop(event,'${g}')">
         ${mine.map(p=>renderSuiviCard(p)).join('')}
-        ${mine.length===0?`<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Aucun projet</div>`:''}
+        ${mine.length===0?`<div class="suivi-empty" style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Aucun projet</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -3571,7 +3572,9 @@ function renderSuiviCard(p){
       onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">
       ${s.icon} ${key}
     </div>`).join('');
-  return`<div class="suivi-card" onclick="openSuiviFiche('${p.id}')" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='none'">
+  return`<div class="suivi-card" data-id="${p.id}" draggable="true"
+    ondragstart="suividragStart(event,'${p.id}')" ondragend="suividragEnd(event)"
+    onclick="openSuiviFiche('${p.id}')" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:grab;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='none'">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
       <div style="font-weight:600;font-size:13px;line-height:1.3">${p.nom}</div>
       <div style="position:relative;flex-shrink:0" onclick="event.stopPropagation()">
@@ -3623,6 +3626,68 @@ async function updateSuiviStatut(id, statut, card){
   badge.style.borderColor=st.color+'33';
   badge.textContent=`${st.icon} ${statut} ▾`;
   toast('Statut mis à jour ✓');
+}
+
+// ── Suivi drag & drop vertical ──
+let suiviDragId=null;
+let suiviDragEl=null;
+let suiviPlaceholder=null;
+
+function suividragStart(e, id){
+  suiviDragId=id;
+  suiviDragEl=e.currentTarget;
+  setTimeout(()=>{if(suiviDragEl)suiviDragEl.style.opacity='0.4';},0);
+  e.dataTransfer.effectAllowed='move';
+  // Crée un placeholder de même hauteur
+  suiviPlaceholder=document.createElement('div');
+  suiviPlaceholder.style.cssText=`height:${suiviDragEl.offsetHeight}px;border:2px dashed var(--border);border-radius:var(--radius);background:var(--bg);pointer-events:none`;
+  suiviPlaceholder.className='suivi-placeholder';
+}
+
+function suividragEnd(e){
+  if(suiviDragEl)suiviDragEl.style.opacity='1';
+  suiviPlaceholder?.remove();
+  suiviPlaceholder=null;
+  suiviDragEl=null;
+}
+
+function suividragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const col=e.currentTarget;
+  const cards=[...col.querySelectorAll('.suivi-card:not(.suivi-placeholder)')];
+  // Trouve la carte la plus proche
+  const mouse=e.clientY;
+  let closest=null, closestDist=Infinity;
+  cards.forEach(c=>{
+    if(c===suiviDragEl)return;
+    const box=c.getBoundingClientRect();
+    const mid=box.top+box.height/2;
+    const dist=Math.abs(mouse-mid);
+    if(dist<closestDist){closestDist=dist;closest={el:c,above:mouse<mid};}
+  });
+  if(suiviPlaceholder){
+    if(!closest){col.appendChild(suiviPlaceholder);}
+    else if(closest.above){col.insertBefore(suiviPlaceholder,closest.el);}
+    else{col.insertBefore(suiviPlaceholder,closest.el.nextSibling);}
+  }
+}
+
+async function suividrop(e, gestionnaire){
+  e.preventDefault();
+  if(!suiviDragId||!suiviPlaceholder)return;
+  const col=e.currentTarget;
+  // Insère la carte à la place du placeholder
+  col.insertBefore(suiviDragEl,suiviPlaceholder);
+  suiviPlaceholder.remove();
+  suiviDragEl.style.opacity='1';
+  // Supprime l'état vide si présent
+  col.querySelectorAll('.suivi-empty').forEach(e=>e.remove());
+  // Sauvegarde le nouvel ordre + potentiel changement de gestionnaire
+  const cards=[...col.querySelectorAll('.suivi-card')];
+  const updates=cards.map((c,i)=>sb.from('projets_suivi').update({ordre:i,gestionnaire}).eq('id',c.dataset.id));
+  await Promise.all(updates);
+  toast('Ordre sauvegardé ✓');
 }
 
 async function openSuiviFiche(id){
