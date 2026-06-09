@@ -146,6 +146,8 @@
   .comment-meta{font-size:10px;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between}
   .comment-text{font-size:13px}
   .comment-input{display:flex;gap:8px}
+  /* ACHATS */
+  .achat-cat-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
   /* ORGANIGRAMME */
   .org-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;cursor:grab;user-select:none;width:200px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:box-shadow 0.15s;overflow:hidden}
   .org-resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:se-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px}
@@ -236,6 +238,7 @@
       <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
       <button class="nav-item" onclick="showPage('prospects',this)">◈ Prospects</button>
+      <button class="nav-item" onclick="showPage('achats',this)">◎ Achats</button>
       <button class="nav-item" onclick="showPage('rh',this)">◉ RH</button>
     </nav>
     <div class="sidebar-footer">
@@ -408,6 +411,15 @@
       <div id="page-prospects" class="hidden">
         <div class="kanban" id="prospects-kanban"></div>
       </div>
+      <!-- ACHATS -->
+      <div id="page-achats" class="hidden">
+        <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px">
+          <button class="rh-tab active" id="achat-tab-suivi" onclick="showAchatTab('suivi',this)">📋 Suivi mensuel</button>
+          <button class="rh-tab" id="achat-tab-bilan" onclick="showAchatTab('bilan',this)">📊 Bilan des dépenses</button>
+        </div>
+        <div id="achat-suivi"><div class="loading">Chargement…</div></div>
+        <div id="achat-bilan" class="hidden"><div class="loading">Chargement…</div></div>
+      </div>
       <!-- RH -->
       <div id="page-rh" class="hidden">
         <!-- Sous-navigation RH -->
@@ -572,7 +584,7 @@ function showPage(page,el){
   document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+page).classList.remove('hidden');
   if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
-  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client'}[page]||page;
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client','achats':'Achats'}[page]||page;
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
@@ -586,6 +598,7 @@ function loadPage(p){
   else if(p==='devis')loadDevisList();
   else if(p==='factures')loadFactures();
   else if(p==='prospects')loadProspects();
+  else if(p==='achats'){currentAchatTab='suivi';loadAchatsSuivi();}
   else if(p==='rh'){currentRhTab='salaries';loadRhSalaries();}
 }
 
@@ -601,6 +614,7 @@ function openNew(){
   else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
   else if(currentPage==='devis')openDevisBuilder(null);
   else if(currentPage==='prospects')openProspectModal();
+  else if(currentPage==='achats')openAchatModal();
   else if(currentPage==='rh'){
     if(currentRhTab==='salaries')openSalarieModal();
     else if(currentRhTab==='pointage')openPointageModal();
@@ -3055,6 +3069,290 @@ async function saveNewClientFromDevis(){
   sel.value=data.id;
   closeModal('rh-modal');
   toast('Client créé et sélectionné ✓');
+}
+
+// ─── ACHATS ──────────────────────────────────────────────────────────────────
+let currentAchatTab='suivi';
+let currentAchatMois=new Date().getMonth()+1;
+let currentAchatAnnee=new Date().getFullYear();
+
+const ACHAT_CATS=[
+  {key:'Menuiserie bois',color:'#378ADD'},
+  {key:'Tapisserie',color:'#EF9F27'},
+  {key:'Céramique',color:'#5DCAA5'},
+  {key:'Ferronnerie',color:'#9B6DD6'},
+  {key:'Administration',color:'#C8A97A'},
+  {key:'Livraison',color:'#E05A5A'},
+  {key:'Autre',color:'#888'}
+];
+
+function showAchatTab(tab, el){
+  currentAchatTab=tab;
+  document.querySelectorAll('#page-achats .rh-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('achat-suivi').classList.toggle('hidden', tab!=='suivi');
+  document.getElementById('achat-bilan').classList.toggle('hidden', tab!=='bilan');
+  if(tab==='suivi') loadAchatsSuivi();
+  else loadAchatsBilan();
+}
+
+function navAchat(dir){
+  currentAchatMois+=dir;
+  if(currentAchatMois>12){currentAchatMois=1;currentAchatAnnee++;}
+  if(currentAchatMois<1){currentAchatMois=12;currentAchatAnnee--;}
+  if(currentAchatTab==='suivi') loadAchatsSuivi();
+  else loadAchatsBilan();
+}
+
+async function loadAchatsSuivi(){
+  const el=document.getElementById('achat-suivi');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const moisStr=`${currentAchatAnnee}-${String(currentAchatMois).padStart(2,'0')}`;
+  const lastDay=new Date(currentAchatAnnee,currentAchatMois,0).getDate();
+  const{data:achats}=await sb.from('achats')
+    .select('*,salaries(nom,prenom)')
+    .gte('date',`${moisStr}-01`)
+    .lte('date',`${moisStr}-${String(lastDay).padStart(2,'0')}`)
+    .order('date',{ascending:false});
+
+  const moisLabel=new Date(currentAchatAnnee,currentAchatMois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const totalMois=(achats||[]).reduce((s,a)=>s+Number(a.montant||0),0);
+
+  // Group by categorie
+  const groups={};
+  ACHAT_CATS.forEach(c=>{groups[c.key]=[];});
+  (achats||[]).forEach(a=>{
+    const k=a.categorie||'Autre';
+    if(!groups[k])groups[k]=[];
+    groups[k].push(a);
+  });
+
+  const catHTML=ACHAT_CATS.filter(c=>groups[c.key]&&groups[c.key].length).map(cat=>{
+    const sousTotal=groups[cat.key].reduce((s,a)=>s+Number(a.montant||0),0);
+    return`<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:${cat.color}18;border-left:3px solid ${cat.color};margin-bottom:0">
+        <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${cat.color}">${cat.key} (${groups[cat.key].length})</span>
+        <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${cat.color}">${sousTotal.toLocaleString('fr-FR')} MAD</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 16px;text-align:left;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Date</th>
+          <th style="padding:8px 16px;text-align:left;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Description</th>
+          <th style="padding:8px 16px;text-align:left;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Salarié</th>
+          <th style="padding:8px 16px;text-align:right;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Montant</th>
+          <th style="padding:8px 16px;text-align:center;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.4px">Bon</th>
+          <th style="padding:8px 16px;border-bottom:1px solid var(--border)"></th>
+        </tr></thead>
+        <tbody>${groups[cat.key].map(a=>`<tr>
+          <td style="padding:11px 16px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${a.date?new Date(a.date+'T12:00:00').toLocaleDateString('fr-FR'):'—'}</td>
+          <td style="padding:11px 16px;border-bottom:1px solid var(--border);font-weight:500">${a.description||'—'}${a.notes?`<div style="font-size:11px;color:var(--muted)">${a.notes}</div>`:''}</td>
+          <td style="padding:11px 16px;border-bottom:1px solid var(--border);color:var(--muted)">${a.salaries?a.salaries.prenom+' '+a.salaries.nom:'—'}</td>
+          <td style="padding:11px 16px;border-bottom:1px solid var(--border);text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${Number(a.montant||0).toLocaleString('fr-FR')} MAD</td>
+          <td style="padding:11px 16px;border-bottom:1px solid var(--border);text-align:center">
+            ${a.bon_url?`<a href="${a.bon_url}" target="_blank" style="font-size:18px" title="Voir le bon">📄</a>`:'<span style="color:var(--muted);font-size:12px">—</span>'}
+          </td>
+          <td style="padding:11px 16px;border-bottom:1px solid var(--border)"><div class="actions">
+            <button class="btn btn-sm" onclick="editAchat('${a.id}')">Modifier</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteAchat('${a.id}')">Suppr.</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-sm" onclick="navAchat(-1)">←</button>
+        <div style="font-size:15px;font-weight:500;text-transform:capitalize;min-width:160px;text-align:center">${moisLabel}</div>
+        <button class="btn btn-sm" onclick="navAchat(1)">→</button>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">Total : ${totalMois.toLocaleString('fr-FR')} MAD</div>
+    </div>
+    ${catHTML||'<div class="empty">Aucun achat ce mois-ci.</div>'}`;
+}
+
+async function loadAchatsBilan(){
+  const el=document.getElementById('achat-bilan');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const moisStr=`${currentAchatAnnee}-${String(currentAchatMois).padStart(2,'0')}`;
+  const lastDay=new Date(currentAchatAnnee,currentAchatMois,0).getDate();
+  const{data:achats}=await sb.from('achats')
+    .select('*,salaries(nom,prenom)')
+    .gte('date',`${moisStr}-01`)
+    .lte('date',`${moisStr}-${String(lastDay).padStart(2,'0')}`)
+    .order('montant',{ascending:false});
+
+  const moisLabel=new Date(currentAchatAnnee,currentAchatMois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const total=(achats||[]).reduce((s,a)=>s+Number(a.montant||0),0);
+
+  // Par catégorie
+  const byCat={};
+  (achats||[]).forEach(a=>{
+    const k=a.categorie||'Autre';
+    if(!byCat[k])byCat[k]=0;
+    byCat[k]+=Number(a.montant||0);
+  });
+
+  // Par personne
+  const byPerson={};
+  (achats||[]).forEach(a=>{
+    const k=a.salaries?(a.salaries.prenom+' '+a.salaries.nom).trim():'Non assigné';
+    if(!byPerson[k])byPerson[k]=0;
+    byPerson[k]+=Number(a.montant||0);
+  });
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-sm" onclick="navAchat(-1)">←</button>
+        <div style="font-size:15px;font-weight:500;text-transform:capitalize;min-width:160px;text-align:center">${moisLabel}</div>
+        <button class="btn btn-sm" onclick="navAchat(1)">→</button>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600">Total : ${total.toLocaleString('fr-FR')} MAD</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <!-- Par catégorie -->
+      <div>
+        <div class="section-title" style="margin-bottom:12px">Par catégorie</div>
+        <div class="table-wrap">
+          <table style="width:100%;border-collapse:collapse">
+            ${ACHAT_CATS.filter(c=>byCat[c.key]).map(cat=>`<tr>
+              <td style="padding:11px 16px;border-bottom:1px solid var(--border)">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${cat.color};margin-right:8px"></span>
+                ${cat.key}
+              </td>
+              <td style="padding:11px 16px;border-bottom:1px solid var(--border);text-align:right;font-family:'DM Mono',monospace;font-weight:500">${byCat[cat.key].toLocaleString('fr-FR')} MAD</td>
+              <td style="padding:11px 16px;border-bottom:1px solid var(--border);text-align:right;font-size:11px;color:var(--muted)">${total?Math.round(byCat[cat.key]/total*100)+'%':''}</td>
+            </tr>`).join('')}
+            <tr style="background:var(--bg)">
+              <td style="padding:11px 16px;font-weight:600">TOTAL</td>
+              <td style="padding:11px 16px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${total.toLocaleString('fr-FR')} MAD</td>
+              <td style="padding:11px 16px;text-align:right;font-size:11px;color:var(--muted)">100%</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <!-- Par personne -->
+      <div>
+        <div class="section-title" style="margin-bottom:12px">Par personne</div>
+        <div class="table-wrap">
+          <table style="width:100%;border-collapse:collapse">
+            ${Object.entries(byPerson).sort((a,b)=>b[1]-a[1]).map(([nom,mt])=>`<tr>
+              <td style="padding:11px 16px;border-bottom:1px solid var(--border);font-weight:500">${nom}</td>
+              <td style="padding:11px 16px;border-bottom:1px solid var(--border);text-align:right;font-family:'DM Mono',monospace;font-weight:500">${mt.toLocaleString('fr-FR')} MAD</td>
+              <td style="padding:11px 16px;border-bottom:1px solid var(--border);text-align:right;font-size:11px;color:var(--muted)">${total?Math.round(mt/total*100)+'%':''}</td>
+            </tr>`).join('')}
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function openAchatModal(data={}){
+  const{data:sals}=await sb.from('salaries').select('id,nom,prenom,atelier').eq('statut','Actif').order('nom');
+  const isEdit=!!data.id;
+  const html=`<div class="modal" style="max-width:540px">
+    <div class="modal-title">${isEdit?'Modifier achat':'Nouvel achat'}</div>
+    <input type="hidden" id="achat-id" value="${data.id||''}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Date *</label><input type="date" id="achat-date" value="${data.date||new Date().toISOString().split('T')[0]}"></div>
+      <div class="form-group"><label>Catégorie *</label>
+        <select id="achat-cat">
+          ${ACHAT_CATS.map(c=>`<option ${data.categorie===c.key?'selected':''}>${c.key}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Description *</label><input id="achat-desc" value="${data.description||''}" placeholder="Ex: Bois de carcasse, Mousse HRF…"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Montant (MAD) *</label><input type="number" id="achat-montant" value="${data.montant||''}" placeholder="0"></div>
+      <div class="form-group"><label>Salarié concerné</label>
+        <select id="achat-salarie">
+          <option value="">— Aucun —</option>
+          ${(sals||[]).map(s=>`<option value="${s.id}" ${data.salarie_id===s.id?'selected':''}>${s.prenom||''} ${s.nom} (${s.atelier||'—'})</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="achat-notes" rows="2">${data.notes||''}</textarea></div>
+    <div class="form-group"><label>Bon / Justificatif</label>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        ${data.bon_url?`<a href="${data.bon_url}" target="_blank" style="font-size:13px;color:var(--blue)">📄 Voir le bon</a>
+          <button class="btn btn-sm btn-danger" onclick="removeAchatBon('${data.id||''}')">Suppr.</button>`
+          :`<span style="font-size:12px;color:var(--muted)">Aucun fichier</span>`}
+      </div>
+      <input type="file" id="achat-bon-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="uploadAchatBon(this,'${data.id||''}')">
+      <button class="btn btn-sm" onclick="document.getElementById('achat-bon-input').click()">📎 ${data.bon_url?'Remplacer':'Ajouter un bon'}</button>
+    </div>
+    <div class="modal-footer">
+      ${isEdit?`<button class="btn btn-danger btn-sm" onclick="deleteAchat('${data.id}')">Supprimer</button>`:''}
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveAchat()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+async function saveAchat(){
+  const id=document.getElementById('achat-id').value;
+  const desc=document.getElementById('achat-desc').value.trim();
+  const montant=Number(document.getElementById('achat-montant').value);
+  if(!desc){toast('Description requise');return;}
+  if(!montant){toast('Montant requis');return;}
+  const payload={
+    date:document.getElementById('achat-date').value,
+    categorie:document.getElementById('achat-cat').value,
+    description:desc,
+    montant,
+    salarie_id:document.getElementById('achat-salarie').value||null,
+    notes:document.getElementById('achat-notes').value
+  };
+  if(id) await sb.from('achats').update(payload).eq('id',id);
+  else await sb.from('achats').insert(payload);
+  closeModal('rh-modal');
+  toast('Achat enregistré ✓');
+  loadAchatsSuivi();
+}
+
+async function editAchat(id){
+  const{data}=await sb.from('achats').select('*').eq('id',id).single();
+  openAchatModal(data||{});
+}
+
+async function deleteAchat(id){
+  if(!confirm('Supprimer cet achat ?'))return;
+  await sb.from('achats').delete().eq('id',id);
+  closeModal('rh-modal');
+  toast('Supprimé');
+  loadAchatsSuivi();
+}
+
+async function uploadAchatBon(input, achatId){
+  const file=input.files[0];
+  if(!file)return;
+  if(!achatId){
+    await saveAchat();
+    toast("Enregistrez d'abord l'achat puis ajoutez le bon");
+    return;
+  }
+  toast('Upload en cours…');
+  const ext=file.name.split('.').pop();
+  const path=`achats/${achatId}.${ext}`;
+  const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+  if(error){toast('Erreur upload');return;}
+  const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+  await sb.from('achats').update({bon_url:publicUrl}).eq('id',achatId);
+  toast('Bon enregistré ✓');
+  input.value='';
+  closeModal('rh-modal');
+  loadAchatsSuivi();
+}
+
+async function removeAchatBon(achatId){
+  if(!achatId||!confirm('Supprimer ce bon ?'))return;
+  await sb.from('achats').update({bon_url:null}).eq('id',achatId);
+  toast('Bon supprimé');
+  closeModal('rh-modal');
+  loadAchatsSuivi();
 }
 
 checkSession();
