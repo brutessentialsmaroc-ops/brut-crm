@@ -255,8 +255,10 @@
       <!-- DASHBOARD -->
       <div id="page-dashboard">
         <!-- Date + Bonjour -->
-        <div style="margin-bottom:20px">
-          <div id="dash-date" style="font-size:15px;font-weight:500"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <button class="btn btn-sm" onclick="navDashDate(-1)">←</button>
+          <div id="dash-date" style="font-size:15px;font-weight:500;min-width:180px;text-align:center"></div>
+          <button class="btn btn-sm" onclick="navDashDate(1)" id="btn-dash-next">→</button>
         </div>
         <!-- Stats -->
         <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
@@ -523,6 +525,14 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentPage = 'dashboard';
 let currentDevisId = null;
 let sectionsData = []; // {id, nom, sous_titre, ordre, articles:[{id,description,quantite,prix_unitaire}]}
+
+// ─── DASHBOARD DATE ──────────────────────────────────────────────────────────
+let currentDashDate = new Date();
+
+function navDashDate(dir){
+  currentDashDate.setDate(currentDashDate.getDate()+dir);
+  loadDashboard();
+}
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 async function checkSession(){
