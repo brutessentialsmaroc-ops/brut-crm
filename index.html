@@ -2347,12 +2347,12 @@ function generateFicheAtelier(){
     desc:document.getElementById('atl-desc-'+i)?.value||''
   })).filter(p=>p.size!=='hidden');
 
-  const heightMap={large:'240px',medium:'180px',small:'120px'};
+  const heightMap={large:'280px',medium:'210px',small:'140px'};
 
   const photosHTML=photos.map(p=>`
     <div style="display:grid;grid-template-columns:${p.size==='large'?'55%':'45%'} 1fr;gap:6mm;margin-bottom:6mm;page-break-inside:avoid">
-      <div style="border-radius:4px;overflow:hidden;border:1px solid #e8e4dc">
-        <img src="${p.url}" style="width:100%;height:${heightMap[p.size]};object-fit:cover;display:block">
+      <div style="border-radius:4px;overflow:hidden;border:1px solid #e8e4dc;background:#f9f8f6;display:flex;align-items:center;justify-content:center;min-height:${heightMap[p.size]}">
+        <img src="${p.url}" style="width:100%;max-height:${heightMap[p.size]};object-fit:contain;display:block">
       </div>
       <div style="display:flex;flex-direction:column;justify-content:center;padding:3mm 0">
         ${p.title?`<div style="font-size:12px;font-weight:600;color:#1a1a18;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">${p.title}</div>`:''}
@@ -2474,12 +2474,12 @@ function generateFicheClient(){
     desc:document.getElementById('fiche-desc-'+i)?.value||''
   })).filter(p=>p.size!=='hidden');
 
-  const heightMap={large:'260px',medium:'190px',small:'130px'};
+  const heightMap={large:'300px',medium:'220px',small:'150px'};
 
   const photosHTML=photos.map(p=>`
     <div style="display:grid;grid-template-columns:${p.size==='large'?'55%':'45%'} 1fr;gap:8mm;margin-bottom:8mm;page-break-inside:avoid">
-      <div style="border-radius:6px;overflow:hidden;border:1px solid #e8e4dc">
-        <img src="${p.url}" style="width:100%;height:${heightMap[p.size]};object-fit:cover;display:block">
+      <div style="border-radius:6px;overflow:hidden;border:1px solid #e8e4dc;background:#f9f8f6;display:flex;align-items:center;justify-content:center;min-height:${heightMap[p.size]}">
+        <img src="${p.url}" style="width:100%;max-height:${heightMap[p.size]};object-fit:contain;display:block">
       </div>
       <div style="display:flex;flex-direction:column;justify-content:center;padding:4mm 0">
         ${p.title?`<div style="font-size:13px;font-weight:600;color:#1a1a18;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${p.title}</div>`:''}
@@ -2858,12 +2858,12 @@ function generateFicheProspect(){
     desc:document.getElementById('fp-desc-'+i)?.value||''
   })).filter(ph=>ph.size!=='hidden');
 
-  const heightMap={large:'260px',medium:'190px',small:'130px'};
+  const heightMap={large:'300px',medium:'220px',small:'150px'};
 
   const photosHTML=photos.map(ph=>`
     <div style="display:grid;grid-template-columns:${ph.size==='large'?'55%':'45%'} 1fr;gap:8mm;margin-bottom:8mm;page-break-inside:avoid">
-      <div style="border-radius:6px;overflow:hidden;border:1px solid #e8e4dc">
-        <img src="${ph.url}" style="width:100%;height:${heightMap[ph.size]};object-fit:cover;display:block">
+      <div style="border-radius:6px;overflow:hidden;border:1px solid #e8e4dc;background:#f9f8f6;display:flex;align-items:center;justify-content:center;min-height:${heightMap[ph.size]}">
+        <img src="${ph.url}" style="width:100%;max-height:${heightMap[ph.size]};object-fit:contain;display:block">
       </div>
       <div style="display:flex;flex-direction:column;justify-content:center;padding:4mm 0">
         ${ph.title?`<div style="font-size:13px;font-weight:600;color:#1a1a18;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${ph.title}</div>`:''}
