@@ -2615,7 +2615,8 @@ async function loadProspects(){
 }
 
 function renderProspectCard(p){
-  const safeData=JSON.stringify({id:p.id,nom:p.nom,telephone:p.telephone||'',email:p.email||'',source:p.source||'',source_autre:p.source_autre||'',besoin:p.besoin||'',budget:p.budget||'',statut:p.statut||'Nouveau',devis_id:p.devis_id||'',notes:p.notes||'',photos:p.photos||[],pdf_url:p.pdf_url||'',commentaires:p.commentaires||[]}).replace(/"/g,'&quot;');
+  const safeData=JSON.stringify({id:p.id,nom:p.nom,telephone:p.telephone||'',email:p.email||'',source:p.source||'',source_autre:p.source_autre||'',besoin:p.besoin||'',budget:p.budget||'',statut:p.statut||'Nouveau',devis_id:p.devis_id||'',notes:p.notes||'',photos:p.photos||[],pdf_url:p.pdf_url||'',commentaires:p.commentaires||[],date_contact:p.date_contact||p.created_at||''}).replace(/"/g,'&quot;');
+  const dateLabel=p.date_contact||p.created_at?new Date(p.date_contact||p.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):'';
   return`<div class="kanban-card" draggable="true" data-id="${p.id}"
     ondragstart="dragProspectStart(event,'${p.id}')"
     ondragend="dragEnd(event)"
@@ -2631,6 +2632,7 @@ function renderProspectCard(p){
         ${p.photos.slice(0,3).map(url=>`<img src="${url}" style="width:40px;height:30px;object-fit:cover;border-radius:3px">`).join('')}
       </div>`:''}
       ${p.pdf_url?`<div style="margin-top:4px"><span style="font-size:10px;color:var(--blue)">📄 Document joint</span></div>`:''}
+      ${dateLabel?`<div style="margin-top:6px;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;border-top:1px solid var(--border);padding-top:5px">📅 ${dateLabel}</div>`:''}
     </div>
   </div>`;
 }
@@ -2654,6 +2656,9 @@ async function openProspectModal(data={}){
     <input type="hidden" id="pr-id" value="${data.id||''}">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Nom *</label><input id="pr-nom" value="${data.nom||''}" placeholder="Nom du prospect"></div>
+      <div class="form-group"><label>Date de contact</label><input type="date" id="pr-date-contact" value="${data.date_contact?(data.date_contact.split('T')[0]):(data.created_at?data.created_at.split('T')[0]:new Date().toISOString().split('T')[0])}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Source</label>
         <select id="pr-source" onchange="document.getElementById('source-autre-wrap').style.display=this.value==='Autre'?'block':'none'">
           <option ${data.source==='Réseau Samir'?'selected':''}>Réseau Samir</option>
@@ -2751,6 +2756,7 @@ async function saveProspect(){
     source_autre:document.getElementById('pr-source-autre')?.value||null,
     telephone:document.getElementById('pr-tel').value,
     email:document.getElementById('pr-email').value,
+    date_contact:document.getElementById('pr-date-contact').value||null,
     besoin:document.getElementById('pr-besoin').value,
     budget:Number(document.getElementById('pr-budget').value)||null,
     statut:document.getElementById('pr-statut').value,
