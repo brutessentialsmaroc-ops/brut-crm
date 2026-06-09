@@ -3888,12 +3888,21 @@ async function deleteSuiviProjet(id){
 async function uploadSuiviPdf(input,projetId){
   const file=input.files[0];if(!file)return;
   toast('Upload en cours…');
-  const path=`projets/pdf/${Date.now()}_${Math.random().toString(36).slice(2)}.${file.name.split('.').pop()}`;
-  const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
-  if(error){toast('Erreur: '+error.message);return;}
-  const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+  const ext=file.name.split('.').pop();
+  const path=`projets-pdf/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const{data:upData,error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+  if(error){toast('Erreur upload: '+error.message);console.error('Upload error:',error);return;}
+  const{data:urlData}=sb.storage.from('atelier-photos').getPublicUrl(path);
+  const publicUrl=urlData?.publicUrl;
+  if(!publicUrl){toast('Erreur: URL introuvable');return;}
   document.getElementById('sp-pdf-data').value=publicUrl;
-  document.getElementById('sp-pdf-section').innerHTML=`<div style="display:flex;align-items:center;gap:10px"><a href="${publicUrl}" target="_blank" style="font-size:13px;color:var(--blue)">📎 ${file.name}</a><button class="btn btn-sm btn-danger" onclick="removeSuiviPdf()">✕</button></div>`;
+  document.getElementById('sp-pdf-section').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">
+      <span>📎</span>
+      <a href="${publicUrl}" target="_blank" style="font-size:13px;color:var(--blue);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${file.name}</a>
+      <button class="btn btn-sm btn-danger" onclick="removeSuiviPdf()">✕</button>
+    </div>`;
+  input.value='';
   toast('PDF joint ✓');
 }
 function removeSuiviPdf(){
@@ -3906,9 +3915,12 @@ async function uploadSuiviPhotos(input,projetId){
   toast(`Upload ${files.length} photo(s)…`);
   const urls=JSON.parse(document.getElementById('sp-photos-data').value.replace(/&quot;/g,'"'));
   for(const file of files){
-    const path=`projets/photos/${Date.now()}_${Math.random().toString(36).slice(2)}.${file.name.split('.').pop()}`;
+    const ext=file.name.split('.').pop();
+    const path=`projets-photos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
-    if(!error){const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);urls.push(publicUrl);}
+    if(error){console.error('Photo upload error:',error);continue;}
+    const{data:urlData}=sb.storage.from('atelier-photos').getPublicUrl(path);
+    if(urlData?.publicUrl)urls.push(urlData.publicUrl);
   }
   document.getElementById('sp-photos-data').value=JSON.stringify(urls).replace(/"/g,'&quot;');
   refreshSuiviPhotosGrid(urls,projetId);
