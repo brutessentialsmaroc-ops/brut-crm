@@ -289,6 +289,10 @@
           <div><div class="section-title">Dernières commandes</div><div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div></div>
           <div><div class="section-title">Avancement atelier</div><div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div></div>
         </div>
+        <div style="margin-bottom:16px">
+          <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Projets bloqués <span style="font-size:11px;color:var(--muted);font-weight:400">— Suivi Projets</span></div>
+          <div id="dash-bloques" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
+        </div>
         <div>
           <div class="section-title">Absences & congés aujourd'hui</div>
           <div id="dash-conges-today" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
@@ -661,15 +665,16 @@ async function loadDashboard(){
   if(btnNext) btnNext.style.opacity=cur>=today?'0.3':'1';
 
   const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const[r1,r2,r3,r4,r5,r6]=await Promise.all([
+  const[r1,r2,r3,r4,r5,r6,r7]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente'),
     sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').neq('statut','Payée'),
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
-    sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard')
+    sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard'),
+    sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true})
   ]);
-  const clients=r1.data, commandes=r2.data, devis=r3.data, factures=r4.data, congesAujourd=r5.data, pointagesAujourd=r6.data;
+  const clients=r1.data, commandes=r2.data, devis=r3.data, factures=r4.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[];
   document.getElementById('stat-clients').textContent=(clients||[]).length;
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
   // CA HT = sum of commandes montant
@@ -720,6 +725,25 @@ async function loadDashboard(){
     </div>
     <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FDF0E3;color:#8A4000;font-weight:500">En cours</span>
   </div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
+
+  // Projets suivi bloqués
+  const elBloques=document.getElementById('dash-bloques');
+  if(elBloques){
+    if(bloques.length){
+      elBloques.innerHTML=bloques.map(p=>`
+        <div onclick="showPage('suivi');setTimeout(()=>openSuiviFiche('${p.id}'),300)"
+          style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer"
+          onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+          <div>
+            <div style="font-size:13px;font-weight:500">${p.nom}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Gestionnaire : ${p.gestionnaire}${p.date_cible?' · Cible : '+new Date(p.date_cible+'T12:00:00').toLocaleDateString('fr-FR'):''}</div>
+          </div>
+          <span style="font-size:11px;padding:2px 10px;border-radius:20px;background:#FEF2F2;color:#EF4444;font-weight:600;white-space:nowrap;flex-shrink:0">🔴 Bloqué</span>
+        </div>`).join('');
+    } else {
+      elBloques.innerHTML='<div style="padding:12px 0;font-size:13px;color:var(--muted)">✅ Aucun projet bloqué</div>';
+    }
+  }
 }
 
 // ─── CLIENTS ──────────────────────────────────────────────────────────────────
@@ -2070,6 +2094,7 @@ async function loadPaie(){
             <button class="btn btn-sm" onclick="printFichePaie('${s.id}',${mois},${annee})">Fiche</button>
             <button class="btn btn-sm" onclick="openModifierPaie('${s.id}',${mois},${annee})">Modifier</button>
             ${p?`<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="marquerPaye('${p.id}')">✓ Payé</button>`:''}
+            ${p?.statut==='Payé'?`<button class="btn btn-sm" style="color:var(--muted);font-size:11px" onclick="resetPaie('${p.id}')">↺ Réinit.</button>`:''}
           </div></td>
         </tr>`;
       }).join('')}
@@ -2115,6 +2140,12 @@ async function genererPaie(){
 async function marquerPaye(id){
   await sb.from('paie').update({statut:'Payé'}).eq('id',id);
   toast('Marqué payé ✓'); loadPaie();
+}
+
+async function resetPaie(id){
+  if(!confirm('Remettre cette paie en "En attente" ?'))return;
+  await sb.from('paie').update({statut:'En attente'}).eq('id',id);
+  toast('Remis en attente ✓'); loadPaie();
 }
 
 async function printFichePaie(salId,mois,annee){
