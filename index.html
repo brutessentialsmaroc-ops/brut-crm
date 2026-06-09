@@ -570,7 +570,16 @@ function showApp(email){
   document.getElementById('login-page').classList.add('hidden');
   document.getElementById('app-page').classList.remove('hidden');
   document.getElementById('user-email').textContent=email;
-  loadDashboard();
+  // Pages qu'on ne restaure pas (états temporaires)
+  const noRestore=['devis-builder','ticket','client-detail'];
+  const lastPage=localStorage.getItem('brut-last-page');
+  const pageToLoad=(lastPage&&!noRestore.includes(lastPage))?lastPage:'dashboard';
+  // Active le bon bouton nav
+  document.querySelectorAll('.nav-item').forEach(btn=>{
+    if(btn.getAttribute('onclick')?.includes(`'${pageToLoad}'`))btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+  showPage(pageToLoad);
 }
 function showLogin(){
   document.getElementById('login-page').classList.remove('hidden');
@@ -598,6 +607,7 @@ function showPage(page,el){
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
+  localStorage.setItem('brut-last-page', page);
   loadPage(page);
 }
 function loadPage(p){
