@@ -2615,7 +2615,7 @@ async function loadProspects(){
 }
 
 function renderProspectCard(p){
-  const safeData=JSON.stringify({id:p.id,nom:p.nom,telephone:p.telephone||'',email:p.email||'',source:p.source||'',source_autre:p.source_autre||'',besoin:p.besoin||'',budget:p.budget||'',statut:p.statut||'Nouveau',devis_id:p.devis_id||'',notes:p.notes||'',photos:p.photos||[]}).replace(/"/g,'&quot;');
+  const safeData=JSON.stringify({id:p.id,nom:p.nom,telephone:p.telephone||'',email:p.email||'',source:p.source||'',source_autre:p.source_autre||'',besoin:p.besoin||'',budget:p.budget||'',statut:p.statut||'Nouveau',devis_id:p.devis_id||'',notes:p.notes||'',photos:p.photos||[],pdf_url:p.pdf_url||'',commentaires:p.commentaires||[]}).replace(/"/g,'&quot;');
   return`<div class="kanban-card" draggable="true" data-id="${p.id}"
     ondragstart="dragProspectStart(event,'${p.id}')"
     ondragend="dragEnd(event)"
@@ -2702,7 +2702,9 @@ async function openProspectModal(data={}){
       </div>
       <input type="hidden" id="pr-comments-data" value="${JSON.stringify(data.commentaires||[]).replace(/"/g,'&quot;')}">
     </div>
-      <div style="display:flex;align-items:center;gap:10px">
+    <div class="form-group">
+      <label>Document PDF</label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         ${data.pdf_url
           ?`<a href="${data.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:6px">📄 Voir le document</a>
             <button class="btn btn-sm btn-danger" onclick="removeProspectPdf('${data.id||''}')">Suppr.</button>`
