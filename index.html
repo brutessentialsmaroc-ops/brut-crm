@@ -235,6 +235,7 @@
       <button class="nav-item" onclick="showPage('clients',this)">◎ Clients</button>
       <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
       <button class="nav-item" onclick="showPage('commandes',this)">◫ Commandes</button>
+      <button class="nav-item" onclick="showPage('suivi',this)">◑ Suivi Projets</button>
       <button class="nav-item" onclick="showPage('atelier',this)">⚙ Atelier</button>
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
       <div style="height:1px;background:var(--border);margin:10px 4px"></div>
@@ -409,6 +410,13 @@
       <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
       <!-- FACTURES -->
       <div id="page-factures" class="hidden"><div id="factures-list"></div></div>
+      <!-- SUIVI PROJETS -->
+      <div id="page-suivi" class="hidden">
+        <div id="suivi-main">
+          <div id="suivi-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
+        </div>
+        <div id="suivi-fiche" class="hidden"></div>
+      </div>
       <!-- PROSPECTS -->
       <div id="page-prospects" class="hidden">
         <div class="kanban" id="prospects-kanban"></div>
@@ -586,7 +594,7 @@ function showPage(page,el){
   document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+page).classList.remove('hidden');
   if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
-  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client','achats':'Achats'}[page]||page;
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client','achats':'Achats',suivi:'Suivi Projets'}[page]||page;
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
@@ -602,6 +610,7 @@ function loadPage(p){
   else if(p==='prospects')loadProspects();
   else if(p==='achats'){currentAchatTab='suivi';loadAchatsSuivi();}
   else if(p==='rh'){currentRhTab='salaries';loadRhSalaries();}
+  else if(p==='suivi')loadSuivi();
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -616,6 +625,7 @@ function openNew(){
   else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
   else if(currentPage==='devis')openDevisBuilder(null);
   else if(currentPage==='prospects')openProspectModal();
+  else if(currentPage==='suivi')openSuiviModal();
   else if(currentPage==='achats')openAchatModal();
   else if(currentPage==='rh'){
     if(currentRhTab==='salaries')openSalarieModal();
@@ -3512,6 +3522,319 @@ async function removeAchatBon(achatId){
   toast('Bon supprimé');
   closeModal('rh-modal');
   loadAchatsSuivi();
+}
+
+
+// ─── SUIVI PROJETS ────────────────────────────────────────────────────────────
+
+const SUIVI_GESTIONNAIRES = ['Nabil','Cherazade','Loubna'];
+const SUIVI_STATUTS = {
+  'En cours':   {color:'#3B82F6', bg:'#EFF6FF', icon:'🔵'},
+  'Bloqué':     {color:'#EF4444', bg:'#FEF2F2', icon:'🔴'},
+  'En attente': {color:'#F59E0B', bg:'#FFFBEB', icon:'🟡'},
+  'Terminé':    {color:'#10B981', bg:'#F0FDF4', icon:'✅'},
+};
+const UPDATE_TYPES = ['💬 Info','✅ Avancement','🔴 Bloqué','📦 Livraison','📋 Action requise'];
+
+async function loadSuivi(){
+  document.getElementById('suivi-fiche').classList.add('hidden');
+  document.getElementById('suivi-main').classList.remove('hidden');
+  const {data:projets}=await sb.from('projets_suivi')
+    .select('*,commandes(reference,clients(nom)),devis(reference,projet_nom),projets_updates(id,auteur,type,texte,created_at)')
+    .order('created_at',{ascending:false});
+  const kanban=document.getElementById('suivi-kanban');
+  kanban.innerHTML=SUIVI_GESTIONNAIRES.map(g=>{
+    const mine=(projets||[]).filter(p=>p.gestionnaire===g);
+    return`<div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase">${g}</div>
+        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--muted)">${mine.length}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${mine.map(p=>renderSuiviCard(p)).join('')}
+        ${mine.length===0?`<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Aucun projet</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSuiviCard(p){
+  const st=SUIVI_STATUTS[p.statut]||SUIVI_STATUTS['En cours'];
+  const updates=p.projets_updates||[];
+  const last=updates.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+  const lastDate=last?new Date(last.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}):'—';
+  const ref=p.devis?.reference||p.commandes?.reference||'';
+  const client=p.commandes?.clients?.nom||p.devis?.projet_nom||'';
+  return`<div onclick="openSuiviFiche('${p.id}')" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='none'">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px;line-height:1.3">${p.nom}</div>
+      <span style="background:${st.bg};color:${st.color};font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0">${st.icon} ${p.statut}</span>
+    </div>
+    ${client?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">👤 ${client}</div>`:''}
+    ${ref?`<div style="font-size:10px;color:var(--blue);margin-bottom:6px;font-family:'DM Mono',monospace">${ref}</div>`:''}
+    ${last?`<div style="font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;margin-top:6px">
+      <span style="color:var(--muted)">${last.type||'💬'}</span> <span style="color:#444">${last.texte.length>60?last.texte.slice(0,60)+'…':last.texte}</span>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace">${lastDate} · ${last.auteur}</div>
+    </div>`:`<div style="font-size:11px;color:var(--muted);font-style:italic">Aucune mise à jour</div>`}
+    ${p.suppleant?`<div style="font-size:10px;color:var(--muted);margin-top:6px">Suppléant : ${p.suppleant}</div>`:''}
+  </div>`;
+}
+
+async function openSuiviFiche(id){
+  document.getElementById('suivi-main').classList.add('hidden');
+  const fiche=document.getElementById('suivi-fiche');
+  fiche.classList.remove('hidden');
+  fiche.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+    <button class="btn" onclick="loadSuivi()">← Retour</button>
+    <div style="color:var(--muted);font-size:13px">Chargement…</div>
+  </div>`;
+  const {data:p}=await sb.from('projets_suivi')
+    .select('*,commandes(id,reference,clients(nom)),devis(id,reference,projet_nom)')
+    .eq('id',id).single();
+  const {data:updates}=await sb.from('projets_updates')
+    .select('*').eq('projet_id',id).order('created_at',{ascending:false});
+  const st=SUIVI_STATUTS[p.statut]||SUIVI_STATUTS['En cours'];
+  fiche.innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+      <button class="btn" onclick="loadSuivi()">← Retour</button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:20px;font-weight:700">${p.nom}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">
+          Gestionnaire : <strong>${p.gestionnaire}</strong>${p.suppleant?' · Suppléant : '+p.suppleant:''}
+          ${p.date_debut?' · Début : '+new Date(p.date_debut).toLocaleDateString('fr-FR'):''}
+          ${p.date_cible?' · Cible : '+new Date(p.date_cible).toLocaleDateString('fr-FR'):''}
+        </div>
+      </div>
+      <span style="background:${st.bg};color:${st.color};padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">${st.icon} ${p.statut}</span>
+      <button class="btn btn-sm" onclick="openSuiviModal('${id}')">✏️ Modifier</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
+      <div>
+        <!-- FIL DE MISES À JOUR -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px">Mises à jour (${updates?.length||0})</div>
+          <div id="suivi-updates-list" style="max-height:500px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            ${(updates||[]).map(u=>renderUpdate(u)).join('')}
+            ${!updates?.length?`<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px">Aucune mise à jour — soyez le premier !</div>`:''}
+          </div>
+          <!-- SAISIE -->
+          <div style="padding:14px 16px;border-top:1px solid var(--border);background:var(--bg)">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <select id="su-auteur" style="font-size:12px">
+                ${SUIVI_GESTIONNAIRES.map(g=>`<option>${g}</option>`).join('')}
+              </select>
+              <select id="su-type" style="font-size:12px">
+                ${UPDATE_TYPES.map(t=>`<option>${t}</option>`).join('')}
+              </select>
+            </div>
+            <div style="display:flex;gap:8px">
+              <textarea id="su-texte" placeholder="Votre mise à jour…" rows="2" style="flex:1;font-size:13px;resize:none"></textarea>
+              <button class="btn btn-primary" onclick="addSuiviUpdate('${id}')" style="align-self:flex-end">Envoyer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- SIDEBAR DROITE -->
+      <div style="display:flex;flex-direction:column;gap:14px">
+        ${p.commandes||p.devis?`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Lié à</div>
+          ${p.commandes?`<div style="font-size:13px">📦 <strong>${p.commandes.reference}</strong>${p.commandes.clients?.nom?' · '+p.commandes.clients.nom:''}</div>`:''}
+          ${p.devis?`<div style="font-size:13px">📄 <strong>${p.devis.reference}</strong>${p.devis.projet_nom?' · '+p.devis.projet_nom:''}</div>`:''}
+        </div>`:''}
+        ${p.pdf_url?`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Document</div>
+          <a href="${p.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue);text-decoration:none">📎 Fiche technique</a>
+        </div>`:''}
+        ${p.photos&&p.photos.length?`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Photos</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+            ${p.photos.map(url=>`<img src="${url}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;cursor:pointer" onclick="openLightbox('${url}')">`).join('')}
+          </div>
+        </div>`:''}
+      </div>
+    </div>`;
+}
+
+function renderUpdate(u){
+  const d=new Date(u.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const colors={'✅ Avancement':'#10B981','🔴 Bloqué':'#EF4444','📦 Livraison':'#3B82F6','📋 Action requise':'#F59E0B'};
+  const border=colors[u.type]||'var(--border)';
+  return`<div style="border-left:3px solid ${border};padding:10px 12px;background:var(--bg);border-radius:0 var(--radius) var(--radius) 0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:11px;font-weight:600">${u.auteur}</span>
+      <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${d}</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${u.type}</div>
+    <div style="font-size:13px;line-height:1.5;white-space:pre-wrap">${u.texte}</div>
+  </div>`;
+}
+
+async function addSuiviUpdate(projetId){
+  const texte=document.getElementById('su-texte').value.trim();
+  if(!texte){toast('Écrivez votre mise à jour');return;}
+  const auteur=document.getElementById('su-auteur').value;
+  const type=document.getElementById('su-type').value;
+  const{error}=await sb.from('projets_updates').insert({projet_id:projetId,auteur,type,texte});
+  if(error){toast('Erreur: '+error.message);return;}
+  document.getElementById('su-texte').value='';
+  toast('Mise à jour ajoutée ✓');
+  // Ajouter dans le fil sans rechargement complet
+  const list=document.getElementById('suivi-updates-list');
+  const div=document.createElement('div');
+  div.innerHTML=renderUpdate({auteur,type,texte,created_at:new Date().toISOString()});
+  if(list.children.length&&list.children[0].textContent.includes('Aucune'))list.innerHTML='';
+  list.insertBefore(div.firstChild,list.firstChild);
+  // update compteur
+  const title=list.closest('.overflow-hidden')?.querySelector('.font-semibold');
+}
+
+async function openSuiviModal(id=null){
+  let data={};
+  if(id){
+    const{data:p}=await sb.from('projets_suivi').select('*').eq('id',id).single();
+    data=p||{};
+  }
+  const {data:commandes}=await sb.from('commandes').select('id,reference,clients(nom)').order('created_at',{ascending:false}).limit(50);
+  const {data:devisList}=await sb.from('devis').select('id,reference,projet_nom').order('created_at',{ascending:false}).limit(50);
+  const html=`<div class="modal" style="max-width:520px">
+    <div class="modal-title">${id?'Modifier projet':'Nouveau projet de suivi'}</div>
+    <input type="hidden" id="sp-id" value="${id||''}">
+    <div class="form-group"><label>Nom du projet *</label><input id="sp-nom" value="${data.nom||''}" placeholder="Ex: Villa AIA — Salon"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Gestionnaire *</label>
+        <select id="sp-gestionnaire">
+          ${SUIVI_GESTIONNAIRES.map(g=>`<option ${data.gestionnaire===g?'selected':''}>${g}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Suppléant</label>
+        <select id="sp-suppleant">
+          <option value="">— Aucun —</option>
+          ${SUIVI_GESTIONNAIRES.map(g=>`<option ${data.suppleant===g?'selected':''}>${g}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Statut</label>
+        <select id="sp-statut">
+          ${Object.keys(SUIVI_STATUTS).map(s=>`<option ${data.statut===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Date cible</label><input type="date" id="sp-date-cible" value="${data.date_cible||''}"></div>
+    </div>
+    <div class="form-group"><label>Lier à une commande (optionnel)</label>
+      <select id="sp-commande">
+        <option value="">— Aucune commande —</option>
+        ${(commandes||[]).map(c=>`<option value="${c.id}" ${data.commande_id===c.id?'selected':''}>${c.reference||'—'} · ${c.clients?.nom||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Lier à un devis (optionnel)</label>
+      <select id="sp-devis">
+        <option value="">— Aucun devis —</option>
+        ${(devisList||[]).map(d=>`<option value="${d.id}" ${data.devis_id===d.id?'selected':''}>${d.reference||'—'} · ${d.projet_nom||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fiche technique PDF</label>
+      <div id="sp-pdf-section">
+        ${data.pdf_url
+          ?`<div style="display:flex;align-items:center;gap:10px"><a href="${data.pdf_url}" target="_blank" style="font-size:13px;color:var(--blue)">📎 Document joint</a>
+             <button class="btn btn-sm btn-danger" onclick="removeSuiviPdf()">✕</button></div>`
+          :`<span style="font-size:12px;color:var(--muted)">Aucun document</span>`}
+      </div>
+      <input type="file" id="sp-pdf-input" accept=".pdf,.doc,.docx" style="display:none" onchange="uploadSuiviPdf(this,'${id||''}')">
+      <input type="hidden" id="sp-pdf-data" value="${data.pdf_url||''}">
+      <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('sp-pdf-input').click()">📎 ${data.pdf_url?'Remplacer':'Ajouter un PDF'}</button>
+    </div>
+    <div class="form-group">
+      <label>Photos</label>
+      <div id="sp-photos-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+        ${(data.photos||[]).map((url,i)=>`<div style="position:relative;aspect-ratio:1;border-radius:4px;overflow:hidden"><img src="${url}" style="width:100%;height:100%;object-fit:cover"><button onclick="removeSuiviPhoto(${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;font-size:10px">✕</button></div>`).join('')}
+        <div onclick="document.getElementById('sp-photos-input').click()" style="aspect-ratio:1;border:2px dashed var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--muted)">+</div>
+      </div>
+      <input type="file" id="sp-photos-input" accept="image/*" multiple style="display:none" onchange="uploadSuiviPhotos(this,'${id||''}')">
+      <input type="hidden" id="sp-photos-data" value="${JSON.stringify(data.photos||[]).replace(/"/g,'&quot;')}">
+    </div>
+    <div class="modal-footer">
+      ${id?`<button class="btn btn-sm btn-danger" onclick="deleteSuiviProjet('${id}')">Supprimer</button>`:''}
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveSuiviProjet()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveSuiviProjet(){
+  const id=document.getElementById('sp-id').value;
+  const nom=document.getElementById('sp-nom').value.trim();
+  if(!nom){toast('Nom requis');return;}
+  const payload={
+    nom,
+    gestionnaire:document.getElementById('sp-gestionnaire').value,
+    suppleant:document.getElementById('sp-suppleant').value||null,
+    statut:document.getElementById('sp-statut').value,
+    date_cible:document.getElementById('sp-date-cible').value||null,
+    commande_id:document.getElementById('sp-commande').value||null,
+    devis_id:document.getElementById('sp-devis').value||null,
+    pdf_url:document.getElementById('sp-pdf-data').value||null,
+    photos:JSON.parse(document.getElementById('sp-photos-data').value.replace(/&quot;/g,'"')),
+  };
+  let error;
+  if(id){({error}=await sb.from('projets_suivi').update(payload).eq('id',id));}
+  else{({error}=await sb.from('projets_suivi').insert(payload));}
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast(id?'Projet mis à jour ✓':'Projet créé ✓');
+  if(id)openSuiviFiche(id); else loadSuivi();
+}
+
+async function deleteSuiviProjet(id){
+  if(!confirm('Supprimer ce projet et toutes ses mises à jour ?'))return;
+  await sb.from('projets_updates').delete().eq('projet_id',id);
+  await sb.from('projets_suivi').delete().eq('id',id);
+  closeModal('rh-modal');
+  toast('Projet supprimé');
+  loadSuivi();
+}
+
+async function uploadSuiviPdf(input,projetId){
+  const file=input.files[0];if(!file)return;
+  toast('Upload en cours…');
+  const path=`projets/pdf/${Date.now()}_${Math.random().toString(36).slice(2)}.${file.name.split('.').pop()}`;
+  const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+  if(error){toast('Erreur: '+error.message);return;}
+  const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);
+  document.getElementById('sp-pdf-data').value=publicUrl;
+  document.getElementById('sp-pdf-section').innerHTML=`<div style="display:flex;align-items:center;gap:10px"><a href="${publicUrl}" target="_blank" style="font-size:13px;color:var(--blue)">📎 ${file.name}</a><button class="btn btn-sm btn-danger" onclick="removeSuiviPdf()">✕</button></div>`;
+  toast('PDF joint ✓');
+}
+function removeSuiviPdf(){
+  document.getElementById('sp-pdf-data').value='';
+  document.getElementById('sp-pdf-section').innerHTML=`<span style="font-size:12px;color:var(--muted)">Aucun document</span>`;
+}
+
+async function uploadSuiviPhotos(input,projetId){
+  const files=Array.from(input.files);if(!files.length)return;
+  toast(`Upload ${files.length} photo(s)…`);
+  const urls=JSON.parse(document.getElementById('sp-photos-data').value.replace(/&quot;/g,'"'));
+  for(const file of files){
+    const path=`projets/photos/${Date.now()}_${Math.random().toString(36).slice(2)}.${file.name.split('.').pop()}`;
+    const{error}=await sb.storage.from('atelier-photos').upload(path,file,{upsert:true});
+    if(!error){const{data:{publicUrl}}=sb.storage.from('atelier-photos').getPublicUrl(path);urls.push(publicUrl);}
+  }
+  document.getElementById('sp-photos-data').value=JSON.stringify(urls).replace(/"/g,'&quot;');
+  refreshSuiviPhotosGrid(urls,projetId);
+  toast('Photos ajoutées ✓');
+}
+function removeSuiviPhoto(idx){
+  const urls=JSON.parse(document.getElementById('sp-photos-data').value.replace(/&quot;/g,'"'));
+  urls.splice(idx,1);
+  document.getElementById('sp-photos-data').value=JSON.stringify(urls).replace(/"/g,'&quot;');
+  refreshSuiviPhotosGrid(urls,'');
+}
+function refreshSuiviPhotosGrid(urls,projetId){
+  const grid=document.getElementById('sp-photos-grid');
+  grid.innerHTML=urls.map((url,i)=>`<div style="position:relative;aspect-ratio:1;border-radius:4px;overflow:hidden"><img src="${url}" style="width:100%;height:100%;object-fit:cover"><button onclick="removeSuiviPhoto(${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;font-size:10px">✕</button></div>`).join('')+
+  `<div onclick="document.getElementById('sp-photos-input').click()" style="aspect-ratio:1;border:2px dashed var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--muted)">+</div>`;
 }
 
 checkSession();
