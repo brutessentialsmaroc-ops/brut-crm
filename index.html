@@ -438,7 +438,12 @@
         <!-- INFO DEVIS -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:20px">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-            <div class="form-group" style="margin:0"><label>Client</label><select id="builder-client" onchange="if(this.value==='__new__')openNewClientFromDevis()"></select></div>
+            <div class="form-group" style="margin:0"><label>Client</label>
+          <div style="display:flex;gap:8px">
+            <select id="builder-client" style="flex:1" onchange="if(this.value==='__new__')openNewClientFromDevis()"></select>
+            <button type="button" class="btn btn-sm" onclick="openNewClientFromDevis()" title="Nouveau client">+</button>
+          </div>
+        </div>
             <div class="form-group" style="margin:0"><label>Nom du projet</label><input type="text" id="builder-projet" placeholder="Appartement Agadir…"></div>
             <div class="form-group" style="margin:0"><label>Statut</label>
               <select id="builder-statut"><option>En attente</option><option>Accepté</option><option>Refusé</option></select>
