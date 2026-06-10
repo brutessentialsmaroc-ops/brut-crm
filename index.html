@@ -285,6 +285,16 @@
           </div>
           <button class="btn btn-sm" style="border-color:#F5C5C5;color:var(--red)" onclick="showPage('factures',document.querySelector('.nav-item:nth-child(6)'))">Voir →</button>
         </div>
+        <!-- Absences EN PREMIER -->
+        <div style="margin-bottom:16px">
+          <div class="section-title">Absences & congés aujourd'hui</div>
+          <div id="dash-conges-today" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
+        </div>
+        <!-- Missions en cours -->
+        <div style="margin-bottom:16px">
+          <div class="section-title" style="display:flex;align-items:center;gap:8px">⚡ Missions tâches atelier <span style="font-size:11px;color:var(--muted);font-weight:400">— en cours</span></div>
+          <div id="dash-missions" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
+        </div>
         <div class="two-col" style="margin-bottom:16px">
           <div><div class="section-title">Dernières commandes</div><div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div></div>
           <div><div class="section-title">Avancement atelier</div><div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div></div>
@@ -292,10 +302,6 @@
         <div style="margin-bottom:16px">
           <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Projets bloqués <span style="font-size:11px;color:var(--muted);font-weight:400">— Suivi Projets</span></div>
           <div id="dash-bloques" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
-        </div>
-        <div>
-          <div class="section-title">Absences & congés aujourd'hui</div>
-          <div id="dash-conges-today" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
         </div>
       </div>
       <!-- CLIENTS -->
@@ -419,7 +425,7 @@
         <!-- TABS -->
         <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
           <button class="rh-tab active" id="suivi-tab-projets" onclick="showSuiviMainTab('projets',this)">◑ Projets</button>
-          <button class="rh-tab" id="suivi-tab-missions" onclick="showSuiviMainTab('missions',this)">⚡ Missions atelier</button>
+          <button class="rh-tab" id="suivi-tab-missions" onclick="showSuiviMainTab('missions',this)">⚡ Suivi Missions Tâches Atelier</button>
         </div>
         <!-- PROJETS -->
         <div id="suivi-tab-content-projets">
@@ -691,16 +697,17 @@ async function loadDashboard(){
   if(btnNext) btnNext.style.opacity=cur>=today?'0.3':'1';
 
   const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const[r1,r2,r3,r4,r5,r6,r7]=await Promise.all([
+  const[r1,r2,r3,r4,r5,r6,r7,r8]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente'),
     sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').neq('statut','Payée'),
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
     sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard'),
-    sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true})
+    sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true}),
+    sb.from('missions').select('*,projets_suivi(nom)').neq('statut','Terminé').order('created_at',{ascending:false})
   ]);
-  const clients=r1.data, commandes=r2.data, devis=r3.data, factures=r4.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[];
+  const clients=r1.data, commandes=r2.data, devis=r3.data, factures=r4.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[];
   document.getElementById('stat-clients').textContent=(clients||[]).length;
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
   // CA HT = sum of commandes montant
@@ -751,6 +758,38 @@ async function loadDashboard(){
     </div>
     <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FDF0E3;color:#8A4000;font-weight:500">En cours</span>
   </div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
+
+  // Missions en cours
+  const elMissions=document.getElementById('dash-missions');
+  if(elMissions){
+    const now2=new Date(); now2.setHours(0,0,0,0);
+    if(missionsEnCours.length){
+      elMissions.innerHTML=missionsEnCours.slice(0,8).map(m=>{
+        const cible=m.date_cible?new Date(m.date_cible+'T12:00:00'):null;
+        const retard=cible&&cible<now2;
+        const st=MISSION_STATUTS?.[m.statut]||{color:'#3B82F6',bg:'#EFF6FF',icon:'🔵'};
+        const relances=m.relances||[];
+        return`<div onclick="showPage('suivi');setTimeout(()=>{showSuiviMainTab('missions',document.getElementById('suivi-tab-missions'))},300)"
+          style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer"
+          onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+          <div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:13px;font-weight:500">${m.titre}</span>
+              ${retard?`<span style="background:#FEF2F2;color:#EF4444;font-size:10px;padding:1px 6px;border-radius:20px;font-weight:700">RETARD</span>`:''}
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">
+              ${m.gestionnaire}${cible?' · Cible : '+cible.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}):''}
+              ${m.projets_suivi?' · 📁 '+m.projets_suivi.nom:''}
+              ${relances.length?' · R'+relances.length:''}
+            </div>
+          </div>
+          <span style="font-size:11px;padding:2px 10px;border-radius:20px;background:${st.bg};color:${st.color};font-weight:600;white-space:nowrap">${st.icon} ${m.statut}</span>
+        </div>`;
+      }).join('');
+    } else {
+      elMissions.innerHTML='<div style="padding:12px 0;font-size:13px;color:var(--muted)">✅ Aucune mission en cours</div>';
+    }
+  }
 
   // Projets suivi bloqués
   const elBloques=document.getElementById('dash-bloques');
@@ -1843,7 +1882,7 @@ async function loadPointage(){
   const ptSortedGroups=Object.keys(ptGroups).sort((a,b)=>{const ia=ptAtelierOrder.indexOf(a);const ib=ptAtelierOrder.indexOf(b);return(ia===-1?99:ia)-(ib===-1?99:ib);});
   const ptColors={'Administration':'#C8A97A','Menuiserie bois':'#378ADD','Tapisserie':'#EF9F27','Céramique':'#5DCAA5','Ferronnerie':'#9B6DD6','Livraison':'#E05A5A'};
 
-  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Repos':'🔵','Férié':'⭐'};
+  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Repos':'🔵','Férié':'⭐','Demi-J':'🔆','En mission extérieure':'🚗'};
 
   const dayHeaders=Array.from({length:daysInMonth},(_,i)=>{
     const d=new Date(year,month,i+1);
@@ -1861,7 +1900,7 @@ async function loadPointage(){
       if(pt&&pt.statut==='Absent') absences++;
       if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
       const icon=pt?statusIcon[pt.statut]||'?':'';
-      const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':'#fff':'#fff';
+      const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':pt.statut==='Demi-J'?'#FFF7ED':pt.statut==='En mission extérieure'?'#F0FDF4':'#fff':'#fff';
       return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:14px" onclick="openPointageDetail('${s.id}','${(s.prenom||"")+" "+s.nom}','${dateStr}')" title="${pt?(pt.statut+(pt.heure_arrivee?" · "+pt.heure_arrivee:"")+(pt.heures_sup>0?" · +"+pt.heures_sup+"h sup":"")):dateStr}">${icon}</td>`;
     }).join('');
     return`<tr>
@@ -1902,7 +1941,7 @@ async function loadPointage(){
     }).join('')}
     </div>
     <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--muted)">
-      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span><span>🔵 Repos</span>
+      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span><span>🔵 Repos</span><span>🔆 Demi-J</span><span>🚗 En mission extérieure</span>
       <span style="margin-left:8px;font-style:italic">Cliquez sur une case pour saisir</span>
     </div>`;
 }
@@ -1923,6 +1962,8 @@ async function openPointageDetail(salId, salNom, date){
         <option ${existing?.statut==='Retard'?'selected':''}>Retard</option>
         <option ${existing?.statut==='Congé'?'selected':''}>Congé</option>
         <option ${existing?.statut==='Repos'?'selected':''}>Repos</option>
+        <option ${existing?.statut==='Demi-J'?'selected':''}>Demi-J</option>
+        <option ${existing?.statut==='En mission extérieure'?'selected':''}>En mission extérieure</option>
       </select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
@@ -1989,7 +2030,7 @@ function openPointageModal(){
     </div>
     <div class="form-group"><label>Date</label><input type="date" id="pt-date" value="${new Date().toISOString().split('T')[0]}"></div>
     <div class="form-group"><label>Statut</label>
-      <select id="pt-statut"><option>Présent</option><option>Absent</option><option>Retard</option><option>Congé</option></select>
+      <select id="pt-statut"><option>Présent</option><option>Absent</option><option>Retard</option><option>Congé</option><option>Demi-J</option><option>En mission extérieure</option></select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
       <div class="form-group"><label>Arrivée</label><input type="time" id="pt-arrivee"></div>
@@ -3122,6 +3163,16 @@ async function printEmargement(){
           <div style="width:14px;height:14px;border:1.5px solid #A32D2D;border-radius:2px"></div> Absent
         </div>
       </td>
+      <td style="padding:10px;border:1px solid #e0dbd2;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
+          <div style="width:14px;height:14px;border:1.5px solid #F59E0B;border-radius:2px"></div> Demi-J
+        </div>
+      </td>
+      <td style="padding:10px;border:1px solid #e0dbd2;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px">
+          <div style="width:14px;height:14px;border:1.5px solid #10B981;border-radius:2px"></div> Mission ext.
+        </div>
+      </td>
     </tr>`).join('')}
   `).join('');
 
@@ -3150,9 +3201,11 @@ async function printEmargement(){
           <tr>
             <th style="padding:8px 10px;text-align:left;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18">NOM & PRÉNOM</th>
             <th style="padding:8px 10px;text-align:left;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18">POSTE</th>
-            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">PRÉSENT</th>
-            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">RETARD</th>
-            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">ABSENT</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:70px">PRÉSENT</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:70px">RETARD</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:70px">ABSENT</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:70px">DEMI-J</th>
+            <th style="padding:8px 10px;text-align:center;background:#1a1a18;color:#fff;font-size:11px;font-weight:600;letter-spacing:0.5px;border:1px solid #1a1a18;width:80px">MISSION EXT.</th>
           </tr>
         </thead>
         <tbody>${rowsHTML}</tbody>
