@@ -416,10 +416,32 @@
       <div id="page-factures" class="hidden"><div id="factures-list"></div></div>
       <!-- SUIVI PROJETS -->
       <div id="page-suivi" class="hidden">
-        <div id="suivi-main">
-          <div id="suivi-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
+        <!-- TABS -->
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
+          <button class="rh-tab active" id="suivi-tab-projets" onclick="showSuiviMainTab('projets',this)">◑ Projets</button>
+          <button class="rh-tab" id="suivi-tab-missions" onclick="showSuiviMainTab('missions',this)">⚡ Missions atelier</button>
         </div>
-        <div id="suivi-fiche" class="hidden"></div>
+        <!-- PROJETS -->
+        <div id="suivi-tab-content-projets">
+          <div id="suivi-main">
+            <div id="suivi-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
+          </div>
+          <div id="suivi-fiche" class="hidden"></div>
+        </div>
+        <!-- MISSIONS -->
+        <div id="suivi-tab-content-missions" class="hidden">
+          <div id="missions-filters" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            <select id="mf-statut" onchange="loadMissions()" style="font-size:12px">
+              <option value="">Tous statuts</option>
+              <option>En cours</option><option>Terminé</option><option>Bloqué</option>
+            </select>
+            <select id="mf-gestionnaire" onchange="loadMissions()" style="font-size:12px">
+              <option value="">Tous gestionnaires</option>
+              <option>Nabil</option><option>Cherazade</option><option>Loubna</option>
+            </select>
+          </div>
+          <div id="missions-list"></div>
+        </div>
       </div>
       <!-- PROSPECTS -->
       <div id="page-prospects" class="hidden">
@@ -639,7 +661,11 @@ function openNew(){
   else if(currentPage==='commandes'||currentPage==='atelier')openCommandeModal();
   else if(currentPage==='devis')openDevisBuilder(null);
   else if(currentPage==='prospects')openProspectModal();
-  else if(currentPage==='suivi')openSuiviModal();
+  else if(currentPage==='suivi'){
+    const activeTab=document.getElementById('suivi-tab-missions')?.classList.contains('active');
+    if(activeTab) openMissionModal();
+    else openSuiviModal();
+  }
   else if(currentPage==='achats')openAchatModal();
   else if(currentPage==='rh'){
     if(currentRhTab==='salaries')openSalarieModal();
@@ -1012,8 +1038,8 @@ async function loadDevisList(){
   el.innerHTML=(data||[]).map(d=>{
     const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const ttc=ht*1.2;
-    return`<div class="devis-card" onclick="openDevisBuilder('${d.id}')">
-      <div class="devis-card-left">
+    return`<div class="devis-card">
+      <div class="devis-card-left" onclick="openDevisBuilder('${d.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
         <div class="devis-card-title">${d.clients?.nom||'—'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
         <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)</div>
@@ -1024,6 +1050,7 @@ async function loadDevisList(){
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeClass(d.statut)}">${d.statut}</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();printDevisById('${d.id}')">📄 PDF</button>
         <button class="btn btn-sm" onclick="event.stopPropagation();dupliquerDevis('${d.id}')">Dupliquer</button>
         <button class="btn btn-sm" onclick="event.stopPropagation();convertirFacture('${d.id}')">→ Facture</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteDevis('${d.id}')">Suppr.</button>
@@ -1288,6 +1315,95 @@ async function printDevis(){
 }
 
 // ─── DUPLIQUER DEVIS ──────────────────────────────────────────────────────────
+async function printDevisById(devisId){
+  toast('Préparation du PDF…');
+  const{data:d}=await sb.from('devis').select('*,clients(*),devis_sections(nom,sous_titre,ordre,devis_articles(*))').eq('id',devisId).single();
+  if(!d){toast('Devis introuvable');return;}
+  const client=d.clients;
+  const ref=d.reference||'—';
+  const projet=d.projet_nom||'Projet';
+  const date=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
+  const sections=(d.devis_sections||[]).sort((a,b)=>a.ordre-b.ordre);
+  const ht=sections.reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+  const tva=ht*0.2; const ttc=ht+tva;
+  const sectionsHTML=sections.map(sec=>{
+    const arts=(sec.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre);
+    return`<div style="margin-bottom:28px">
+      <div style="background:#f5f3ee;padding:10px 14px;margin-bottom:0;border-radius:4px 4px 0 0">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:monospace">${sec.nom||'Section'}</div>
+        ${sec.sous_titre?`<div style="font-size:12px;color:#aaa;margin-top:2px">${sec.sous_titre}</div>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f5f3ee">
+          <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc">ARTICLE</th>
+          <th style="padding:8px 14px;text-align:center;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:60px">QTÉ</th>
+          <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">P.U. HT (MAD)</th>
+          <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">TOTAL HT (MAD)</th>
+        </tr></thead>
+        <tbody>${arts.map(a=>`<tr>
+          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4">
+            <div style="font-weight:500">${a.designation||'—'}</div>
+            ${a.description?`<div style="font-size:11px;color:#aaa;margin-top:2px">${a.description}</div>`:''}
+          </td>
+          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:center;font-family:monospace">${a.quantite||1}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace">${Number(a.prix_unitaire||0).toLocaleString('fr-FR')}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-weight:500">${(Number(a.quantite||1)*Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+  const recapHTML=sections.map(sec=>{
+    const st=(sec.devis_articles||[]).reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0);
+    return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
+  }).join('');
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:20mm}</style>
+    <div style="page-break-after:always;height:220mm;display:flex;flex-direction:column;justify-content:space-between;padding:40px 0">
+      <div style="text-align:right;font-size:10px;font-family:monospace;color:#aaa;letter-spacing:2px">DEVIS ${new Date().getFullYear()}</div>
+      <div style="text-align:center;padding:30px 0">
+        <div style="font-size:72px;font-weight:600;letter-spacing:4px;margin-bottom:20px">${projet.toUpperCase()}</div>
+        <div style="width:60px;height:2px;background:#1a1a18;margin:0 auto"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:40px;border-top:1px solid #e8e4dc">
+        <div><div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PROJET</div>
+          <div style="font-weight:600;font-size:14px">${client?.nom||'—'}</div>
+          <div style="color:#888;margin-top:4px">${client?.ville||''}</div></div>
+        <div style="text-align:right"><div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PRÉPARÉ PAR</div>
+          <div style="font-weight:600;font-size:14px">Nabil Ziani — DG</div>
+          <div style="color:#888;margin-top:4px">BRUT Essentials</div>
+          <div style="color:#888">Atelier de fabrication · Design & Mobilier</div>
+          <div style="font-weight:500;margin-top:4px">+212 621 754 582</div></div>
+      </div>
+      <div style="text-align:center;font-size:9px;letter-spacing:3px;color:#aaa;font-family:monospace;padding-top:20px;border-top:1px solid #e8e4dc">CONFIDENTIEL</div>
+    </div>
+    <div style="page-break-before:always">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #e8e4dc">
+        <div><div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">DEVIS — ${projet.toUpperCase()}</div>
+          <div style="font-size:12px;color:#888">${client?.nom||'—'} · ${date}</div></div>
+        <div style="text-align:right;font-size:11px;color:#888">
+          <div style="font-family:monospace">${ref}</div>
+          <div style="font-weight:500;color:#1a1a18">Nabil Ziani — DG</div>
+          <div>BRUT Essentials · +212 621 754 582</div></div>
+      </div>
+      ${sectionsHTML}
+      <div style="margin-top:32px;page-break-inside:avoid">
+        <div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:12px">RÉCAPITULATIF</div>
+        <table style="width:100%;border-collapse:collapse">
+          ${recapHTML}
+          <tr><td style="padding:12px 0 8px;font-weight:600">Total HT</td><td style="padding:12px 0 8px;text-align:right;font-family:monospace;font-weight:600">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr><td style="padding:4px 0;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr style="background:#1a1a18;color:#fff">
+            <td style="padding:12px 14px;font-weight:600;border-radius:4px 0 0 4px">TOTAL TTC</td>
+            <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:600;border-radius:0 4px 4px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
+          </tr>
+        </table>
+        <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;font-style:italic">Fabrication sur mesure · Atelier BRUT Essentials — Marrakech · TVA 20%</div>
+      </div>
+    </div>`;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
 async function dupliquerDevis(id){
   toast('Duplication en cours…');
   // Load original
@@ -1347,8 +1463,8 @@ async function loadFactures(){
     const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const ttc=ht*1.2;
     const badgeCls=f.statut==='Payée'?'badge-green':f.statut==='En retard'?'badge-red':'badge-amber';
-    return`<div class="devis-card" onclick="printFacture('${f.id}')">
-      <div class="devis-card-left">
+    return`<div class="devis-card">
+      <div class="devis-card-left" onclick="printFacture('${f.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${f.reference} · Émise le ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
         <div class="devis-card-title">${f.clients?.nom||'—'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
         <div class="devis-card-sub">Échéance : ${f.date_echeance?new Date(f.date_echeance).toLocaleDateString('fr-FR'):'—'}</div>
@@ -1359,9 +1475,10 @@ async function loadFactures(){
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeCls}">${f.statut}</span>
-        <button class="btn btn-sm" onclick="event.stopPropagation();editFacture('${f.id}')">Modifier</button>
-        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();marquerPayee('${f.id}')">✓ Payée</button>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteFacture('${f.id}')">Suppr.</button>
+        <button class="btn btn-sm" onclick="printFacture('${f.id}')">📄 PDF</button>
+        <button class="btn btn-sm" onclick="editFacture('${f.id}')">Modifier</button>
+        <button class="btn btn-sm btn-primary" onclick="marquerPayee('${f.id}')">✓ Payée</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteFacture('${f.id}')">Suppr.</button>
       </div>
     </div>`;
   }).join('');
@@ -3577,7 +3694,24 @@ const SUIVI_STATUTS = {
 };
 const UPDATE_TYPES = ['💬 Info','✅ Avancement','🔴 Bloqué','📦 Livraison','📋 Action requise'];
 
+function showSuiviMainTab(tab, el){
+  ['projets','missions'].forEach(t=>{
+    document.getElementById('suivi-tab-content-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('suivi-tab-'+t).classList.toggle('active', t===tab);
+  });
+  if(tab==='missions') loadMissions();
+  else loadSuiviKanban();
+}
+
 async function loadSuivi(){
+  document.getElementById('suivi-tab-content-projets').classList.remove('hidden');
+  document.getElementById('suivi-tab-content-missions').classList.add('hidden');
+  document.getElementById('suivi-tab-projets').classList.add('active');
+  document.getElementById('suivi-tab-missions').classList.remove('active');
+  loadSuiviKanban();
+}
+
+async function loadSuiviKanban(){
   document.getElementById('suivi-fiche').classList.add('hidden');
   document.getElementById('suivi-main').classList.remove('hidden');
   const {data:projets}=await sb.from('projets_suivi')
@@ -3835,6 +3969,190 @@ function showSuiviTab(tab, el){
     document.getElementById('stab-content-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('stab-'+t).classList.toggle('active', t===tab);
   });
+}
+
+// ─── MISSIONS ATELIER ─────────────────────────────────────────────────────────
+const MISSION_STATUTS={
+  'En cours': {color:'#3B82F6',bg:'#EFF6FF',icon:'🔵'},
+  'Terminé':  {color:'#10B981',bg:'#F0FDF4',icon:'✅'},
+  'Bloqué':   {color:'#EF4444',bg:'#FEF2F2',icon:'🔴'},
+};
+
+async function loadMissions(){
+  const el=document.getElementById('missions-list');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  let query=sb.from('missions').select('*,projets_suivi(nom)').order('created_at',{ascending:false});
+  const statut=document.getElementById('mf-statut')?.value;
+  const gest=document.getElementById('mf-gestionnaire')?.value;
+  if(statut) query=query.eq('statut',statut);
+  if(gest) query=query.eq('gestionnaire',gest);
+  const{data:missions,error}=await query;
+  if(error){el.innerHTML=`<div class="empty">Table missions manquante — exécutez le SQL dans Supabase.</div>`;return;}
+  const{data:salaries}=await sb.from('salaries').select('id,nom,prenom').eq('statut','Actif').order('nom');
+  const salMap={};(salaries||[]).forEach(s=>salMap[s.id]=`${s.prenom||''} ${s.nom}`.trim());
+  if(!(missions||[]).length){el.innerHTML='<div class="empty">Aucune mission. Cliquez sur + Nouveau.</div>';return;}
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">
+    ${missions.map(m=>renderMissionRow(m,salMap)).join('')}
+  </div>`;
+}
+
+function renderMissionRow(m, salMap){
+  const st=MISSION_STATUTS[m.statut]||MISSION_STATUTS['En cours'];
+  const now=new Date(); now.setHours(0,0,0,0);
+  const cible=m.date_cible?new Date(m.date_cible+'T12:00:00'):null;
+  const retard=cible&&cible<now&&m.statut!=='Terminé';
+  const salIds=m.salaries_ids||[];
+  const salNoms=salIds.map(id=>salMap[id]).filter(Boolean);
+  const dateCreation=new Date(m.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  const relances=m.relances||[];
+  return`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <span style="font-weight:600;font-size:13px">${m.titre}</span>
+        ${retard?`<span style="background:#FEF2F2;color:#EF4444;font-size:10px;padding:1px 7px;border-radius:20px;font-weight:700">RETARD</span>`:''}
+        ${m.projets_suivi?`<span style="background:var(--bg);border:1px solid var(--border);font-size:10px;padding:1px 7px;border-radius:20px;color:var(--muted)">📁 ${m.projets_suivi.nom}</span>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
+        <span>👤 ${m.gestionnaire}</span>
+        <span>🕐 ${dateCreation}</span>
+        ${cible?`<span style="color:${retard?'#EF4444':'var(--muted)'}">📅 Cible : ${cible.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}</span>`:''}
+        ${salNoms.length?`<span>🔧 ${salNoms.join(', ')}</span>`:''}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${relances.length?`<span style="font-size:11px;color:var(--muted);background:var(--bg);padding:3px 8px;border-radius:20px;border:1px solid var(--border)">R${relances.length} · ${new Date(relances[relances.length-1].date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>`:''}
+      <div style="position:relative">
+        <span id="mst-badge-${m.id}" onclick="toggleMissionStatut('${m.id}')"
+          style="background:${st.bg};color:${st.color};font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;border:1px solid ${st.color}33;font-weight:600;white-space:nowrap">
+          ${st.icon} ${m.statut} ▾
+        </span>
+        <div id="mst-menu-${m.id}" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:140px">
+          ${Object.entries(MISSION_STATUTS).map(([key,s])=>`<div onclick="updateMissionStatut('${m.id}','${key}')"
+            style="padding:7px 12px;font-size:12px;cursor:pointer;color:${s.color};display:flex;align-items:center;gap:6px"
+            onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">${s.icon} ${key}</div>`).join('')}
+        </div>
+      </div>
+      <button class="btn btn-sm" onclick="ajouterRelance('${m.id}')">📣 Relance</button>
+      <button class="btn btn-sm" onclick="openMissionModal('${m.id}')">Modifier</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteMission('${m.id}')">✕</button>
+    </div>
+  </div>`;
+}
+
+function toggleMissionStatut(id){
+  document.querySelectorAll('[id^=mst-menu-]').forEach(m=>{if(m.id!=='mst-menu-'+id)m.style.display='none';});
+  const menu=document.getElementById('mst-menu-'+id);
+  menu.style.display=menu.style.display==='none'?'block':'none';
+  if(menu.style.display==='block'){
+    setTimeout(()=>{document.addEventListener('click',function c(){menu.style.display='none';document.removeEventListener('click',c);},{once:true});},0);
+  }
+}
+
+async function updateMissionStatut(id, statut){
+  await sb.from('missions').update({statut}).eq('id',id);
+  document.getElementById('mst-menu-'+id).style.display='none';
+  const st=MISSION_STATUTS[statut];
+  const badge=document.getElementById('mst-badge-'+id);
+  if(badge){badge.style.background=st.bg;badge.style.color=st.color;badge.style.borderColor=st.color+'33';badge.textContent=`${st.icon} ${statut} ▾`;}
+  toast('Statut mis à jour ✓');
+}
+
+async function ajouterRelance(id){
+  const{data:m}=await sb.from('missions').select('relances,gestionnaire').eq('id',id).single();
+  const relances=[...(m.relances||[]),{date:new Date().toISOString(),auteur:m.gestionnaire}];
+  if(relances.length>3){toast('Maximum 3 relances atteint');return;}
+  await sb.from('missions').update({relances}).eq('id',id);
+  toast(`Relance R${relances.length} enregistrée ✓`);
+  loadMissions();
+}
+
+async function deleteMission(id){
+  if(!confirm('Supprimer cette mission ?'))return;
+  await sb.from('missions').delete().eq('id',id);
+  toast('Mission supprimée'); loadMissions();
+}
+
+async function openMissionModal(id=null){
+  let data={};
+  if(id){const{data:m}=await sb.from('missions').select('*').eq('id',id).single();data=m||{};}
+  const{data:salaries}=await sb.from('salaries').select('id,nom,prenom').eq('statut','Actif').order('nom');
+  const{data:projets}=await sb.from('projets_suivi').select('id,nom').order('nom');
+  const selectedIds=data.salaries_ids||[];
+  const html=`<div class="modal" style="max-width:520px">
+    <div class="modal-title">${id?'Modifier mission':'Nouvelle mission'}</div>
+    <input type="hidden" id="ms-id" value="${id||''}">
+    <div class="form-group"><label>Mission *</label><input id="ms-titre" value="${data.titre||''}" placeholder="Ex: Aller chercher devis bois chez fournisseur…"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Gestionnaire *</label>
+        <select id="ms-gestionnaire">
+          ${['Nabil','Cherazade','Loubna'].map(g=>`<option ${data.gestionnaire===g?'selected':''}>${g}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Statut</label>
+        <select id="ms-statut">
+          ${Object.keys(MISSION_STATUTS).map(s=>`<option ${data.statut===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Date cible</label><input type="date" id="ms-date-cible" value="${data.date_cible||''}"></div>
+    <div class="form-group">
+      <label>Salariés assignés</label>
+      <div id="ms-salaries-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+        ${(salaries||[]).map(s=>{
+          const sel=selectedIds.includes(s.id);
+          return`<span id="mstag-${s.id}" onclick="toggleSalTag('${s.id}')"
+            style="padding:4px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);
+            background:${sel?'#1a1a18':'#fff'};color:${sel?'#fff':'var(--text)'};transition:.15s"
+            data-selected="${sel?'1':'0'}">${s.prenom||''} ${s.nom}</span>`;
+        }).join('')}
+      </div>
+      <input type="hidden" id="ms-salaries-data" value="${JSON.stringify(selectedIds).replace(/"/g,'&quot;')}">
+    </div>
+    <div class="form-group"><label>Projet lié (optionnel)</label>
+      <select id="ms-projet">
+        <option value="">— Aucun projet —</option>
+        ${(projets||[]).map(p=>`<option value="${p.id}" ${data.projet_id===p.id?'selected':''}>${p.nom}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-footer">
+      ${id?`<button class="btn btn-sm btn-danger" onclick="deleteMission('${id}');closeModal('rh-modal')">Supprimer</button>`:''}
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveMission()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+function toggleSalTag(salId){
+  const tag=document.getElementById('mstag-'+salId);
+  const sel=tag.dataset.selected==='1';
+  tag.dataset.selected=sel?'0':'1';
+  tag.style.background=sel?'#fff':'#1a1a18';
+  tag.style.color=sel?'var(--text)':'#fff';
+  const ids=JSON.parse(document.getElementById('ms-salaries-data').value.replace(/&quot;/g,'"'));
+  const newIds=sel?ids.filter(i=>i!==salId):[...ids,salId];
+  document.getElementById('ms-salaries-data').value=JSON.stringify(newIds).replace(/"/g,'&quot;');
+}
+
+async function saveMission(){
+  const id=document.getElementById('ms-id').value;
+  const titre=document.getElementById('ms-titre').value.trim();
+  if(!titre){toast('Titre requis');return;}
+  const payload={
+    titre,
+    gestionnaire:document.getElementById('ms-gestionnaire').value,
+    statut:document.getElementById('ms-statut').value,
+    date_cible:document.getElementById('ms-date-cible').value||null,
+    salaries_ids:JSON.parse(document.getElementById('ms-salaries-data').value.replace(/&quot;/g,'"')),
+    projet_id:document.getElementById('ms-projet').value||null,
+  };
+  let error;
+  if(id){({error}=await sb.from('missions').update(payload).eq('id',id));}
+  else{({error}=await sb.from('missions').insert(payload));}
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast(id?'Mission mise à jour ✓':'Mission créée ✓');
+  loadMissions();
 }
 
 const ARTICLE_STATUTS=[
