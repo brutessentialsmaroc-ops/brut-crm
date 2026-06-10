@@ -1269,11 +1269,9 @@ async function printDevis(){
   const clientId=document.getElementById('builder-client').value;
   if(!clientId||clientId==='__new__'){
     toast('⚠️ Sélectionnez un client avant d\'imprimer — le devis ne sera pas sauvegardé sinon');
-    // On laisse quand même imprimer sans sauvegarder
   } else {
     await saveDevisBuilder();
   }
-  const clientId=document.getElementById('builder-client').value;
   const{data:client}=await sb.from('clients').select('*').eq('id',clientId).single();
   const ref=document.getElementById('builder-ref').textContent;
   const projet=document.getElementById('builder-projet').value;
