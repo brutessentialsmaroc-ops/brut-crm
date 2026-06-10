@@ -1103,14 +1103,20 @@ async function deleteDevis(id){if(!confirm('Supprimer ce devis ?'))return;await 
 async function openDevisBuilder(devisId){
   currentDevisId=devisId;
   sectionsData=[];
-  // Load clients
-  const{data:clients}=await sb.from('clients').select('id,nom').order('nom');
+  // Load clients + prospects
+  const[{data:clients},{data:prospects}]=await Promise.all([
+    sb.from('clients').select('id,nom').order('nom'),
+    sb.from('prospects').select('id,nom').order('nom')
+  ]);
+  const clientOpts=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  const prospectOpts=(prospects||[]).map(p=>`<option value="prospect_${p.id}">🔍 ${p.nom} (prospect)</option>`).join('');
   document.getElementById('builder-client').innerHTML=
+    '<option value="">— Sélectionnez un client —</option>'+
     '<option value="__new__">+ Nouveau client…</option>'+
-    (clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+    (clientOpts?`<optgroup label="Clients">${clientOpts}</optgroup>`:'')+
+    (prospectOpts?`<optgroup label="Prospects">${prospectOpts}</optgroup>`:'');
 
   if(devisId){
-    // Load existing devis
     const{data:d}=await sb.from('devis').select('*').eq('id',devisId).single();
     if(d){
       document.getElementById('builder-client').value=d.client_id||'';
@@ -1118,14 +1124,12 @@ async function openDevisBuilder(devisId){
       document.getElementById('builder-statut').value=d.statut||'En attente';
       document.getElementById('builder-ref').textContent=d.reference||'';
     }
-    // Load sections + articles
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
     sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire)}))}));
   } else {
     document.getElementById('builder-ref').textContent='Nouveau devis';
     document.getElementById('builder-projet').value='';
     document.getElementById('builder-statut').value='En attente';
-    // Start with one empty section
     sectionsData=[{id:null,nom:'',sous_titre:'',ordre:0,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]}];
   }
   renderSections();
@@ -1203,8 +1207,22 @@ function updateTotals(){
 }
 
 async function saveDevisBuilder(){
-  const clientId=document.getElementById('builder-client').value;
-  if(!clientId){toast('Sélectionnez un client');return}
+  let clientId=document.getElementById('builder-client').value;
+  if(!clientId){toast('Sélectionnez un client');return;}
+  // Si c'est un prospect, le convertir en client d'abord
+  if(clientId.startsWith('prospect_')){
+    const prospectId=clientId.replace('prospect_','');
+    const{data:prospect}=await sb.from('prospects').select('nom,telephone,email').eq('id',prospectId).single();
+    if(!prospect){toast('Prospect introuvable');return;}
+    // Créer le client
+    const{data:newClient,error}=await sb.from('clients').insert({nom:prospect.nom,telephone:prospect.telephone||'',email:prospect.email||'',statut:'Actif'}).select().single();
+    if(error){toast('Erreur création client: '+error.message);return;}
+    clientId=newClient.id;
+    // Mettre à jour le select
+    document.getElementById('builder-client').innerHTML+=`<option value="${clientId}" selected>${prospect.nom}</option>`;
+    document.getElementById('builder-client').value=clientId;
+    toast('Client créé depuis prospect ✓');
+  }
   const statut=document.getElementById('builder-statut').value;
   const projetNom=document.getElementById('builder-projet').value.trim();
 
@@ -1248,7 +1266,13 @@ async function saveDevisBuilder(){
 
 // ─── PRINT / PDF ──────────────────────────────────────────────────────────────
 async function printDevis(){
-  await saveDevisBuilder();
+  const clientId=document.getElementById('builder-client').value;
+  if(!clientId||clientId==='__new__'){
+    toast('⚠️ Sélectionnez un client avant d\'imprimer — le devis ne sera pas sauvegardé sinon');
+    // On laisse quand même imprimer sans sauvegarder
+  } else {
+    await saveDevisBuilder();
+  }
   const clientId=document.getElementById('builder-client').value;
   const{data:client}=await sb.from('clients').select('*').eq('id',clientId).single();
   const ref=document.getElementById('builder-ref').textContent;
