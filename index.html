@@ -1993,7 +1993,12 @@ async function savePointageDetail(){
     heures_sup:Number(document.getElementById('pd-hsup').value)||0,
     note:document.getElementById('pd-note').value
   };
-  await sb.from('pointages').upsert(payload,{onConflict:'salarie_id,date'});
+  const{data:existing}=await sb.from('pointages').select('id').eq('salarie_id',salId).eq('date',date).maybeSingle();
+  if(existing){
+    await sb.from('pointages').update(payload).eq('id',existing.id);
+  } else {
+    await sb.from('pointages').insert(payload);
+  }
   closeModal('rh-modal'); toast('Pointage enregistré ✓'); loadPointage();
 }
 
@@ -2056,7 +2061,12 @@ async function savePointage(){
     heures_sup:Number(document.getElementById('pt-hsup').value)||0,
     note:document.getElementById('pt-note').value
   };
-  await sb.from('pointages').upsert(payload,{onConflict:'salarie_id,date'});
+  const{data:existing}=await sb.from('pointages').select('id').eq('salarie_id',salId).eq('date',date).maybeSingle();
+  if(existing){
+    await sb.from('pointages').update(payload).eq('id',existing.id);
+  } else {
+    await sb.from('pointages').insert(payload);
+  }
   closeModal('rh-modal'); toast('Pointage enregistré ✓'); loadPointage();
 }
 
