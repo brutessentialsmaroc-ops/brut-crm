@@ -1699,8 +1699,23 @@ async function loadFactures(){
     const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const remise=Number(f.remise||0);
     const htNet=ht*(1-remise/100);
-    const ttc=htNet*1.2;
-    const badgeCls=f.statut==='Payée'?'badge-green':f.statut==='En retard'?'badge-red':'badge-amber';
+    const ttc=Math.round(htNet*1.2*100)/100;
+    const a1=Number(f.acompte1||0);
+    const a2=Number(f.acompte2||0);
+    const totalVerse=a1+a2;
+    const reste=Math.max(0,ttc-totalVerse);
+    // Badge intelligent
+    let badgeLabel, badgeBg, badgeColor;
+    if(f.statut==='Payée'||reste<=0){
+      badgeLabel='✅ Payée'; badgeBg='#F0FDF4'; badgeColor='#10B981';
+    } else if(f.statut==='En retard'){
+      badgeLabel='⚠️ En retard'; badgeBg='#FEF2F2'; badgeColor='#EF4444';
+    } else if(totalVerse>0){
+      const pct=Math.round((totalVerse/ttc)*100);
+      badgeLabel=`💰 Acompte ${pct}%`; badgeBg='#FFFBEB'; badgeColor='#F59E0B';
+    } else {
+      badgeLabel='Non payée'; badgeBg='#FDF6EC'; badgeColor='#EF9F27';
+    }
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="printFacture('${f.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${f.reference} · Émise le ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
@@ -1712,7 +1727,7 @@ async function loadFactures(){
           <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
           <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${htNet.toLocaleString('fr-FR')} HT</div>
         </div>
-        <span class="badge ${badgeCls}">${f.statut}</span>
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${badgeBg};color:${badgeColor};font-weight:600;white-space:nowrap">${badgeLabel}</span>
         <button class="btn btn-sm" onclick="printFacture('${f.id}')">📄 PDF</button>
         <button class="btn btn-sm" onclick="editFacture('${f.id}')">Modifier</button>
         <button class="btn btn-sm btn-primary" onclick="marquerPayee('${f.id}')">✓ Payée</button>
