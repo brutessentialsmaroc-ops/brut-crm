@@ -514,6 +514,15 @@
         <!-- TOTAL -->
         <div class="devis-total" id="devis-total-block">
           <div class="devis-total-row"><span>Total HT</span><span id="total-ht">0 MAD</span></div>
+          <div class="devis-total-row" style="align-items:center">
+            <span style="display:flex;align-items:center;gap:8px">
+              Remise
+              <input type="number" id="builder-remise" min="0" max="100" step="0.5" value="0"
+                oninput="updateDevisTotal()"
+                style="width:60px;font-size:13px;padding:3px 6px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;text-align:center"> %
+            </span>
+            <span id="total-remise">0 MAD</span>
+          </div>
           <div class="devis-total-row"><span>TVA 20%</span><span id="total-tva">0 MAD</span></div>
           <div class="devis-total-row"><span>TOTAL TTC</span><span id="total-ttc">0 MAD</span></div>
         </div>
@@ -1180,14 +1189,20 @@ function addSection(){
 }
 function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}sectionsData.splice(si,1);renderSections();}
 function moveSection(si,dir){const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
+function updateDevisTotal(){updateTotals();}
 function addArticle(si){sectionsData[si].articles.push({id:null,description:'',quantite:1,prix_unitaire:0});renderSections();}
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
   const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-  const tva=ht*0.2;
-  const ttc=ht+tva;
+  const remisePct=Number(document.getElementById('builder-remise')?.value||0);
+  const remiseMnt=ht*(remisePct/100);
+  const htApresRemise=ht-remiseMnt;
+  const tva=htApresRemise*0.2;
+  const ttc=htApresRemise+tva;
   document.getElementById('total-ht').textContent=ht.toLocaleString('fr-FR')+' MAD';
+  const remiseEl=document.getElementById('total-remise');
+  if(remiseEl) remiseEl.textContent=remisePct>0?'-'+remiseMnt.toLocaleString('fr-FR')+' MAD':'0 MAD';
   document.getElementById('total-tva').textContent=tva.toLocaleString('fr-FR')+' MAD';
   document.getElementById('total-ttc').textContent=ttc.toLocaleString('fr-FR')+' MAD';
   // Update section subtotals
@@ -1277,7 +1292,6 @@ async function printDevis(){
   const projet=document.getElementById('builder-projet').value;
   const date=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
   const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-  const tva=ht*0.2;const ttc=ht+tva;
 
   const sectionsHTML=sectionsData.map(sec=>`
     <div style="margin-bottom:28px">
@@ -1313,62 +1327,58 @@ async function printDevis(){
     return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
 
+  const remisePct=Number(document.getElementById('builder-remise')?.value||0);
+  const remiseMnt=ht*(remisePct/100);
+  const htNet=ht-remiseMnt;
+  const tva=htNet*0.2; const ttc=htNet+tva;
+
   document.getElementById('pdf-preview').innerHTML=`
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
       body{font-family:'DM Sans',sans-serif}
-      @page{margin:20mm}
+      @page{margin:15mm 20mm}
     </style>
-    <!-- PAGE DE GARDE -->
-    <div style="page-break-after:always;height:220mm;display:flex;flex-direction:column;justify-content:space-between;padding:40px 0">
-      <div style="text-align:right;font-size:10px;font-family:monospace;color:#aaa;letter-spacing:2px">DEVIS ${new Date().getFullYear()}</div>
-      <div style="text-align:center;padding:30px 0">
-        <div style="font-size:72px;font-weight:600;letter-spacing:4px;margin-bottom:20px">${(projet||'PROJET').toUpperCase()}</div>
-        <div style="width:60px;height:2px;background:#1a1a18;margin:0 auto"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:40px;border-top:1px solid #e8e4dc">
+    <div>
+      <!-- EN-TÊTE -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:2px solid #1a1a18">
         <div>
-          <div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PROJET</div>
-          <div style="font-weight:600;font-size:14px">${client?.nom||'—'}</div>
-          <div style="color:#888;margin-top:4px">${client?.ville||''}</div>
+          <div style="font-size:15px;font-weight:700;letter-spacing:1px">BRUT ESSENTIALS by CERAMICS DESIGN SARL</div>
+          <div style="font-size:12px;color:#555;margin-top:3px">Directeur : Nabil ZIANI</div>
+          <div style="font-size:12px;color:#555">Tél : +212 6 60 10 78 96</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PRÉPARÉ PAR</div>
-          <div style="font-weight:600;font-size:14px">Nabil Ziani — DG</div>
-          <div style="color:#888;margin-top:4px">BRUT Essentials</div>
-          <div style="color:#888">Atelier de fabrication · Design & Mobilier</div>
-          <div style="font-weight:500;margin-top:4px">+212 621 754 582</div>
+          <div style="font-size:11px;font-family:monospace;color:#aaa;letter-spacing:1px">DEVIS</div>
+          <div style="font-size:14px;font-weight:600;font-family:monospace;margin-top:2px">${ref}</div>
+          <div style="font-size:11px;color:#888;margin-top:4px">${date}</div>
         </div>
       </div>
-      <div style="text-align:center;font-size:9px;letter-spacing:3px;color:#aaa;font-family:monospace;padding-top:20px;border-top:1px solid #e8e4dc">CONFIDENTIEL</div>
-    </div>
-    <!-- CONTENU -->
-    <div style="page-break-before:always">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #e8e4dc">
-        <div>
-          <div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">DEVIS — ${(projet||'PROJET').toUpperCase()}</div>
-          <div style="font-size:12px;color:#888">${client?.nom||'—'} · ${date}</div>
-        </div>
-        <div style="text-align:right;font-size:11px;color:#888">
-          <div style="font-family:monospace">${ref}</div>
-          <div style="font-weight:500;color:#1a1a18">Nabil Ziani — DG</div>
-          <div>BRUT Essentials · +212 621 754 582</div>
-        </div>
+      <!-- CLIENT -->
+      <div style="margin-bottom:24px">
+        <div style="font-size:10px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">CLIENT</div>
+        <div style="font-size:14px;font-weight:600">${client?.nom||'—'}</div>
+        ${client?.ville?`<div style="font-size:12px;color:#888">${client.ville}</div>`:''}
+        ${client?.telephone?`<div style="font-size:12px;color:#888">${client.telephone}</div>`:''}
+        ${projet?`<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic">Projet : ${projet}</div>`:''}
       </div>
+      <!-- SECTIONS -->
       ${sectionsHTML}
       <!-- RECAP -->
-      <div style="margin-top:32px;page-break-inside:avoid">
-        <div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:12px">RÉCAPITULATIF</div>
-        <table style="width:100%;border-collapse:collapse">
+      <div style="margin-top:28px;page-break-inside:avoid">
+        <table style="width:100%;border-collapse:collapse;max-width:380px;margin-left:auto">
           ${recapHTML}
-          <tr><td style="padding:12px 0 8px;font-weight:600">Total HT</td><td style="padding:12px 0 8px;text-align:right;font-family:monospace;font-weight:600">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr><td style="padding:10px 0 6px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:10px 0 6px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+          ${remisePct>0?`<tr><td style="padding:4px 0;color:#E05A2B">Remise ${remisePct}%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#E05A2B">- ${remiseMnt.toLocaleString('fr-FR')} MAD</td></tr>`:''}
           <tr><td style="padding:4px 0;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
           <tr style="background:#1a1a18;color:#fff">
-            <td style="padding:12px 14px;font-weight:600;border-radius:4px 0 0 4px">TOTAL TTC</td>
-            <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:600;border-radius:0 4px 4px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
+            <td style="padding:12px 14px;font-weight:700;font-size:14px;border-radius:4px 0 0 4px">TOTAL TTC</td>
+            <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:700;font-size:14px;border-radius:0 4px 4px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
           </tr>
         </table>
-        <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;font-style:italic">Fabrication sur mesure · Atelier BRUT Essentials — Marrakech · TVA 20%</div>
+      </div>
+      <!-- PIED DE PAGE -->
+      <div style="margin-top:40px;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
+        CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96<br>
+        Capital social : 100 000 DHS &nbsp;|&nbsp; R.C : 109 729 &nbsp;|&nbsp; I.F : 47 350 876 &nbsp;|&nbsp; ICE : 002672298000046 &nbsp;|&nbsp; PATENTE : 64002515
       </div>
     </div>`;
   document.getElementById('pdf-preview').style.display='block';
@@ -1418,47 +1428,42 @@ async function printDevisById(devisId){
     return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
   document.getElementById('pdf-preview').innerHTML=`
-    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:20mm}</style>
-    <div style="page-break-after:always;height:220mm;display:flex;flex-direction:column;justify-content:space-between;padding:40px 0">
-      <div style="text-align:right;font-size:10px;font-family:monospace;color:#aaa;letter-spacing:2px">DEVIS ${new Date().getFullYear()}</div>
-      <div style="text-align:center;padding:30px 0">
-        <div style="font-size:72px;font-weight:600;letter-spacing:4px;margin-bottom:20px">${projet.toUpperCase()}</div>
-        <div style="width:60px;height:2px;background:#1a1a18;margin:0 auto"></div>
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:15mm 20mm}</style>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:2px solid #1a1a18">
+        <div>
+          <div style="font-size:15px;font-weight:700;letter-spacing:1px">BRUT ESSENTIALS by CERAMICS DESIGN SARL</div>
+          <div style="font-size:12px;color:#555;margin-top:3px">Directeur : Nabil ZIANI</div>
+          <div style="font-size:12px;color:#555">Tél : +212 6 60 10 78 96</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;font-family:monospace;color:#aaa;letter-spacing:1px">DEVIS</div>
+          <div style="font-size:14px;font-weight:600;font-family:monospace;margin-top:2px">${ref}</div>
+          <div style="font-size:11px;color:#888;margin-top:4px">${date}</div>
+        </div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:40px;border-top:1px solid #e8e4dc">
-        <div><div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PROJET</div>
-          <div style="font-weight:600;font-size:14px">${client?.nom||'—'}</div>
-          <div style="color:#888;margin-top:4px">${client?.ville||''}</div></div>
-        <div style="text-align:right"><div style="font-size:9px;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:8px">PRÉPARÉ PAR</div>
-          <div style="font-weight:600;font-size:14px">Nabil Ziani — DG</div>
-          <div style="color:#888;margin-top:4px">BRUT Essentials</div>
-          <div style="color:#888">Atelier de fabrication · Design & Mobilier</div>
-          <div style="font-weight:500;margin-top:4px">+212 621 754 582</div></div>
-      </div>
-      <div style="text-align:center;font-size:9px;letter-spacing:3px;color:#aaa;font-family:monospace;padding-top:20px;border-top:1px solid #e8e4dc">CONFIDENTIEL</div>
-    </div>
-    <div style="page-break-before:always">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #e8e4dc">
-        <div><div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">DEVIS — ${projet.toUpperCase()}</div>
-          <div style="font-size:12px;color:#888">${client?.nom||'—'} · ${date}</div></div>
-        <div style="text-align:right;font-size:11px;color:#888">
-          <div style="font-family:monospace">${ref}</div>
-          <div style="font-weight:500;color:#1a1a18">Nabil Ziani — DG</div>
-          <div>BRUT Essentials · +212 621 754 582</div></div>
+      <div style="margin-bottom:24px">
+        <div style="font-size:10px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:6px">CLIENT</div>
+        <div style="font-size:14px;font-weight:600">${client?.nom||'—'}</div>
+        ${client?.ville?`<div style="font-size:12px;color:#888">${client.ville}</div>`:''}
+        ${client?.telephone?`<div style="font-size:12px;color:#888">${client.telephone}</div>`:''}
+        ${projet?`<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic">Projet : ${projet}</div>`:''}
       </div>
       ${sectionsHTML}
-      <div style="margin-top:32px;page-break-inside:avoid">
-        <div style="font-size:11px;font-weight:600;letter-spacing:2px;color:#aaa;font-family:monospace;margin-bottom:12px">RÉCAPITULATIF</div>
-        <table style="width:100%;border-collapse:collapse">
+      <div style="margin-top:28px;page-break-inside:avoid">
+        <table style="width:100%;border-collapse:collapse;max-width:380px;margin-left:auto">
           ${recapHTML}
-          <tr><td style="padding:12px 0 8px;font-weight:600">Total HT</td><td style="padding:12px 0 8px;text-align:right;font-family:monospace;font-weight:600">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr><td style="padding:10px 0 6px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:10px 0 6px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${ht.toLocaleString('fr-FR')} MAD</td></tr>
           <tr><td style="padding:4px 0;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
           <tr style="background:#1a1a18;color:#fff">
-            <td style="padding:12px 14px;font-weight:600;border-radius:4px 0 0 4px">TOTAL TTC</td>
-            <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:600;border-radius:0 4px 4px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
+            <td style="padding:12px 14px;font-weight:700;font-size:14px;border-radius:4px 0 0 4px">TOTAL TTC</td>
+            <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:700;font-size:14px;border-radius:0 4px 4px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
           </tr>
         </table>
-        <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;font-style:italic">Fabrication sur mesure · Atelier BRUT Essentials — Marrakech · TVA 20%</div>
+      </div>
+      <div style="margin-top:40px;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
+        CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96<br>
+        Capital social : 100 000 DHS &nbsp;|&nbsp; R.C : 109 729 &nbsp;|&nbsp; I.F : 47 350 876 &nbsp;|&nbsp; ICE : 002672298000046 &nbsp;|&nbsp; PATENTE : 64002515
       </div>
     </div>`;
   document.getElementById('pdf-preview').style.display='block';
