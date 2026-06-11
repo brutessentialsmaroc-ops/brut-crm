@@ -1615,7 +1615,7 @@ async function loadPaiements(){
             </td>
             <td style="padding:8px;background:#f9f8f6">
               <select id="pm1-${f.id}" onchange="savePaiement('${f.id}',${ttc})"
-                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted)">
+                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted);width:110px">
                 ${modeOptions}
               </select>
             </td>
@@ -1631,7 +1631,7 @@ async function loadPaiements(){
             </td>
             <td style="padding:8px;background:#f5f3ee">
               <select id="pm2-${f.id}" onchange="savePaiement('${f.id}',${ttc})"
-                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted)">
+                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted);width:110px">
                 ${['','Chèque','Virement','Cash'].map(m=>`<option value="${m}" ${f.mode_paiement2===m?'selected':''}>${m||'Mode…'}</option>`).join('')}
               </select>
             </td>
