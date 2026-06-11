@@ -419,7 +419,14 @@
       <!-- DEVIS LIST -->
       <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
       <!-- FACTURES -->
-      <div id="page-factures" class="hidden"><div id="factures-list"></div></div>
+      <div id="page-factures" class="hidden">
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)">
+          <button class="rh-tab active" id="ftab-liste" onclick="showFactureTab('liste',this)">◈ Factures</button>
+          <button class="rh-tab" id="ftab-paiements" onclick="showFactureTab('paiements',this)">💳 Suivi des paiements</button>
+        </div>
+        <div id="ftab-content-liste"><div id="factures-list"></div></div>
+        <div id="ftab-content-paiements" class="hidden"><div id="paiements-list"></div></div>
+      </div>
       <!-- SUIVI PROJETS -->
       <div id="page-suivi" class="hidden">
         <!-- TABS -->
@@ -1543,6 +1550,115 @@ async function convertirFacture(devisId){
   toast('Facture créée ✓');
   const facturNav=document.querySelector('.nav-item[onclick*="factures"]');
   showPage('factures', facturNav);
+}
+
+function showFactureTab(tab, el){
+  ['liste','paiements'].forEach(t=>{
+    document.getElementById('ftab-content-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('ftab-'+t).classList.toggle('active', t===tab);
+  });
+  if(tab==='paiements') loadPaiements();
+  else loadFactures();
+}
+
+async function loadPaiements(){
+  const el=document.getElementById('paiements-list');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const{data:factures}=await sb.from('factures')
+    .select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))')
+    .neq('statut','Payée')
+    .order('created_at',{ascending:false});
+  if(!(factures||[]).length){
+    el.innerHTML='<div class="empty">Aucune facture en attente de paiement.</div>';return;
+  }
+  el.innerHTML=`
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">FACTURE</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">CLIENT</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">TOTAL TTC</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f9f8f6" colspan="2">ACOMPTE 1</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f5f3ee" colspan="2">ACOMPTE 2</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">RESTE À PAYER</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${factures.map(f=>{
+          const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+          const remise=Number(f.remise||0);
+          const htNet=ht*(1-remise/100);
+          const ttc=Math.round(htNet*1.2*100)/100;
+          const a1=Number(f.acompte1||0);
+          const a2=Number(f.acompte2||0);
+          const reste=Math.round((ttc-a1-a2)*100)/100;
+          const pct=ttc>0?Math.round(((a1+a2)/ttc)*100):0;
+          const barColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#e8e4dc';
+          const badgeBg=reste<=0?'#F0FDF4':pct>0?'#FFFBEB':'#FEF2F2';
+          const badgeColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#EF4444';
+          const badgeText=reste<=0?'Soldé':pct>0?`${pct}% réglé`:'En attente';
+          return`<tr style="border-bottom:1px solid var(--border);vertical-align:middle">
+            <td style="padding:12px;color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;white-space:nowrap">
+              ${f.reference}<br>
+              <span style="font-size:10px">${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</span>
+            </td>
+            <td style="padding:12px;font-weight:500">${f.clients?.nom||'—'}<br>
+              <span style="font-size:11px;color:var(--muted)">${f.projet_nom||''}</span>
+            </td>
+            <td style="padding:12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
+            <td style="padding:12px 8px;background:#f9f8f6">
+              <input type="number" value="${a1||''}" placeholder="Montant…" min="0" step="0.01"
+                style="width:110px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
+                onchange="savePaiement('${f.id}','acompte1',this.value,${ttc})">
+            </td>
+            <td style="padding:12px 8px;background:#f9f8f6">
+              <input type="date" value="${f.acompte1_date||''}"
+                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
+                onchange="savePaiement('${f.id}','acompte1_date',this.value,${ttc})">
+            </td>
+            <td style="padding:12px 8px;background:#f5f3ee">
+              <input type="number" value="${a2||''}" placeholder="Montant…" min="0" step="0.01"
+                style="width:110px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
+                onchange="savePaiement('${f.id}','acompte2',this.value,${ttc})">
+            </td>
+            <td style="padding:12px 8px;background:#f5f3ee">
+              <input type="date" value="${f.acompte2_date||''}"
+                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
+                onchange="savePaiement('${f.id}','acompte2_date',this.value,${ttc})">
+            </td>
+            <td style="padding:12px;text-align:right">
+              <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:14px;color:${reste<=0?'#10B981':'#1a1a18'}">${reste<=0?'0':reste.toLocaleString('fr-FR')} MAD</div>
+              <div style="margin-top:6px;height:4px;background:#e8e4dc;border-radius:2px;width:80px;margin-left:auto">
+                <div style="height:4px;background:${barColor};border-radius:2px;width:${Math.min(pct,100)}%"></div>
+              </div>
+              <div style="font-size:10px;margin-top:4px;padding:2px 6px;border-radius:20px;background:${badgeBg};color:${badgeColor};display:inline-block;font-weight:600">${badgeText}</div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+async function savePaiement(factureId, champ, valeur, ttc){
+  const update={};
+  update[champ]=valeur||null;
+  await sb.from('factures').update(update).eq('id',factureId);
+  // Si tout est payé, proposer de marquer payée
+  if(champ==='acompte1'||champ==='acompte2'){
+    const{data:f}=await sb.from('factures').select('acompte1,acompte2').eq('id',factureId).single();
+    const total=Number(f.acompte1||0)+Number(f.acompte2||0);
+    if(total>=ttc-0.01){
+      if(confirm('Le total est réglé. Marquer la facture comme Payée ?')){
+        await sb.from('factures').update({statut:'Payée'}).eq('id',factureId);
+        toast('Facture marquée Payée ✓');
+        loadPaiements();
+        return;
+      }
+    }
+  }
+  toast('Enregistré ✓');
 }
 
 async function loadFactures(){
