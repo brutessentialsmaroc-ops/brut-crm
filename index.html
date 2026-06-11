@@ -721,7 +721,7 @@ async function loadDashboard(){
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
   // CA HT = sum of commandes montant
   const caHT=(commandes||[]).reduce((s,c)=>s+Number(c.montant||0),0);
-  document.getElementById('stat-ca').textContent=caHT.toLocaleString('fr-FR')+' MAD';
+  // CA supprimé du dashboard
   document.getElementById('stat-devis').textContent=(devis||[]).length;
   // Factures non payées
   const facturesNP=(factures||[]);
