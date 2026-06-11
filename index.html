@@ -1579,8 +1579,8 @@ async function loadPaiements(){
           <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">FACTURE</th>
           <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">CLIENT</th>
           <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">TOTAL TTC</th>
-          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f9f8f6" colspan="2">ACOMPTE 1</th>
-          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f5f3ee" colspan="2">ACOMPTE 2</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f9f8f6" colspan="3">ACOMPTE 1</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f5f3ee" colspan="3">ACOMPTE 2</th>
           <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">RESTE À PAYER</th>
         </tr>
       </thead>
@@ -1594,45 +1594,49 @@ async function loadPaiements(){
           const a2=Number(f.acompte2||0);
           const reste=Math.round((ttc-a1-a2)*100)/100;
           const pct=ttc>0?Math.round(((a1+a2)/ttc)*100):0;
-          const barColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#e8e4dc';
-          const badgeBg=reste<=0?'#F0FDF4':pct>0?'#FFFBEB':'#FEF2F2';
-          const badgeColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#EF4444';
-          const badgeText=reste<=0?'Soldé':pct>0?`${pct}% réglé`:'En attente';
-          return`<tr style="border-bottom:1px solid var(--border);vertical-align:middle">
+          const modeOptions=['','Chèque','Virement','Cash'].map(m=>`<option value="${m}" ${f.mode_paiement===m?'selected':''}>${m||'Mode…'}</option>`).join('');
+          return`<tr id="prow-${f.id}" style="border-bottom:1px solid var(--border);vertical-align:middle">
             <td style="padding:12px;color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;white-space:nowrap">
-              ${f.reference}<br>
-              <span style="font-size:10px">${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</span>
+              ${f.reference}<br><span style="font-size:10px">${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</span>
             </td>
             <td style="padding:12px;font-weight:500">${f.clients?.nom||'—'}<br>
               <span style="font-size:11px;color:var(--muted)">${f.projet_nom||''}</span>
             </td>
-            <td style="padding:12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
-            <td style="padding:12px 8px;background:#f9f8f6">
-              <input type="number" value="${a1||''}" placeholder="Montant…" min="0" step="0.01"
-                style="width:110px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                onchange="savePaiement('${f.id}','acompte1',this.value,${ttc})">
+            <td style="padding:12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap" data-ttc="${ttc}">${ttc.toLocaleString('fr-FR')} MAD</td>
+            <td style="padding:8px;background:#f9f8f6">
+              <input type="number" id="pa1-${f.id}" value="${a1||''}" placeholder="Montant…" min="0" step="0.01"
+                style="width:100px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
+                oninput="recalcPaiement('${f.id}',${ttc})" onblur="savePaiement('${f.id}',${ttc})">
             </td>
-            <td style="padding:12px 8px;background:#f9f8f6">
-              <input type="date" value="${f.acompte1_date||''}"
+            <td style="padding:8px;background:#f9f8f6">
+              <input type="date" id="pd1-${f.id}" value="${f.acompte1_date||''}"
                 style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                onchange="savePaiement('${f.id}','acompte1_date',this.value,${ttc})">
+                onchange="savePaiement('${f.id}',${ttc})">
             </td>
-            <td style="padding:12px 8px;background:#f5f3ee">
-              <input type="number" value="${a2||''}" placeholder="Montant…" min="0" step="0.01"
-                style="width:110px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                onchange="savePaiement('${f.id}','acompte2',this.value,${ttc})">
+            <td style="padding:8px;background:#f9f8f6">
+              <select id="pm1-${f.id}" onchange="savePaiement('${f.id}',${ttc})"
+                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted)">
+                ${modeOptions}
+              </select>
             </td>
-            <td style="padding:12px 8px;background:#f5f3ee">
-              <input type="date" value="${f.acompte2_date||''}"
+            <td style="padding:8px;background:#f5f3ee">
+              <input type="number" id="pa2-${f.id}" value="${a2||''}" placeholder="Montant…" min="0" step="0.01"
+                style="width:100px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
+                oninput="recalcPaiement('${f.id}',${ttc})" onblur="savePaiement('${f.id}',${ttc})">
+            </td>
+            <td style="padding:8px;background:#f5f3ee">
+              <input type="date" id="pd2-${f.id}" value="${f.acompte2_date||''}"
                 style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                onchange="savePaiement('${f.id}','acompte2_date',this.value,${ttc})">
+                onchange="savePaiement('${f.id}',${ttc})">
+            </td>
+            <td style="padding:8px;background:#f5f3ee">
+              <select id="pm2-${f.id}" onchange="savePaiement('${f.id}',${ttc})"
+                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted)">
+                ${['','Chèque','Virement','Cash'].map(m=>`<option value="${m}" ${f.mode_paiement2===m?'selected':''}>${m||'Mode…'}</option>`).join('')}
+              </select>
             </td>
             <td style="padding:12px;text-align:right">
-              <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:14px;color:${reste<=0?'#10B981':'#1a1a18'}">${reste<=0?'0':reste.toLocaleString('fr-FR')} MAD</div>
-              <div style="margin-top:6px;height:4px;background:#e8e4dc;border-radius:2px;width:80px;margin-left:auto">
-                <div style="height:4px;background:${barColor};border-radius:2px;width:${Math.min(pct,100)}%"></div>
-              </div>
-              <div style="font-size:10px;margin-top:4px;padding:2px 6px;border-radius:20px;background:${badgeBg};color:${badgeColor};display:inline-block;font-weight:600">${badgeText}</div>
+              ${renderReste(f.id, ttc, a1, a2)}
             </td>
           </tr>`;
         }).join('')}
@@ -1641,24 +1645,49 @@ async function loadPaiements(){
     </div>`;
 }
 
-async function savePaiement(factureId, champ, valeur, ttc){
-  const update={};
-  update[champ]=valeur||null;
+function renderReste(fid, ttc, a1, a2){
+  const reste=Math.max(0,Math.round((ttc-a1-a2)*100)/100);
+  const pct=ttc>0?Math.min(100,Math.round(((a1+a2)/ttc)*100)):0;
+  const barColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#e8e4dc';
+  const badgeBg=reste<=0?'#F0FDF4':pct>0?'#FFFBEB':'#FEF2F2';
+  const badgeColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#EF4444';
+  const badgeText=reste<=0?'✅ Soldé':pct>0?`${pct}% réglé`:'En attente';
+  return`<div id="reste-${fid}">
+    <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:14px;color:${reste<=0?'#10B981':'#1a1a18'}">${reste<=0?'0':reste.toLocaleString('fr-FR')} MAD</div>
+    <div style="margin-top:6px;height:4px;background:#e8e4dc;border-radius:2px;width:80px;margin-left:auto">
+      <div style="height:4px;background:${barColor};border-radius:2px;width:${pct}%"></div>
+    </div>
+    <div style="font-size:10px;margin-top:4px;padding:2px 8px;border-radius:20px;background:${badgeBg};color:${badgeColor};display:inline-block;font-weight:600">${badgeText}</div>
+  </div>`;
+}
+
+function recalcPaiement(fid, ttc){
+  const a1=Number(document.getElementById('pa1-'+fid)?.value||0);
+  const a2=Number(document.getElementById('pa2-'+fid)?.value||0);
+  const el=document.getElementById('reste-'+fid);
+  if(el) el.outerHTML=renderReste(fid, ttc, a1, a2);
+}
+
+async function savePaiement(factureId, ttc){
+  const a1=Number(document.getElementById('pa1-'+factureId)?.value||0);
+  const a2=Number(document.getElementById('pa2-'+factureId)?.value||0);
+  const update={
+    acompte1:a1||null,
+    acompte1_date:document.getElementById('pd1-'+factureId)?.value||null,
+    mode_paiement:document.getElementById('pm1-'+factureId)?.value||null,
+    acompte2:a2||null,
+    acompte2_date:document.getElementById('pd2-'+factureId)?.value||null,
+    mode_paiement2:document.getElementById('pm2-'+factureId)?.value||null,
+  };
   await sb.from('factures').update(update).eq('id',factureId);
-  // Si tout est payé, proposer de marquer payée
-  if(champ==='acompte1'||champ==='acompte2'){
-    const{data:f}=await sb.from('factures').select('acompte1,acompte2').eq('id',factureId).single();
-    const total=Number(f.acompte1||0)+Number(f.acompte2||0);
-    if(total>=ttc-0.01){
-      if(confirm('Le total est réglé. Marquer la facture comme Payée ?')){
-        await sb.from('factures').update({statut:'Payée'}).eq('id',factureId);
-        toast('Facture marquée Payée ✓');
-        loadPaiements();
-        return;
-      }
+  // Si soldé, proposer de marquer payée
+  if(a1+a2>=ttc-0.01&&ttc>0){
+    if(confirm('Le total est réglé. Marquer la facture comme Payée ?')){
+      await sb.from('factures').update({statut:'Payée'}).eq('id',factureId);
+      toast('Facture marquée Payée ✓');
+      loadPaiements();
     }
   }
-  toast('Enregistré ✓');
 }
 
 async function loadFactures(){
