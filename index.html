@@ -1223,60 +1223,72 @@ function updateTotals(){
 
 async function saveDevisBuilder(){
   let clientId=document.getElementById('builder-client').value;
-  if(!clientId){toast('Sélectionnez un client');return;}
-  // Si c'est un prospect, le convertir en client d'abord
+  if(!clientId||clientId==='__new__'){toast('Sélectionnez un client');return;}
+
+  // Prospect → créer client
   if(clientId.startsWith('prospect_')){
     const prospectId=clientId.replace('prospect_','');
     const{data:prospect}=await sb.from('prospects').select('nom,telephone,email').eq('id',prospectId).single();
     if(!prospect){toast('Prospect introuvable');return;}
-    // Créer le client
     const{data:newClient,error}=await sb.from('clients').insert({nom:prospect.nom,telephone:prospect.telephone||'',email:prospect.email||'',statut:'Actif'}).select().single();
-    if(error){toast('Erreur création client: '+error.message);return;}
+    if(error){toast('Erreur: '+error.message);return;}
     clientId=newClient.id;
-    // Mettre à jour le select
-    document.getElementById('builder-client').innerHTML+=`<option value="${clientId}" selected>${prospect.nom}</option>`;
     document.getElementById('builder-client').value=clientId;
-    toast('Client créé depuis prospect ✓');
+    toast('Client créé ✓');
   }
+
   const statut=document.getElementById('builder-statut').value;
   const projetNom=document.getElementById('builder-projet').value.trim();
 
   let devisId=currentDevisId;
+
+  // 1. Créer ou mettre à jour le devis
   if(!devisId){
-    // Create new devis
     const ref='DEV-'+Date.now().toString().slice(-6);
-    const{data,error}=await sb.from('devis').insert({reference:ref,client_id:clientId,projet_nom:projetNom,statut,date_envoi:new Date().toISOString().split('T')[0]}).select().single();
-    if(error){toast('Erreur: '+error.message);return}
+    const{data,error}=await sb.from('devis').insert({
+      reference:ref, client_id:clientId, projet_nom:projetNom,
+      statut, date_envoi:new Date().toISOString().split('T')[0]
+    }).select().single();
+    if(error){toast('Erreur création: '+error.message);return;}
     devisId=data.id;
     currentDevisId=devisId;
     document.getElementById('builder-ref').textContent=ref;
   } else {
-    await sb.from('devis').update({client_id:clientId,projet_nom:projetNom,statut}).eq('id',devisId);
+    const{error}=await sb.from('devis').update({
+      client_id:clientId, projet_nom:projetNom, statut
+    }).eq('id',devisId);
+    if(error){toast('Erreur mise à jour: '+error.message);return;}
   }
 
-  // Save sections & articles
+  // 2. Supprimer toutes les sections existantes (cascade supprime les articles)
+  await sb.from('devis_sections').delete().eq('devis_id',devisId);
+
+  // 3. Réinsérer sections + articles proprement
   for(let si=0;si<sectionsData.length;si++){
     const sec=sectionsData[si];
-    let secId=sec.id;
-    if(!secId){
-      const{data}=await sb.from('devis_sections').insert({devis_id:devisId,nom:sec.nom,sous_titre:sec.sous_titre,ordre:si}).select().single();
-      secId=data.id;
-      sectionsData[si].id=secId;
-    } else {
-      await sb.from('devis_sections').update({nom:sec.nom,sous_titre:sec.sous_titre,ordre:si}).eq('id',secId);
-    }
-    // Articles
+    const{data:secData,error:secErr}=await sb.from('devis_sections').insert({
+      devis_id:devisId, nom:sec.nom||'', sous_titre:sec.sous_titre||'', ordre:si
+    }).select().single();
+    if(secErr){toast('Erreur section: '+secErr.message);return;}
+    const secId=secData.id;
+    sectionsData[si].id=secId;
+
     for(let ai=0;ai<sec.articles.length;ai++){
       const art=sec.articles[ai];
-      if(!art.id){
-        const{data}=await sb.from('devis_articles').insert({section_id:secId,description:art.description,quantite:art.quantite,prix_unitaire:art.prix_unitaire,ordre:ai}).select().single();
-        sectionsData[si].articles[ai].id=data.id;
-      } else {
-        await sb.from('devis_articles').update({description:art.description,quantite:art.quantite,prix_unitaire:art.prix_unitaire,ordre:ai}).eq('id',art.id);
-      }
+      const{data:artData,error:artErr}=await sb.from('devis_articles').insert({
+        section_id:secId,
+        description:art.description||'',
+        quantite:Number(art.quantite)||0,
+        prix_unitaire:Number(art.prix_unitaire)||0,
+        ordre:ai
+      }).select().single();
+      if(artErr){toast('Erreur article: '+artErr.message);return;}
+      sectionsData[si].articles[ai].id=artData.id;
     }
   }
+
   toast('Devis enregistré ✓');
+  return devisId;
 }
 
 // ─── PRINT / PDF ──────────────────────────────────────────────────────────────
@@ -1523,7 +1535,8 @@ async function convertirFacture(devisId){
   if(error){toast('Erreur: '+error.message);return;}
   await sb.from('devis').update({statut:'Accepté'}).eq('id',devisId);
   toast('Facture créée ✓');
-  showPage('factures',document.querySelector('.nav-item:nth-child(6)'));
+  const facturNav=document.querySelector('.nav-item[onclick*="factures"]');
+  showPage('factures', facturNav);
 }
 
 async function loadFactures(){
