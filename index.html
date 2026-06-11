@@ -270,7 +270,7 @@
         <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
           <div class="stat"><div class="stat-label">Clients</div><div class="stat-value" id="stat-clients">—</div><div class="stat-sub">actifs</div></div>
           <div class="stat"><div class="stat-label">Commandes</div><div class="stat-value" id="stat-commandes">—</div><div class="stat-sub">en cours</div></div>
-          <div class="stat"><div class="stat-label">CA total HT</div><div class="stat-value" id="stat-ca">—</div><div class="stat-sub">commandes</div></div>
+          
           <div class="stat"><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">—</div><div class="stat-sub">en attente</div></div>
           <div class="stat" style="border-color:#FCEAEA;background:#FFFAFA"><div class="stat-label" style="color:var(--red)">Factures</div><div class="stat-value" id="stat-factures" style="color:var(--red)">—</div><div class="stat-sub" style="color:var(--red)">non payées</div></div>
         </div>
@@ -1335,15 +1335,15 @@ async function printDevis(){
   document.getElementById('pdf-preview').innerHTML=`
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
-      body{font-family:'DM Sans',sans-serif}
+      body{font-family:'DM Sans',sans-serif;margin:0}
       @page{margin:15mm 20mm}
     </style>
-    <div>
+    <div style="min-height:calc(297mm - 30mm);display:flex;flex-direction:column">
       <!-- EN-TÊTE -->
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:2px solid #1a1a18">
         <div>
           <div style="font-size:15px;font-weight:700;letter-spacing:1px">BRUT ESSENTIALS by CERAMICS DESIGN SARL</div>
-          <div style="font-size:12px;color:#555;margin-top:3px">Directeur : Nabil ZIANI</div>
+          <div style="font-size:12px;color:#555;margin-top:3px">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div>
           <div style="font-size:12px;color:#555">Tél : +212 6 60 10 78 96</div>
         </div>
         <div style="text-align:right">
@@ -1361,13 +1361,13 @@ async function printDevis(){
         ${projet?`<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic">Projet : ${projet}</div>`:''}
       </div>
       <!-- SECTIONS -->
-      ${sectionsHTML}
+      <div style="flex:1">${sectionsHTML}</div>
       <!-- RECAP -->
       <div style="margin-top:28px;page-break-inside:avoid">
         <table style="width:100%;border-collapse:collapse;max-width:380px;margin-left:auto">
           ${recapHTML}
           <tr><td style="padding:10px 0 6px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:10px 0 6px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${ht.toLocaleString('fr-FR')} MAD</td></tr>
-          ${remisePct>0?`<tr><td style="padding:4px 0;color:#E05A2B">Remise ${remisePct}%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#E05A2B">- ${remiseMnt.toLocaleString('fr-FR')} MAD</td></tr>`:''}
+          ${remiseMnt>0?`<tr><td style="padding:4px 0;color:#E05A2B">Remise</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#E05A2B">- ${remiseMnt.toLocaleString('fr-FR')} MAD</td></tr>`:''}
           <tr><td style="padding:4px 0;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
           <tr style="background:#1a1a18;color:#fff">
             <td style="padding:12px 14px;font-weight:700;font-size:14px;border-radius:4px 0 0 4px">TOTAL TTC</td>
@@ -1376,9 +1376,9 @@ async function printDevis(){
         </table>
       </div>
       <!-- PIED DE PAGE -->
-      <div style="margin-top:40px;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
+      <div style="margin-top:auto;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
         CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96<br>
-        Capital social : 100 000 DHS &nbsp;|&nbsp; R.C : 109 729 &nbsp;|&nbsp; I.F : 47 350 876 &nbsp;|&nbsp; ICE : 002672298000046 &nbsp;|&nbsp; PATENTE : 64002515
+        Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
       </div>
     </div>`;
   document.getElementById('pdf-preview').style.display='block';
@@ -1428,12 +1428,12 @@ async function printDevisById(devisId){
     return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
   document.getElementById('pdf-preview').innerHTML=`
-    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:15mm 20mm}</style>
-    <div>
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0}@page{margin:15mm 20mm}</style>
+    <div style="min-height:calc(297mm - 30mm);display:flex;flex-direction:column">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:2px solid #1a1a18">
         <div>
           <div style="font-size:15px;font-weight:700;letter-spacing:1px">BRUT ESSENTIALS by CERAMICS DESIGN SARL</div>
-          <div style="font-size:12px;color:#555;margin-top:3px">Directeur : Nabil ZIANI</div>
+          <div style="font-size:12px;color:#555;margin-top:3px">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div>
           <div style="font-size:12px;color:#555">Tél : +212 6 60 10 78 96</div>
         </div>
         <div style="text-align:right">
@@ -1449,7 +1449,7 @@ async function printDevisById(devisId){
         ${client?.telephone?`<div style="font-size:12px;color:#888">${client.telephone}</div>`:''}
         ${projet?`<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic">Projet : ${projet}</div>`:''}
       </div>
-      ${sectionsHTML}
+      <div style="flex:1">${sectionsHTML}</div>
       <div style="margin-top:28px;page-break-inside:avoid">
         <table style="width:100%;border-collapse:collapse;max-width:380px;margin-left:auto">
           ${recapHTML}
@@ -1461,9 +1461,9 @@ async function printDevisById(devisId){
           </tr>
         </table>
       </div>
-      <div style="margin-top:40px;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
+      <div style="margin-top:auto;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
         CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96<br>
-        Capital social : 100 000 DHS &nbsp;|&nbsp; R.C : 109 729 &nbsp;|&nbsp; I.F : 47 350 876 &nbsp;|&nbsp; ICE : 002672298000046 &nbsp;|&nbsp; PATENTE : 64002515
+        Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
       </div>
     </div>`;
   document.getElementById('pdf-preview').style.display='block';
@@ -3982,7 +3982,17 @@ async function openSuiviFiche(id){
         </div>
         ${p.description?`<div style="font-size:13px;color:#555;margin-top:6px;line-height:1.5">${p.description}</div>`:''}
       </div>
-      <span style="background:${st.bg};color:${st.color};padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">${st.icon} ${p.statut}</span>
+      <div style="position:relative" onclick="event.stopPropagation()">
+        <span id="fiche-statut-badge" onclick="toggleFicheStatut('${id}')"
+          style="background:${st.bg};color:${st.color};padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${st.color}33">
+          ${st.icon} ${p.statut} ▾
+        </span>
+        <div id="fiche-statut-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:160px">
+          ${Object.entries(SUIVI_STATUTS).map(([key,s])=>`<div onclick="updateFicheStatut('${id}','${key}')"
+            style="padding:7px 14px;font-size:12px;cursor:pointer;color:${s.color};display:flex;align-items:center;gap:6px"
+            onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">${s.icon} ${key}</div>`).join('')}
+        </div>
+      </div>
       <button class="btn btn-sm" onclick="openSuiviModal('${id}')">✏️ Modifier</button>
     </div>
 
@@ -4052,6 +4062,24 @@ async function openSuiviFiche(id){
         </div>`:''}
       </div>
     </div>`;
+}
+
+function toggleFicheStatut(id){
+  const menu=document.getElementById('fiche-statut-menu');
+  if(!menu)return;
+  menu.style.display=menu.style.display==='none'?'block':'none';
+  if(menu.style.display==='block'){
+    setTimeout(()=>{document.addEventListener('click',function c(){menu.style.display='none';document.removeEventListener('click',c);},{once:true});},0);
+  }
+}
+
+async function updateFicheStatut(id, statut){
+  await sb.from('projets_suivi').update({statut}).eq('id',id);
+  document.getElementById('fiche-statut-menu').style.display='none';
+  const st=SUIVI_STATUTS[statut]||SUIVI_STATUTS['En cours'];
+  const badge=document.getElementById('fiche-statut-badge');
+  if(badge){badge.style.background=st.bg;badge.style.color=st.color;badge.style.borderColor=st.color+'33';badge.innerHTML=`${st.icon} ${statut} ▾`;}
+  toast('Statut mis à jour ✓');
 }
 
 function showSuiviTab(tab, el){
@@ -4337,11 +4365,28 @@ function renderUpdate(u){
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${d}</span>
         ${u.id?`<button onclick="editUpdate('${u.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0" title="Modifier">✏️</button>`:''}
+        ${u.id?`<button onclick="deleteUpdate('${u.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0" title="Supprimer">🗑️</button>`:''}
       </div>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${u.type}</div>
     <div id="update-text-${u.id||''}" style="font-size:13px;line-height:1.5;white-space:pre-wrap">${u.texte}</div>
   </div>`;
+}
+
+async function deleteUpdate(id){
+  if(!confirm('Supprimer ce commentaire ?'))return;
+  await sb.from('projets_updates').delete().eq('id',id);
+  const row=document.getElementById('update-row-'+id);
+  if(row) row.remove();
+  // Update counter
+  const list=document.getElementById('suivi-updates-list');
+  if(list){
+    const count=list.querySelectorAll('[id^=update-row]').length;
+    const tab=document.getElementById('stab-commentaires');
+    if(tab) tab.textContent=`💬 Commentaires (${count})`;
+    if(count===0) list.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px">Aucun commentaire</div>';
+  }
+  toast('Commentaire supprimé');
 }
 
 async function editUpdate(id){
