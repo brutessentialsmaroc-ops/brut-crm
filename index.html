@@ -1085,17 +1085,19 @@ async function loadDevisList(){
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis. Cliquez sur + Nouveau pour commencer.</div>';return}
   el.innerHTML=(data||[]).map(d=>{
     const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-    const ttc=ht*1.2;
+    const remise=Number(d.remise||0);
+    const htNet=ht*(1-remise/100);
+    const ttc=htNet*1.2;
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="openDevisBuilder('${d.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
         <div class="devis-card-title">${d.clients?.nom||'—'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
-        <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)</div>
+        <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)${remise>0?` · Remise ${remise}%`:''}</div>
       </div>
       <div class="devis-card-right">
         <div>
           <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
-          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
+          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${htNet.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeClass(d.statut)}">${d.statut}</span>
         <button class="btn btn-sm" onclick="event.stopPropagation();printDevisById('${d.id}')">📄 PDF</button>
@@ -1132,6 +1134,7 @@ async function openDevisBuilder(devisId){
       document.getElementById('builder-projet').value=d.projet_nom||'';
       document.getElementById('builder-statut').value=d.statut||'En attente';
       document.getElementById('builder-ref').textContent=d.reference||'';
+      if(document.getElementById('builder-remise')) document.getElementById('builder-remise').value=d.remise||0;
     }
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
     sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire)}))}));
@@ -1247,7 +1250,8 @@ async function saveDevisBuilder(){
     const ref='DEV-'+Date.now().toString().slice(-6);
     const{data,error}=await sb.from('devis').insert({
       reference:ref, client_id:clientId, projet_nom:projetNom,
-      statut, date_envoi:new Date().toISOString().split('T')[0]
+      statut, date_envoi:new Date().toISOString().split('T')[0],
+      remise:Number(document.getElementById('builder-remise')?.value||0)
     }).select().single();
     if(error){toast('Erreur création: '+error.message);return;}
     devisId=data.id;
@@ -1255,7 +1259,8 @@ async function saveDevisBuilder(){
     document.getElementById('builder-ref').textContent=ref;
   } else {
     const{error}=await sb.from('devis').update({
-      client_id:clientId, projet_nom:projetNom, statut
+      client_id:clientId, projet_nom:projetNom, statut,
+      remise:Number(document.getElementById('builder-remise')?.value||0)
     }).eq('id',devisId);
     if(error){toast('Erreur mise à jour: '+error.message);return;}
   }
@@ -1528,6 +1533,7 @@ async function convertirFacture(devisId){
     devis_id:devisId,
     client_id:d.client_id,
     projet_nom:d.projet_nom,
+    remise:d.remise||0,
     statut:'Non payée',
     date_emission:new Date().toISOString().split('T')[0],
     date_echeance:new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0]
@@ -1546,7 +1552,9 @@ async function loadFactures(){
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune facture. Convertissez un devis accepté en facture.</div>';return;}
   el.innerHTML=(data||[]).map(f=>{
     const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-    const ttc=ht*1.2;
+    const remise=Number(f.remise||0);
+    const htNet=ht*(1-remise/100);
+    const ttc=htNet*1.2;
     const badgeCls=f.statut==='Payée'?'badge-green':f.statut==='En retard'?'badge-red':'badge-amber';
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="printFacture('${f.id}')" style="cursor:pointer">
@@ -1557,7 +1565,7 @@ async function loadFactures(){
       <div class="devis-card-right">
         <div>
           <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
-          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${ht.toLocaleString('fr-FR')} HT</div>
+          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${htNet.toLocaleString('fr-FR')} HT</div>
         </div>
         <span class="badge ${badgeCls}">${f.statut}</span>
         <button class="btn btn-sm" onclick="printFacture('${f.id}')">📄 PDF</button>
@@ -1628,7 +1636,10 @@ async function printFacture(id){
   const{data:f}=await sb.from('factures').select('*,clients(*),devis(projet_nom,devis_sections(nom,sous_titre,ordre,devis_articles(*)))').eq('id',id).single();
   const sections=(f.devis?.devis_sections||[]).sort((a,b)=>a.ordre-b.ordre);
   const ht=sections.reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-  const tva=ht*0.2; const ttc=ht+tva;
+  const remise=Number(f.remise||0);
+  const remiseMnt=ht*(remise/100);
+  const htNet=ht-remiseMnt;
+  const tva=htNet*0.2; const ttc=htNet+tva;
   const date=f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
   const echeance=f.date_echeance?new Date(f.date_echeance).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):'—';
 
@@ -1695,6 +1706,7 @@ async function printFacture(id){
     <div style="margin-top:24px;page-break-inside:avoid">
       <table style="width:100%;border-collapse:collapse;margin-left:auto;max-width:300px">
         <tr><td style="padding:8px 0;font-size:13px">Total HT</td><td style="padding:8px 0;text-align:right;font-family:monospace;font-size:13px">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+        ${remiseMnt>0?`<tr><td style="padding:4px 0;font-size:12px;color:#E05A2B">Remise ${remise}%</td><td style="padding:4px 0;text-align:right;font-family:monospace;font-size:12px;color:#E05A2B">- ${remiseMnt.toLocaleString('fr-FR')} MAD</td></tr>`:''}
         <tr><td style="padding:4px 0;font-size:12px;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;font-size:12px;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
         <tr style="background:#1a1a18;color:#fff">
           <td style="padding:12px 14px;font-weight:600;border-radius:4px 0 0 4px;font-size:14px">TOTAL TTC</td>
