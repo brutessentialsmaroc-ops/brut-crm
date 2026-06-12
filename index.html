@@ -4857,7 +4857,7 @@ async function loadBusinessObjectifs(){
   }
 
   const [r1,r2]=await Promise.all([
-    sb.from('factures').select('*').gte('date_emission','2026-01-01'),
+    sb.from('factures').select('*,devis(devis_sections(devis_articles(quantite,prix_unitaire)))').gte('date_emission','2026-01-01'),
     sb.from('objectifs_ca').select('*').in('annee',[2026,2027])
   ]);
   const factures=r1.data||[];
@@ -4866,17 +4866,22 @@ async function loadBusinessObjectifs(){
   const objMap={};
   objectifs.forEach(o=>objMap[`${o.annee}-${o.mois===null?'annuel':o.mois}`]=o);
 
-  function encaissePourMois(mois,annee){
+  function calcTTCFac(f){
+    const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+    return Math.round(ht*(1-Number(f.remise||0)/100)*1.2*100)/100;
+  }
+
+  function facturePourMois(mois,annee){
     const m=String(mois).padStart(2,'0');
     return factures.filter(f=>f.date_emission?.startsWith(`${annee}-${m}`))
-      .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
+      .reduce((s,f)=>s+calcTTCFac(f),0);
   }
 
   const objAnnuel=Number(objMap[`2026-annuel`]?.montant||0);
-  const encaisseAnnee=factures.filter(f=>f.date_emission?.startsWith('2026'))
-    .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
-  const pctAnnee=objAnnuel>0?Math.min(100,Math.round(encaisseAnnee/objAnnuel*100)):0;
-  const resteAnnee=Math.max(0,objAnnuel-encaisseAnnee);
+  const factureAnnee=factures.filter(f=>f.date_emission?.startsWith('2026'))
+    .reduce((s,f)=>s+calcTTCFac(f),0);
+  const pctAnnee=objAnnuel>0?Math.min(100,Math.round(factureAnnee/objAnnuel*100)):0;
+  const resteAnnee=Math.max(0,objAnnuel-factureAnnee);
   const barColorAnnee=pctAnnee>=100?'#10B981':pctAnnee>=50?'#F59E0B':'#EF4444';
 
   el.innerHTML=`
@@ -4887,12 +4892,12 @@ async function loadBusinessObjectifs(){
         <div style="display:flex;flex-direction:column;gap:6px">
           ${moisList.map(({mois,annee,nom})=>{
             const obj=Number(objMap[`${annee}-${mois}`]?.montant||0);
-            const reel=encaissePourMois(mois,annee);
+            const reel=facturePourMois(mois,annee);
             const reste=Math.max(0,obj-reel);
             const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
             const isCurrent=mois===moisCourant&&annee===anneeCourante;
             const isFuture=(annee>anneeCourante)||(annee===anneeCourante&&mois>moisCourant);
-            const barColor=pct>=100?'#10B981':pct>=50?'#10B981':'#F59E0B';
+            const barColor=pct>=50?'#10B981':'#F59E0B';
             const label=pct>=100?'✅ ATTEINT':obj>0&&!isFuture?pct+'%':'';
             const labelColor=pct>=50?'#10B981':'#F59E0B';
             return`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:${isCurrent?'#f5f3ee':'transparent'}">
@@ -4924,15 +4929,15 @@ async function loadBusinessObjectifs(){
             <div style="display:flex;align-items:baseline;gap:8px">
               <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
                 style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:24px;font-weight:700;padding:10px 14px;width:100%;font-family:'DM Mono',monospace;text-align:right"
-                oninput="updateAnnualCard(this.value,${encaisseAnnee})"
+                oninput="updateAnnualCard(this.value,${factureAnnee})"
                 onblur="saveObjectif(2026,null,this.value)">
               <span style="color:rgba(255,255,255,0.5);font-size:14px">MAD</span>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
             <div>
-              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">Encaissé</div>
-              <div style="font-size:24px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">CA Facturé</div>
+              <div style="font-size:24px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${factureAnnee.toLocaleString('fr-FR')}</div>
               <div style="font-size:11px;color:rgba(255,255,255,0.4)">MAD</div>
             </div>
             <div>
