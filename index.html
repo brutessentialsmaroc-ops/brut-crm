@@ -521,6 +521,7 @@
           <div style="margin-top:12px;display:flex;gap:12px">
             <button class="btn btn-primary" onclick="saveDevisBuilder()">Enregistrer</button>
             <button class="btn" onclick="printDevis()" style="gap:6px">🖨 Imprimer / PDF</button>
+            <button class="btn btn-sm" onclick="importOdooDevis()" style="color:#8B5CF6;border-color:#8B5CF6">📥 Import Odoo</button>
           </div>
         </div>
         <!-- SECTIONS -->
@@ -5049,6 +5050,64 @@ async function saveObjectif(annee, mois, montant){
   const val=Number(montant)||0;
   await sb.from('objectifs_ca').upsert({annee, mois:mois||null, montant:val},{onConflict:'annee,mois'});
   toast('Objectif enregistré ✓');
+}
+
+function importOdooDevis(){
+  sectionsData=[
+    {id:null,nom:'RDC',sous_titre:'',ordre:0,articles:[
+      {id:null,description:'MEUBLE DEVANT LA PORTE 145*45P*45H',quantite:1,prix_unitaire:6100,remise:15}
+    ]},
+    {id:null,nom:'SALON',sous_titre:'',ordre:1,articles:[
+      {id:null,description:'CANAPEE 295*110H*65H',quantite:2,prix_unitaire:14602.50,remise:15},
+      {id:null,description:'MOULURE',quantite:1,prix_unitaire:7600,remise:15},
+      {id:null,description:'HABILLAGE MURAL',quantite:1,prix_unitaire:11500,remise:15},
+      {id:null,description:'FAUTEUIL 130*100P*65H',quantite:2,prix_unitaire:5460,remise:15},
+      {id:null,description:'TABLE BASSE 140*160P*35H',quantite:1,prix_unitaire:7058.82,remise:15},
+      {id:null,description:'RIDEAU N°1 : VOILAGE 1086*340H',quantite:1,prix_unitaire:11475.34,remise:15},
+      {id:null,description:'RIDEAU N°2 : VOILAGE 300*340H',quantite:1,prix_unitaire:3788.23,remise:15},
+      {id:null,description:'RIDEAU N°3 : VOILAGE 640*340H',quantite:1,prix_unitaire:7764.70,remise:15}
+    ]},
+    {id:null,nom:'SALLE A MANGER',sous_titre:'',ordre:2,articles:[
+      {id:null,description:'TABLE A MANGER 340*160P*80H',quantite:1,prix_unitaire:21000,remise:15},
+      {id:null,description:'CHAISES 61*53P*73H',quantite:8,prix_unitaire:2117.65,remise:15},
+      {id:null,description:'CHAISES TABOURETS 50*50P*60H assise',quantite:3,prix_unitaire:3294.12,remise:15},
+      {id:null,description:'HABILLAGE MURAL',quantite:1,prix_unitaire:13000,remise:15},
+      {id:null,description:'MIROIR AVEC CADRE EN BOIS 180*230H',quantite:1,prix_unitaire:4941.18,remise:15},
+      {id:null,description:'BUFFET AVEC PIETEMENT EN BOIS NOIR 130*230*43P*73H',quantite:1,prix_unitaire:16470.59,remise:15}
+    ]},
+    {id:null,nom:'CHAMBRE MASTER',sous_titre:'',ordre:3,articles:[
+      {id:null,description:'SOMMIER TAPISSIER + TÊTE DE LIT TAPISSIER 180*209 322*??H',quantite:1,prix_unitaire:11176.47,remise:15},
+      {id:null,description:'TAPIS 320*300',quantite:1,prix_unitaire:5760,remise:15},
+      {id:null,description:'MEUBLE DIVISÉ EN DEUX PARTIES 120*54H 107*86H',quantite:1,prix_unitaire:14588.23,remise:15},
+      {id:null,description:'POUF 40D*47H',quantite:1,prix_unitaire:1800,remise:15},
+      {id:null,description:'TABLE DE CHEVET RONDE EN BOIS NOYER FUMÉ 37D*37H',quantite:2,prix_unitaire:2470.59,remise:15},
+      {id:null,description:'RIDEAU N°1 : VOILAGE 535*340H',quantite:1,prix_unitaire:7600,remise:15},
+      {id:null,description:'RIDEAU N°2 : STORE 227',quantite:1,prix_unitaire:3435.29,remise:15}
+    ]},
+    {id:null,nom:'CHAMBRE JUNIOR',sous_titre:'',ordre:4,articles:[
+      {id:null,description:'LIT AVEC COFFRE DE RANGEMENT EN TAPISSIER 180*200',quantite:1,prix_unitaire:11176.47,remise:15},
+      {id:null,description:'TAPIS 320*300',quantite:1,prix_unitaire:5760,remise:15},
+      {id:null,description:'POUF 40D*47H',quantite:1,prix_unitaire:1800,remise:15},
+      {id:null,description:'RIDEAU N°1 : VOILAGE 400*340H',quantite:1,prix_unitaire:3447.06,remise:15}
+    ]},
+    {id:null,nom:'SUITE 1',sous_titre:'',ordre:5,articles:[
+      {id:null,description:'LIT EN TAPISSIER 180*200',quantite:1,prix_unitaire:11176.47,remise:15},
+      {id:null,description:'TAPIS 320*300',quantite:1,prix_unitaire:5760,remise:15},
+      {id:null,description:'POUF 40D*47H',quantite:1,prix_unitaire:2300,remise:15},
+      {id:null,description:'RIDEAU N°1 : VOILAGE 380*340H',quantite:1,prix_unitaire:3517.65,remise:15},
+      {id:null,description:'RIDEAU N°2 : STORE 100',quantite:1,prix_unitaire:1694.12,remise:15}
+    ]},
+    {id:null,nom:'SUITE 2',sous_titre:'',ordre:6,articles:[
+      {id:null,description:'LIT EN TAPISSIER 180*200',quantite:1,prix_unitaire:11176.47,remise:15},
+      {id:null,description:'TAPIS 320*300',quantite:1,prix_unitaire:5760,remise:15},
+      {id:null,description:'POUF 40D*47H',quantite:1,prix_unitaire:2300,remise:15},
+      {id:null,description:'RIDEAU N°1 : VOILAGE 380*340H',quantite:1,prix_unitaire:3517.65,remise:15},
+      {id:null,description:'RIDEAU N°2 : STORE 100',quantite:1,prix_unitaire:1694.12,remise:15}
+    ]}
+  ];
+  document.getElementById('builder-projet').value='Projet Marrakech — OV00474';
+  renderSections();
+  toast('Devis Odoo importé ✓ — sélectionnez le client et enregistrez');
 }
 
 async function loadBusiness(){
