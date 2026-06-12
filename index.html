@@ -4905,7 +4905,7 @@ async function loadBusinessObjectifs(){
                 ${nom}${annee!==anneeCourante?`<span style="font-size:9px;color:var(--muted)"> '27</span>`:''}
               </div>
               <input type="number" id="obj-${annee}-${mois}" value="${obj||''}" placeholder="—"
-                style="width:115px;font-size:12px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
+                style="width:130px;font-size:13px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'};letter-spacing:1px"
                 oninput="updateObjRow('${annee}',${mois},${reel})"
                 onblur="saveObjectif(${annee},${mois},this.value)">
               <span style="font-size:11px;color:var(--muted)">MAD</span>
@@ -4928,7 +4928,7 @@ async function loadBusinessObjectifs(){
             <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Objectif 🏆</div>
             <div style="display:flex;align-items:center;gap:10px">
               <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
-                style="flex:1;min-width:0;background:rgba(212,175,55,0.1);border:1.5px solid rgba(212,175,55,0.5);border-radius:8px;color:#D4AF37;font-size:22px;font-weight:700;padding:10px 14px;font-family:'DM Mono',monospace;text-align:right"
+              style="flex:1;min-width:0;background:rgba(212,175,55,0.1);border:1.5px solid rgba(212,175,55,0.5);border-radius:8px;color:#D4AF37;font-size:22px;font-weight:700;padding:10px 14px;font-family:'DM Mono',monospace;text-align:right;letter-spacing:2px"
                 oninput="updateAnnualCard(this.value,${factureAnnee})"
                 onblur="saveObjectif(2026,null,this.value)">
               <span style="color:rgba(212,175,55,0.7);font-size:13px;white-space:nowrap">MAD</span>
