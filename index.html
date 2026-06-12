@@ -4904,10 +4904,10 @@ async function loadBusinessObjectifs(){
               <div style="width:44px;font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'}">
                 ${nom}${annee!==anneeCourante?`<span style="font-size:9px;color:var(--muted)"> '27</span>`:''}
               </div>
-              <input type="number" id="obj-${annee}-${mois}" value="${obj||''}" placeholder="—"
-                style="width:130px;font-size:13px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'};letter-spacing:1px"
-                oninput="updateObjRow('${annee}',${mois},${reel})"
-                onblur="saveObjectif(${annee},${mois},this.value)">
+              <input type="text" id="obj-${annee}-${mois}" value="${obj?Math.round(obj).toLocaleString('fr-FR'):''}" placeholder="—"
+                style="width:130px;font-size:13px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
+                oninput="fmtInput(this);updateObjRow('${annee}',${mois},${reel})"
+                onblur="saveObjectif(${annee},${mois},parseNum(this.value))">
               <span style="font-size:11px;color:var(--muted)">MAD</span>
               <span style="font-size:13px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:140px;text-align:right;font-weight:${reel>0?'600':'400'};letter-spacing:0.5px">${reel>0?Math.round(reel).toLocaleString('fr-FR')+' MAD':'—'}</span>
               <div id="bar-${annee}-${mois}" style="flex:1;height:6px;background:#f0ece4;border-radius:3px;overflow:hidden">
@@ -4927,10 +4927,10 @@ async function loadBusinessObjectifs(){
           <div style="margin-bottom:20px">
             <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Objectif 🏆</div>
             <div style="display:flex;align-items:center;gap:10px">
-              <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
-              style="flex:1;min-width:0;background:rgba(212,175,55,0.1);border:1.5px solid rgba(212,175,55,0.5);border-radius:8px;color:#D4AF37;font-size:22px;font-weight:700;padding:10px 14px;font-family:'DM Mono',monospace;text-align:right;letter-spacing:2px"
-                oninput="updateAnnualCard(this.value,${factureAnnee})"
-                onblur="saveObjectif(2026,null,this.value)">
+              <input type="text" id="obj-annuel-2026" value="${objAnnuel?Math.round(objAnnuel).toLocaleString('fr-FR'):''}" placeholder="0"
+              style="flex:1;min-width:0;background:rgba(212,175,55,0.1);border:1.5px solid rgba(212,175,55,0.5);border-radius:8px;color:#D4AF37;font-size:22px;font-weight:700;padding:10px 14px;font-family:'DM Mono',monospace;text-align:right"
+                oninput="fmtInput(this);updateAnnualCard(parseNum(this.value),${factureAnnee})"
+                onblur="saveObjectif(2026,null,parseNum(this.value))">
               <span style="color:rgba(212,175,55,0.7);font-size:13px;white-space:nowrap">MAD</span>
             </div>
           </div>
@@ -4955,8 +4955,22 @@ async function loadBusinessObjectifs(){
     </div>`;
 }
 
+function parseNum(str){
+  return Number(String(str).replace(/\s/g,'').replace(/,/g,'.'))||0;
+}
+function fmtInput(input){
+  const raw=parseNum(input.value);
+  if(raw>0){
+    const pos=input.selectionStart;
+    const oldLen=input.value.length;
+    input.value=Math.round(raw).toLocaleString('fr-FR');
+    const newLen=input.value.length;
+    try{input.setSelectionRange(pos+(newLen-oldLen),pos+(newLen-oldLen));}catch(e){}
+  }
+}
+
 function updateObjRow(annee, mois, reel){
-  const obj=Number(document.getElementById(`obj-${annee}-${mois}`)?.value||0);
+  const obj=parseNum(document.getElementById(`obj-${annee}-${mois}`)?.value||'0');
   const reste=Math.max(0,obj-reel);
   const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
   const isFuture=(Number(annee)>new Date().getFullYear())||(Number(annee)===new Date().getFullYear()&&mois>new Date().getMonth()+1);
