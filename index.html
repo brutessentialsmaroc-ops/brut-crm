@@ -449,7 +449,12 @@
       </div>
       <!-- BUSINESS DASHBOARD -->
       <div id="page-business" class="hidden">
-        <div id="business-content"></div>
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)">
+          <button class="rh-tab active" id="btab-dashboard" onclick="showBusinessTab('dashboard',this)">📊 Dashboard</button>
+          <button class="rh-tab" id="btab-objectifs" onclick="showBusinessTab('objectifs',this)">🎯 Suivi Objectifs</button>
+        </div>
+        <div id="btab-content-dashboard"><div id="business-content"></div></div>
+        <div id="btab-content-objectifs" class="hidden"><div id="business-objectifs"></div></div>
       </div>
       <!-- PROSPECTS -->
       <div id="page-prospects" class="hidden">
@@ -4826,6 +4831,93 @@ function checkBusinessPwd(hasEl){
   }
 }
 
+function showBusinessTab(tab, el){
+  ['dashboard','objectifs'].forEach(t=>{
+    document.getElementById('btab-content-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('btab-'+t).classList.toggle('active', t===tab);
+  });
+  if(tab==='objectifs') loadBusinessObjectifs();
+}
+
+async function loadBusinessObjectifs(){
+  const el=document.getElementById('business-objectifs');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const now=new Date();
+  const anneeCourante=now.getFullYear();
+  const moisCourant=now.getMonth()+1;
+  const debutAnnee=`${anneeCourante}-01-01`;
+  const moisNoms=['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+
+  const[{data:facAnnee},{data:objectifs}]=await Promise.all([
+    sb.from('factures').select('*').gte('date_emission',debutAnnee),
+    sb.from('objectifs_ca').select('*').eq('annee',anneeCourante)
+  ]);
+
+  const objMap={};
+  (objectifs||[]).forEach(o=>objMap[o.mois===null?'annuel':o.mois]=o);
+  const objAnnuel=Number(objMap['annuel']?.montant||0);
+
+  function encaisseFacMois(mois){
+    const m=String(mois).padStart(2,'0');
+    return(facAnnee||[]).filter(f=>f.date_emission?.startsWith(`${anneeCourante}-${m}`))
+      .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
+  }
+  const encaisseAnnee=(facAnnee||[]).reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
+
+  el.innerHTML=`
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:700px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:20px">🎯 Objectifs CA ${anneeCourante}</div>
+      <!-- LIGNE ANNUELLE -->
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:2px solid var(--border);margin-bottom:14px">
+        <div style="width:48px;font-size:12px;font-weight:700;color:var(--muted)">ANNÉE</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--muted)">Objectif :</span>
+          <input type="number" id="obj-annuel" value="${objAnnuel||''}" placeholder="0"
+            style="width:130px;font-size:13px;font-weight:600;padding:5px 8px;border:1px solid var(--border);border-radius:4px;text-align:right;font-family:'DM Mono',monospace"
+            onblur="saveObjectif(${anneeCourante},null,this.value)">
+          <span style="font-size:12px;color:var(--muted)">MAD</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:16px">
+          <span style="font-size:11px;color:var(--muted)">Réel :</span>
+          <span style="font-size:15px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')} MAD</span>
+        </div>
+        <div style="flex:1;margin-left:16px">
+          ${objAnnuel>0?`
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:8px;background:#f0ece4;border-radius:4px;overflow:hidden">
+              <div style="height:8px;background:${encaisseAnnee>=objAnnuel?'#10B981':encaisseAnnee/objAnnuel>0.7?'#F59E0B':'#3B82F6'};border-radius:4px;width:${Math.min(100,Math.round(encaisseAnnee/objAnnuel*100))}%"></div>
+            </div>
+            <span style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace;color:${encaisseAnnee>=objAnnuel?'#10B981':'#3B82F6'};min-width:40px">${Math.round(encaisseAnnee/objAnnuel*100)}%</span>
+          </div>`:'<span style="font-size:11px;color:var(--muted);font-style:italic">Saisir un objectif annuel</span>'}
+        </div>
+      </div>
+      <!-- LIGNES MENSUELLES -->
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${moisNoms.map((nom,i)=>{
+          const mois=i+1;
+          const obj=Number(objMap[mois]?.montant||0);
+          const reel=encaisseFacMois(mois);
+          const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
+          const isCurrent=mois===moisCourant;
+          const isFuture=mois>moisCourant;
+          const barColor=reel>=obj&&obj>0?'#10B981':pct>70?'#F59E0B':'#3B82F6';
+          return`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:${isCurrent?'#f5f3ee':'transparent'}">
+            <div style="width:36px;font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'};">${nom}</div>
+            <input type="number" id="obj-m${mois}" value="${obj||''}" placeholder="—"
+              style="width:120px;font-size:12px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
+              onblur="saveObjectif(${anneeCourante},${mois},this.value)">
+            <span style="font-size:11px;color:var(--muted)">MAD</span>
+            <span style="font-size:13px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:130px;text-align:right;font-weight:${reel>0?'600':'400'}">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
+            <div style="flex:1;height:5px;background:#f0ece4;border-radius:3px;overflow:hidden">
+              ${obj>0&&!isFuture?`<div style="height:5px;background:${barColor};border-radius:3px;width:${pct}%"></div>`:''}
+            </div>
+            <span style="font-size:12px;font-weight:700;width:44px;text-align:right;color:${obj>0&&!isFuture?(reel>=obj?'#10B981':pct>70?'#F59E0B':'#3B82F6'):'var(--muted)'}">${obj>0&&!isFuture?pct+'%':''}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 async function saveObjectif(annee, mois, montant){
   const val=Number(montant)||0;
   await sb.from('objectifs_ca').upsert({annee, mois:mois||null, montant:val},{onConflict:'annee,mois'});
@@ -4898,60 +4990,6 @@ async function loadBusiness(){
         <div style="font-size:12px;color:var(--muted);margin-top:2px">${now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
       </div>
       <button class="btn btn-sm" onclick="businessUnlocked=false;showPage('dashboard',document.querySelector('.nav-item'))" style="color:var(--muted)">🔒 Verrouiller</button>
-    </div>
-
-    <!-- OBJECTIFS CA -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:24px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div style="font-size:13px;font-weight:600">🎯 Objectifs CA ${anneeCourante}</div>
-      </div>
-      <!-- LIGNE ANNUELLE -->
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:2px solid var(--border);margin-bottom:12px">
-        <div style="width:50px;font-size:12px;font-weight:700;color:var(--muted)">ANNÉE</div>
-        <div style="display:flex;align-items:center;gap:6px;flex:1">
-          <span style="font-size:11px;color:var(--muted)">Objectif :</span>
-          <input type="number" id="obj-annuel" value="${objAnnuel||''}" placeholder="0"
-            style="width:130px;font-size:13px;font-weight:600;padding:4px 8px;border:1px solid var(--border);border-radius:4px;text-align:right;font-family:'DM Mono',monospace"
-            onblur="saveObjectif(${anneeCourante},null,this.value)"> MAD
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex:1">
-          <span style="font-size:11px;color:var(--muted)">Réel :</span>
-          <span style="font-size:14px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')} MAD</span>
-        </div>
-        <div style="flex:1">
-          ${objAnnuel>0?`
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="flex:1;height:6px;background:#f0ece4;border-radius:3px;overflow:hidden">
-              <div style="height:6px;background:${encaisseAnnee>=objAnnuel?'#10B981':encaisseAnnee/objAnnuel>0.7?'#F59E0B':'#3B82F6'};border-radius:3px;width:${Math.min(100,Math.round(encaisseAnnee/objAnnuel*100))}%"></div>
-            </div>
-            <span style="font-size:12px;font-weight:700;color:${encaisseAnnee>=objAnnuel?'#10B981':'#3B82F6'};font-family:'DM Mono',monospace">${Math.round(encaisseAnnee/objAnnuel*100)}%</span>
-          </div>`:'<span style="font-size:11px;color:var(--muted);font-style:italic">Saisir un objectif</span>'}
-        </div>
-      </div>
-      <!-- GRILLE MENSUELLE -->
-      <div style="display:flex;flex-direction:column;gap:4px">
-        ${moisNoms.map((nom,i)=>{
-          const mois=i+1;
-          const obj=Number(objMap[mois]?.montant||0);
-          const reel=encaisseFacMois(mois);
-          const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
-          const isCurrent=mois===moisCourant;
-          const isFuture=mois>moisCourant;
-          const barColor=reel>=obj&&obj>0?'#10B981':pct>70?'#F59E0B':'#3B82F6';
-          return`<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;background:${isCurrent?'#f5f3ee':'transparent'}">
-            <div style="width:36px;font-size:11px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'};">${nom}</div>
-            <input type="number" id="obj-m${mois}" value="${obj||''}" placeholder="—"
-              style="width:110px;font-size:12px;padding:3px 6px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
-              onblur="saveObjectif(${anneeCourante},${mois},this.value)">
-            <span style="font-size:10px;color:var(--muted);width:20px">MAD</span>
-            <span style="font-size:12px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:120px;text-align:right">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
-            <div style="flex:1;height:4px;background:#f0ece4;border-radius:2px;overflow:hidden">
-              ${obj>0&&!isFuture?`<div style="height:4px;background:${barColor};border-radius:2px;width:${pct}%"></div>`:''}
-            </div>
-            <span style="font-size:11px;font-weight:600;width:40px;text-align:right;color:${obj>0&&!isFuture?(reel>=obj?'#10B981':'#3B82F6'):'var(--muted)'}">${obj>0&&!isFuture?pct+'%':''}</span>
-          </div>`;
-        }).join('')}
-      </div>
     </div>
 
     <!-- STATS PRINCIPALES -->
