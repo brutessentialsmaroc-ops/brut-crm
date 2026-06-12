@@ -724,17 +724,23 @@ async function loadDashboard(){
   if(btnNext) btnNext.style.opacity=cur>=today?'0.3':'1';
 
   const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const[r1,r2,r3,r5,r6,r7,r8,r9]=await Promise.all([
+  const[r1,r2,r3,r5,r6,r7,r8]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente'),
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
     sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard'),
     sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true}),
-    sb.from('missions').select('*,projets_suivi(nom)').neq('statut','Terminé').order('created_at',{ascending:false}),
-    sb.from('admin_taches').select('*').eq('priorite','Urgente').neq('statut','Terminé').order('date_echeance',{ascending:true})
+    sb.from('missions').select('*,projets_suivi(nom)').neq('statut','Terminé').order('created_at',{ascending:false})
   ]);
-  const clients=r1.data, commandes=r2.data, devis=r3.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[], adminUrgentes=r9.data||[];
+  const clients=r1.data, commandes=r2.data, devis=r3.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[];
+
+  // Admin urgentes — chargement séparé pour ne pas bloquer le reste
+  let adminUrgentes=[];
+  try{
+    const{data:au}=await sb.from('admin_taches').select('*').eq('priorite','Urgente').neq('statut','Terminé').order('date_echeance',{ascending:true});
+    adminUrgentes=au||[];
+  }catch(e){}
   document.getElementById('stat-clients').textContent=(clients||[]).length;
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
   document.getElementById('stat-devis').textContent=(devis||[]).length;
