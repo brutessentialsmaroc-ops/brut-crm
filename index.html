@@ -4909,12 +4909,12 @@ async function loadBusinessObjectifs(){
                 oninput="updateObjRow('${annee}',${mois},${reel})"
                 onblur="saveObjectif(${annee},${mois},this.value)">
               <span style="font-size:11px;color:var(--muted)">MAD</span>
-              <span style="font-size:12px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:110px;text-align:right;font-weight:${reel>0?'600':'400'}">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
+              <span style="font-size:13px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:140px;text-align:right;font-weight:${reel>0?'600':'400'};letter-spacing:0.5px">${reel>0?Math.round(reel).toLocaleString('fr-FR')+' MAD':'—'}</span>
               <div id="bar-${annee}-${mois}" style="flex:1;height:6px;background:#f0ece4;border-radius:3px;overflow:hidden">
                 ${obj>0&&!isFuture?`<div style="height:6px;background:${barColor};border-radius:3px;width:${pct}%"></div>`:''}
               </div>
               <span id="lbl-${annee}-${mois}" style="font-size:11px;font-weight:700;width:70px;text-align:right;color:${labelColor};white-space:nowrap">${label}</span>
-              <span id="rst-${annee}-${mois}" style="font-size:10px;color:#F97316;white-space:nowrap;width:60px;text-align:right">${obj>0&&!isFuture&&reste>0?'-'+reste.toLocaleString('fr-FR'):''}</span>
+              <span id="rst-${annee}-${mois}" style="font-size:11px;color:#F97316;white-space:nowrap;width:70px;text-align:right;letter-spacing:0.5px">${obj>0&&!isFuture&&reste>0?'-'+Math.round(reste).toLocaleString('fr-FR'):''}</span>
             </div>`;
           }).join('')}
         </div>
@@ -4966,7 +4966,7 @@ function updateObjRow(annee, mois, reel){
   const lbl=document.getElementById(`lbl-${annee}-${mois}`);
   if(lbl){lbl.textContent=pct>=100?'✅ ATTEINT':obj>0&&!isFuture?pct+'%':'';lbl.style.color=pct>=50?'#10B981':'#F59E0B';}
   const rst=document.getElementById(`rst-${annee}-${mois}`);
-  if(rst) rst.textContent=obj>0&&!isFuture&&reste>0?'-'+reste.toLocaleString('fr-FR'):'';
+  if(rst) rst.textContent=obj>0&&!isFuture&&reste>0?'-'+Math.round(reste).toLocaleString('fr-FR'):'';
 }
 
 function updateAnnualCard(objVal, facture){
