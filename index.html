@@ -1245,7 +1245,7 @@ function updateTotals(){
   document.getElementById('total-ttc').textContent=ttc.toLocaleString('fr-FR')+' MAD';
   // Update section subtotals
   document.querySelectorAll('.section-subtotal span').forEach((el,i)=>{
-    if(sectionsData[i]){const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0);el.textContent=fmtNum(st)+' MAD';}
+    if(sectionsData[i]){const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);el.textContent=fmtNum(st)+' MAD';}
   });
   // Update article totals
   document.querySelectorAll('.articles-table tbody tr').forEach(row=>{
@@ -1253,8 +1253,11 @@ function updateTotals(){
     const ai=Number(row.dataset.ai);
     if(sectionsData[si]&&sectionsData[si].articles[ai]){
       const a=sectionsData[si].articles[ai];
-      const totalCell=row.querySelectorAll('td')[3];
-      if(totalCell)totalCell.textContent=fmtNum(a.quantite*a.prix_unitaire);
+      const remise=Number(a.remise||0);
+      const totalCell=row.querySelectorAll('td')[4]; // 5th col = Total HT (after remise col)
+      if(totalCell)totalCell.textContent=fmtNum(a.quantite*a.prix_unitaire*(1-remise/100));
+      const remiseInput=row.querySelectorAll('td')[3]?.querySelector('input');
+      if(remiseInput&&remise>0)remiseInput.style.color='#E05A2B';
     }
   });
 }
