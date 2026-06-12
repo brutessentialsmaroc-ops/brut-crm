@@ -4922,31 +4922,31 @@ async function loadBusinessObjectifs(){
 
       <!-- CARTE ANNUELLE -->
       <div style="position:sticky;top:20px">
-        <div style="background:#1a1a18;border-radius:var(--radius);padding:28px;color:#fff">
+        <div style="background:#1a1a18;border-radius:var(--radius);padding:28px;color:#fff;overflow:hidden">
           <div style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-bottom:16px">Challenge Bilan 2026/27</div>
           <div style="margin-bottom:20px">
-            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Objectif</div>
-            <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Objectif 🏆</div>
+            <div style="display:flex;align-items:center;gap:10px">
               <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
-                style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:24px;font-weight:700;padding:10px 14px;width:100%;font-family:'DM Mono',monospace;text-align:right"
+                style="flex:1;min-width:0;background:rgba(212,175,55,0.1);border:1.5px solid rgba(212,175,55,0.5);border-radius:8px;color:#D4AF37;font-size:22px;font-weight:700;padding:10px 14px;font-family:'DM Mono',monospace;text-align:right"
                 oninput="updateAnnualCard(this.value,${factureAnnee})"
                 onblur="saveObjectif(2026,null,this.value)">
-              <span style="color:rgba(255,255,255,0.5);font-size:14px">MAD</span>
+              <span style="color:rgba(212,175,55,0.7);font-size:13px;white-space:nowrap">MAD</span>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
             <div>
               <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">CA Facturé</div>
-              <div style="font-size:24px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${factureAnnee.toLocaleString('fr-FR')}</div>
+              <div style="font-size:22px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${Math.round(factureAnnee).toLocaleString('fr-FR')}</div>
               <div style="font-size:11px;color:rgba(255,255,255,0.4)">MAD</div>
             </div>
             <div>
               <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">Reste</div>
-              <div id="ann-reste" style="font-size:24px;font-weight:700;color:#F97316;font-family:'DM Mono',monospace">${resteAnnee.toLocaleString('fr-FR')}</div>
+              <div id="ann-reste" style="font-size:22px;font-weight:700;color:#F97316;font-family:'DM Mono',monospace">${Math.round(resteAnnee).toLocaleString('fr-FR')}</div>
               <div style="font-size:11px;color:rgba(255,255,255,0.4)">MAD</div>
             </div>
           </div>
-          <div id="ann-bar-wrap" style="height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-bottom:10px">
+          <div style="height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-bottom:10px">
             <div id="ann-bar" style="height:8px;background:${barColorAnnee};border-radius:4px;width:${pctAnnee}%;transition:width .4s"></div>
           </div>
           <div id="ann-pct" style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7)">${pctAnnee}% atteint</div>
@@ -4969,15 +4969,15 @@ function updateObjRow(annee, mois, reel){
   if(rst) rst.textContent=obj>0&&!isFuture&&reste>0?'-'+reste.toLocaleString('fr-FR'):'';
 }
 
-function updateAnnualCard(objVal, encaisse){
+function updateAnnualCard(objVal, facture){
   const obj=Number(objVal||0);
-  const reste=Math.max(0,obj-encaisse);
-  const pct=obj>0?Math.min(100,Math.round(encaisse/obj*100)):0;
+  const reste=Math.max(0,obj-facture);
+  const pct=obj>0?Math.min(100,Math.round(facture/obj*100)):0;
   const barColor=pct>=100?'#10B981':pct>=50?'#F59E0B':'#EF4444';
   const bar=document.getElementById('ann-bar');
   if(bar){bar.style.width=pct+'%';bar.style.background=barColor;}
   const r=document.getElementById('ann-reste');
-  if(r) r.textContent=reste.toLocaleString('fr-FR');
+  if(r) r.textContent=Math.round(reste).toLocaleString('fr-FR');
   const p=document.getElementById('ann-pct');
   if(p) p.textContent=pct+'% atteint';
 }
