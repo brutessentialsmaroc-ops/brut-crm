@@ -240,6 +240,7 @@
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
       <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="openBusinessDashboard(this)" style="color:#8B5CF6">📊 Business</button>
+      <button class="nav-item" onclick="showPage('admin',this)" style="color:#0EA5E9">📋 Administration</button>
       <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="showPage('prospects',this)">◈ Prospects</button>
       <div style="height:1px;background:var(--border);margin:10px 4px"></div>
@@ -288,7 +289,10 @@
         </div>
         <div class="two-col" style="margin-bottom:16px">
           <div><div class="section-title">Dernières commandes</div><div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div></div>
-          <div><div class="section-title">Avancement atelier</div><div class="table-wrap" id="dash-atelier" style="padding:16px"><div class="loading">Chargement…</div></div></div>
+          <div>
+            <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Tâches urgentes <span style="font-size:11px;color:var(--muted);font-weight:400">— Administration</span></div>
+            <div id="dash-admin-urgentes" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
+          </div>
         </div>
         <div style="margin-bottom:16px">
           <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Projets bloqués <span style="font-size:11px;color:var(--muted);font-weight:400">— Suivi Projets</span></div>
@@ -446,6 +450,10 @@
           </div>
           <div id="missions-list"></div>
         </div>
+      </div>
+      <!-- ADMIN -->
+      <div id="page-admin" class="hidden">
+        <div id="admin-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
       </div>
       <!-- BUSINESS DASHBOARD -->
       <div id="page-business" class="hidden">
@@ -651,7 +659,7 @@ function showPage(page,el){
   document.querySelectorAll('.content > div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+page).classList.remove('hidden');
   if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');}
-  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client','achats':'Achats',suivi:'Suivi Projets',business:'Business Dashboard'}[page]||page;
+  document.getElementById('page-title').textContent={dashboard:'Tableau de bord',clients:'Clients',commandes:'Commandes',atelier:'Atelier',devis:'Devis','devis-builder':'Nouveau devis',factures:'Factures',ticket:'Détail commande',rh:'Ressources Humaines',prospects:'Prospects','client-detail':'Fiche client','achats':'Achats',suivi:'Suivi Projets',business:'Business Dashboard',admin:'Administration'}[page]||page;
   currentPage=page;
   const btnNew=document.getElementById('btn-new');
   btnNew.style.display=(page==='devis-builder'||page==='ticket')?'none':'flex';
@@ -670,6 +678,7 @@ function loadPage(p){
   else if(p==='rh'){currentRhTab='salaries';loadRhSalaries();}
   else if(p==='suivi')loadSuivi();
   else if(p==='business')loadBusiness();
+  else if(p==='admin')loadAdmin();
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -689,6 +698,7 @@ function openNew(){
     if(activeTab) openMissionModal();
     else openSuiviModal();
   }
+  else if(currentPage==='admin')openAdminTache();
   else if(currentPage==='achats')openAchatModal();
   else if(currentPage==='rh'){
     if(currentRhTab==='salaries')openSalarieModal();
@@ -714,16 +724,17 @@ async function loadDashboard(){
   if(btnNext) btnNext.style.opacity=cur>=today?'0.3':'1';
 
   const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const[r1,r2,r3,r5,r6,r7,r8]=await Promise.all([
+  const[r1,r2,r3,r5,r6,r7,r8,r9]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
     sb.from('devis').select('*').eq('statut','En attente'),
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
     sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard'),
     sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true}),
-    sb.from('missions').select('*,projets_suivi(nom)').neq('statut','Terminé').order('created_at',{ascending:false})
+    sb.from('missions').select('*,projets_suivi(nom)').neq('statut','Terminé').order('created_at',{ascending:false}),
+    sb.from('admin_taches').select('*').eq('priorite','Urgente').neq('statut','Terminé').order('date_echeance',{ascending:true})
   ]);
-  const clients=r1.data, commandes=r2.data, devis=r3.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[];
+  const clients=r1.data, commandes=r2.data, devis=r3.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[], adminUrgentes=r9.data||[];
   document.getElementById('stat-clients').textContent=(clients||[]).length;
   document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
   document.getElementById('stat-devis').textContent=(devis||[]).length;
@@ -789,6 +800,29 @@ async function loadDashboard(){
       }).join('');
     } else {
       elMissions.innerHTML='<div style="padding:12px 0;font-size:13px;color:var(--muted)">✅ Aucune mission en cours</div>';
+    }
+  }
+
+  // Tâches admin urgentes
+  const elAdminUrgentes=document.getElementById('dash-admin-urgentes');
+  if(elAdminUrgentes){
+    const now2=new Date();now2.setHours(0,0,0,0);
+    if(adminUrgentes.length){
+      elAdminUrgentes.innerHTML=adminUrgentes.map(t=>{
+        const ech=t.date_echeance?new Date(t.date_echeance+'T12:00:00'):null;
+        const retard=ech&&ech<now2;
+        return`<div onclick="showPage('admin',document.querySelector('.nav-item[onclick*=admin]'))"
+          style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer"
+          onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+          <div>
+            <div style="font-size:13px;font-weight:500">${t.titre}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${t.categorie}${t.assigne?' · '+t.assigne:''}${ech?' · 📅 '+ech.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}):''}${retard?' ⚠️':''}</div>
+          </div>
+          ${retard?`<span style="background:#FEF2F2;color:#EF4444;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">RETARD</span>`:`<span style="background:#EFF6FF;color:#3B82F6;font-size:11px;padding:2px 8px;border-radius:20px">${t.statut}</span>`}
+        </div>`;
+      }).join('');
+    } else {
+      elAdminUrgentes.innerHTML='<div style="font-size:13px;color:var(--muted);padding:8px 0">✅ Aucune tâche urgente</div>';
     }
   }
 
@@ -5134,6 +5168,203 @@ async function loadBusiness(){
         </tbody>
       </table>
     </div>`;
+}
+
+// ─── ADMINISTRATION ────────────────────────────────────────────────────────────
+const ADMIN_STATUTS=['À faire','En cours','Terminé'];
+const ADMIN_CATS=['Comptabilité','Administratif','Fournisseur','Banque','Autre'];
+const ADMIN_ASSIGNES=['Nabil','Cherazade','Loubna'];
+const ADMIN_COL_COLORS={'À faire':'#6B7280','En cours':'#3B82F6','Terminé':'#10B981'};
+
+async function loadAdmin(){
+  const el=document.getElementById('admin-kanban');
+  el.innerHTML='<div class="loading" style="grid-column:span 3">Chargement…</div>';
+  const{data:taches,error}=await sb.from('admin_taches').select('*').order('ordre',{ascending:true});
+  if(error){el.innerHTML=`<div class="empty" style="grid-column:span 3">Table admin_taches manquante — exécutez le SQL dans Supabase.</div>`;return;}
+  el.innerHTML=ADMIN_STATUTS.map(statut=>{
+    const col=(taches||[]).filter(t=>t.statut===statut);
+    const color=ADMIN_COL_COLORS[statut];
+    return`<div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid ${color}">
+        <div style="font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:${color}">${statut}</div>
+        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--muted)">${col.length}</span>
+      </div>
+      <div class="admin-col" data-statut="${statut}" style="display:flex;flex-direction:column;gap:10px;min-height:60px"
+        ondragover="adminDragOver(event)" ondrop="adminDrop(event,'${statut}')">
+        ${col.map(t=>renderAdminCard(t)).join('')}
+        ${col.length===0?`<div class="admin-empty" style="padding:16px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Aucune tâche</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAdminCard(t){
+  const now=new Date(); now.setHours(0,0,0,0);
+  const ech=t.date_echeance?new Date(t.date_echeance+'T12:00:00'):null;
+  const retard=ech&&ech<now&&t.statut!=='Terminé';
+  const commentCount=(t.commentaires||[]).length;
+  const catColors={Comptabilité:'#F59E0B',Administratif:'#3B82F6',Fournisseur:'#8B5CF6',Banque:'#10B981',Autre:'#6B7280'};
+  const catColor=catColors[t.categorie]||'#6B7280';
+  return`<div class="admin-card" data-id="${t.id}" draggable="true"
+    ondragstart="adminDragStart(event,'${t.id}')" ondragend="adminDragEnd(event)"
+    onclick="openAdminTache('${t.id}')"
+    style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s;${t.priorite==='Urgente'?'border-left:3px solid #EF4444':''}"
+    onmouseover="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='none'">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px;line-height:1.4">${t.titre}</div>
+      ${t.priorite==='Urgente'?`<span style="background:#FEF2F2;color:#EF4444;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;white-space:nowrap;flex-shrink:0">🔴 URGENT</span>`:''}
+    </div>
+    ${t.description?`<div style="font-size:11px;color:var(--muted);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${t.description}</div>`:''}
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${catColor}18;color:${catColor};font-weight:600">${t.categorie}</span>
+      ${t.assigne?`<span style="font-size:10px;color:var(--muted)">👤 ${t.assigne}</span>`:''}
+      ${ech?`<span style="font-size:10px;color:${retard?'#EF4444':'var(--muted)'}">📅 ${ech.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}${retard?' ⚠️':''}</span>`:''}
+      ${commentCount?`<span style="font-size:10px;color:var(--muted);margin-left:auto">💬 ${commentCount}</span>`:''}
+    </div>
+  </div>`;
+}
+
+async function openAdminTache(id=null){
+  let data={};
+  if(id){const{data:t}=await sb.from('admin_taches').select('*').eq('id',id).single();data=t||{};}
+  const html=`<div class="modal" style="max-width:520px">
+    <div class="modal-title">${id?'Modifier la tâche':'Nouvelle tâche'}</div>
+    <input type="hidden" id="at-id" value="${id||''}">
+    <div class="form-group"><label>Titre *</label><input id="at-titre" value="${data.titre||''}" placeholder="Ex: Déposer bilan comptable…"></div>
+    <div class="form-group"><label>Description</label><textarea id="at-desc" rows="3" placeholder="Détails, informations utiles…">${data.description||''}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Catégorie</label>
+        <select id="at-cat">
+          ${ADMIN_CATS.map(c=>`<option ${data.categorie===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Assigné à</label>
+        <select id="at-assigne">
+          <option value="">— Aucun —</option>
+          ${ADMIN_ASSIGNES.map(a=>`<option ${data.assigne===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Statut</label>
+        <select id="at-statut">
+          ${ADMIN_STATUTS.map(s=>`<option ${data.statut===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Priorité</label>
+        <select id="at-priorite">
+          <option ${data.priorite==='Normale'||!data.priorite?'selected':''}>Normale</option>
+          <option ${data.priorite==='Urgente'?'selected':''}>Urgente</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Date d'échéance</label><input type="date" id="at-date" value="${data.date_echeance||''}"></div>
+    <div class="form-group">
+      <label>Commentaires</label>
+      <div id="at-comments-list" style="max-height:150px;overflow-y:auto;margin-bottom:8px;display:flex;flex-direction:column;gap:6px">
+        ${(data.commentaires||[]).slice().reverse().map(c=>`
+          <div style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px">
+            <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:2px">${new Date(c.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+            <div>${c.texte}</div>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="at-new-comment" placeholder="Ajouter un commentaire…" style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')addAdminComment()">
+        <button class="btn btn-sm" onclick="addAdminComment()">+</button>
+      </div>
+      <input type="hidden" id="at-comments-data" value="${JSON.stringify(data.commentaires||[]).replace(/"/g,'&quot;')}">
+    </div>
+    <div class="modal-footer">
+      ${id?`<button class="btn btn-sm btn-danger" onclick="deleteAdminTache('${id}')">Supprimer</button>`:''}
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveAdminTache()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+function addAdminComment(){
+  const input=document.getElementById('at-new-comment');
+  const texte=input.value.trim();if(!texte)return;
+  const comments=JSON.parse(document.getElementById('at-comments-data').value.replace(/&quot;/g,'"'));
+  const nc={date:new Date().toISOString(),texte};
+  comments.push(nc);
+  document.getElementById('at-comments-data').value=JSON.stringify(comments).replace(/"/g,'&quot;');
+  const list=document.getElementById('at-comments-list');
+  const div=document.createElement('div');
+  div.style.cssText='padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px';
+  div.innerHTML=`<div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:2px">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div><div>${texte}</div>`;
+  list.insertBefore(div,list.firstChild);
+  input.value='';
+}
+
+async function saveAdminTache(){
+  const id=document.getElementById('at-id').value;
+  const titre=document.getElementById('at-titre').value.trim();
+  if(!titre){toast('Titre requis');return;}
+  const payload={
+    titre,
+    description:document.getElementById('at-desc').value||null,
+    categorie:document.getElementById('at-cat').value,
+    assigne:document.getElementById('at-assigne').value||null,
+    statut:document.getElementById('at-statut').value,
+    priorite:document.getElementById('at-priorite').value,
+    date_echeance:document.getElementById('at-date').value||null,
+    commentaires:JSON.parse(document.getElementById('at-comments-data').value.replace(/&quot;/g,'"'))
+  };
+  let error;
+  if(id){({error}=await sb.from('admin_taches').update(payload).eq('id',id));}
+  else{({error}=await sb.from('admin_taches').insert(payload));}
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast(id?'Tâche mise à jour ✓':'Tâche créée ✓');
+  loadAdmin();
+}
+
+async function deleteAdminTache(id){
+  if(!confirm('Supprimer cette tâche ?'))return;
+  await sb.from('admin_taches').delete().eq('id',id);
+  closeModal('rh-modal');toast('Supprimée');loadAdmin();
+}
+
+// Drag & drop admin
+let adminDragId=null, adminDragEl=null, adminPlaceholder=null;
+function adminDragStart(e,id){
+  adminDragId=id;adminDragEl=e.currentTarget;
+  setTimeout(()=>{if(adminDragEl)adminDragEl.style.opacity='0.4';},0);
+  e.dataTransfer.effectAllowed='move';
+  adminPlaceholder=document.createElement('div');
+  adminPlaceholder.style.cssText=`height:${adminDragEl.offsetHeight}px;border:2px dashed var(--border);border-radius:var(--radius);background:var(--bg);pointer-events:none`;
+  adminPlaceholder.className='admin-placeholder';
+}
+function adminDragEnd(e){
+  if(adminDragEl)adminDragEl.style.opacity='1';
+  adminPlaceholder?.remove();adminPlaceholder=null;adminDragEl=null;
+}
+function adminDragOver(e){
+  e.preventDefault();
+  const col=e.currentTarget;
+  const cards=[...col.querySelectorAll('.admin-card')];
+  const mouse=e.clientY;
+  let closest=null,closestDist=Infinity;
+  cards.forEach(c=>{if(c===adminDragEl)return;const box=c.getBoundingClientRect();const mid=box.top+box.height/2;const dist=Math.abs(mouse-mid);if(dist<closestDist){closestDist=dist;closest={el:c,above:mouse<mid};}});
+  if(adminPlaceholder){
+    if(!closest)col.appendChild(adminPlaceholder);
+    else if(closest.above)col.insertBefore(adminPlaceholder,closest.el);
+    else col.insertBefore(adminPlaceholder,closest.el.nextSibling);
+  }
+}
+async function adminDrop(e,statut){
+  e.preventDefault();
+  if(!adminDragId||!adminPlaceholder)return;
+  const col=e.currentTarget;
+  col.insertBefore(adminDragEl,adminPlaceholder);
+  adminPlaceholder.remove();
+  adminDragEl.style.opacity='1';
+  col.querySelectorAll('.admin-empty').forEach(el=>el.remove());
+  const cards=[...col.querySelectorAll('.admin-card')];
+  await Promise.all(cards.map((c,i)=>sb.from('admin_taches').update({ordre:i,statut}).eq('id',c.dataset.id)));
+  toast('Déplacé ✓');
 }
 
 checkSession();
