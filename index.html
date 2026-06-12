@@ -4845,75 +4845,111 @@ async function loadBusinessObjectifs(){
   const now=new Date();
   const anneeCourante=now.getFullYear();
   const moisCourant=now.getMonth()+1;
-  const debutAnnee=`${anneeCourante}-01-01`;
+
+  // Juin 2026 → Juin 2027 : 13 mois
+  const startMois=6; const startAnnee=2026;
   const moisNoms=['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
 
-  const[{data:facAnnee},{data:objectifs}]=await Promise.all([
-    sb.from('factures').select('*').gte('date_emission',debutAnnee),
-    sb.from('objectifs_ca').select('*').eq('annee',anneeCourante)
+  // Build list of months to display
+  const moisList=[];
+  for(let i=0;i<13;i++){
+    let m=startMois+i; let a=startAnnee;
+    if(m>12){m-=12;a++;}
+    moisList.push({mois:m,annee:a,nom:moisNoms[m-1]});
+  }
+
+  // Fetch all factures + objectifs
+  const [r1,r2]=await Promise.all([
+    sb.from('factures').select('*').gte('date_emission','2026-01-01'),
+    sb.from('objectifs_ca').select('*').in('annee',[2026,2027])
   ]);
+  const factures=r1.data||[];
+  const objectifs=r2.data||[];
 
   const objMap={};
-  (objectifs||[]).forEach(o=>objMap[o.mois===null?'annuel':o.mois]=o);
-  const objAnnuel=Number(objMap['annuel']?.montant||0);
+  objectifs.forEach(o=>objMap[`${o.annee}-${o.mois===null?'annuel':o.mois}`]=o);
 
-  function encaisseFacMois(mois){
+  function encaissePourMois(mois,annee){
     const m=String(mois).padStart(2,'0');
-    return(facAnnee||[]).filter(f=>f.date_emission?.startsWith(`${anneeCourante}-${m}`))
+    return factures.filter(f=>f.date_emission?.startsWith(`${annee}-${m}`))
       .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
   }
-  const encaisseAnnee=(facAnnee||[]).reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
+
+  // Annual stats for 2026
+  const objAnnuel=Number(objMap[`2026-annuel`]?.montant||0);
+  const encaisseAnnee=factures.filter(f=>f.date_emission?.startsWith('2026'))
+    .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
+  const pctAnnee=objAnnuel>0?Math.min(100,Math.round(encaisseAnnee/objAnnuel*100)):0;
+  const resteAnnee=Math.max(0,objAnnuel-encaisseAnnee);
+  const barColorAnnee=pctAnnee>=100?'#10B981':pctAnnee>=70?'#F59E0B':pctAnnee>=40?'#F97316':'#EF4444';
 
   el.innerHTML=`
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:700px">
-      <div style="font-size:15px;font-weight:700;margin-bottom:20px">🎯 Objectifs CA ${anneeCourante}</div>
-      <!-- LIGNE ANNUELLE -->
-      <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:2px solid var(--border);margin-bottom:14px">
-        <div style="width:48px;font-size:12px;font-weight:700;color:var(--muted)">ANNÉE</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:11px;color:var(--muted)">Objectif :</span>
-          <input type="number" id="obj-annuel" value="${objAnnuel||''}" placeholder="0"
-            style="width:130px;font-size:13px;font-weight:600;padding:5px 8px;border:1px solid var(--border);border-radius:4px;text-align:right;font-family:'DM Mono',monospace"
-            onblur="saveObjectif(${anneeCourante},null,this.value)">
-          <span style="font-size:12px;color:var(--muted)">MAD</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-left:16px">
-          <span style="font-size:11px;color:var(--muted)">Réel :</span>
-          <span style="font-size:15px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')} MAD</span>
-        </div>
-        <div style="flex:1;margin-left:16px">
-          ${objAnnuel>0?`
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="flex:1;height:8px;background:#f0ece4;border-radius:4px;overflow:hidden">
-              <div style="height:8px;background:${encaisseAnnee>=objAnnuel?'#10B981':encaisseAnnee/objAnnuel>0.7?'#F59E0B':'#3B82F6'};border-radius:4px;width:${Math.min(100,Math.round(encaisseAnnee/objAnnuel*100))}%"></div>
-            </div>
-            <span style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace;color:${encaisseAnnee>=objAnnuel?'#10B981':'#3B82F6'};min-width:40px">${Math.round(encaisseAnnee/objAnnuel*100)}%</span>
-          </div>`:'<span style="font-size:11px;color:var(--muted);font-style:italic">Saisir un objectif annuel</span>'}
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+      <!-- GRILLE MENSUELLE -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px">
+        <div style="font-size:15px;font-weight:700;margin-bottom:20px">🎯 Suivi mensuel — Juin 2026 → Juin 2027</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${moisList.map(({mois,annee,nom})=>{
+            const obj=Number(objMap[`${annee}-${mois}`]?.montant||0);
+            const reel=encaissePourMois(mois,annee);
+            const reste=Math.max(0,obj-reel);
+            const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
+            const isCurrent=mois===moisCourant&&annee===anneeCourante;
+            const isFuture=(annee>anneeCourante)||(annee===anneeCourante&&mois>moisCourant);
+            const barColor=pct>=100?'#10B981':pct>=70?'#F59E0B':pct>=40?'#F97316':'#EF4444';
+            const label=pct>=100?'✅ ATTEINT':obj>0&&!isFuture?pct+'%':'';
+            const labelColor=pct>=100?'#10B981':pct>=70?'#F59E0B':pct>=40?'#F97316':'#EF4444';
+            return`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:${isCurrent?'#f5f3ee':'transparent'}">
+              <div style="width:40px;font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'}">
+                ${nom}${annee!==anneeCourante?`<span style="font-size:9px"> '27</span>`:''}
+              </div>
+              <input type="number" id="obj-${annee}-${mois}" value="${obj||''}" placeholder="—"
+                style="width:115px;font-size:12px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
+                onblur="saveObjectif(${annee},${mois},this.value)">
+              <span style="font-size:11px;color:var(--muted)">MAD</span>
+              <span style="font-size:12px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:120px;text-align:right;font-weight:${reel>0?'600':'400'}">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
+              <div style="flex:1;height:6px;background:#f0ece4;border-radius:3px;overflow:hidden">
+                ${obj>0&&!isFuture?`<div style="height:6px;background:${barColor};border-radius:3px;width:${pct}%;transition:width .3s"></div>`:''}
+              </div>
+              <span style="font-size:11px;font-weight:700;width:70px;text-align:right;color:${labelColor};white-space:nowrap">${label}</span>
+              ${obj>0&&!isFuture&&reste>0?`<span style="font-size:10px;color:#EF4444;white-space:nowrap">-${reste.toLocaleString('fr-FR')}</span>`:''}
+            </div>`;
+          }).join('')}
         </div>
       </div>
-      <!-- LIGNES MENSUELLES -->
-      <div style="display:flex;flex-direction:column;gap:6px">
-        ${moisNoms.map((nom,i)=>{
-          const mois=i+1;
-          const obj=Number(objMap[mois]?.montant||0);
-          const reel=encaisseFacMois(mois);
-          const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
-          const isCurrent=mois===moisCourant;
-          const isFuture=mois>moisCourant;
-          const barColor=reel>=obj&&obj>0?'#10B981':pct>70?'#F59E0B':'#3B82F6';
-          return`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:${isCurrent?'#f5f3ee':'transparent'}">
-            <div style="width:36px;font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'};">${nom}</div>
-            <input type="number" id="obj-m${mois}" value="${obj||''}" placeholder="—"
-              style="width:120px;font-size:12px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
-              onblur="saveObjectif(${anneeCourante},${mois},this.value)">
-            <span style="font-size:11px;color:var(--muted)">MAD</span>
-            <span style="font-size:13px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:130px;text-align:right;font-weight:${reel>0?'600':'400'}">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
-            <div style="flex:1;height:5px;background:#f0ece4;border-radius:3px;overflow:hidden">
-              ${obj>0&&!isFuture?`<div style="height:5px;background:${barColor};border-radius:3px;width:${pct}%"></div>`:''}
+
+      <!-- CARTE ANNUELLE DROITE -->
+      <div style="display:flex;flex-direction:column;gap:14px;position:sticky;top:20px">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Objectif annuel 2026</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
+              style="flex:1;font-size:18px;font-weight:700;padding:8px 12px;border:1px solid var(--border);border-radius:6px;text-align:right;font-family:'DM Mono',monospace"
+              onblur="saveObjectif(2026,null,this.value)">
+            <span style="font-size:13px;color:var(--muted)">MAD</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+            <div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Encaissé</div>
+              <div style="font-size:22px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')}</div>
+              <div style="font-size:11px;color:var(--muted)">MAD</div>
             </div>
-            <span style="font-size:12px;font-weight:700;width:44px;text-align:right;color:${obj>0&&!isFuture?(reel>=obj?'#10B981':pct>70?'#F59E0B':'#3B82F6'):'var(--muted)'}">${obj>0&&!isFuture?pct+'%':''}</span>
-          </div>`;
-        }).join('')}
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Reste</div>
+              <div style="font-size:22px;font-weight:700;color:#EF4444;font-family:'DM Mono',monospace">${resteAnnee.toLocaleString('fr-FR')}</div>
+              <div style="font-size:11px;color:var(--muted)">MAD</div>
+            </div>
+          </div>
+          <div style="height:10px;background:#f0ece4;border-radius:5px;overflow:hidden;margin-bottom:8px">
+            <div style="height:10px;background:${barColorAnnee};border-radius:5px;width:${pctAnnee}%;transition:width .4s"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;color:var(--muted)">${pctAnnee}% atteint</span>
+            <span style="font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;background:${pctAnnee>=100?'#F0FDF4':pctAnnee>=70?'#FFFBEB':pctAnnee>=40?'#FFF7ED':'#FEF2F2'};color:${barColorAnnee}">
+              ${pctAnnee>=100?'✅ OBJECTIF ATTEINT':pctAnnee>=70?'🟡 En bonne voie':pctAnnee>=40?'🟠 À accélérer':'🔴 En retard'}
+            </span>
+          </div>
+        </div>
       </div>
     </div>`;
 }
