@@ -4846,11 +4846,9 @@ async function loadBusinessObjectifs(){
   const anneeCourante=now.getFullYear();
   const moisCourant=now.getMonth()+1;
 
-  // Juin 2026 → Juin 2027 : 13 mois
   const startMois=6; const startAnnee=2026;
   const moisNoms=['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
 
-  // Build list of months to display
   const moisList=[];
   for(let i=0;i<13;i++){
     let m=startMois+i; let a=startAnnee;
@@ -4858,7 +4856,6 @@ async function loadBusinessObjectifs(){
     moisList.push({mois:m,annee:a,nom:moisNoms[m-1]});
   }
 
-  // Fetch all factures + objectifs
   const [r1,r2]=await Promise.all([
     sb.from('factures').select('*').gte('date_emission','2026-01-01'),
     sb.from('objectifs_ca').select('*').in('annee',[2026,2027])
@@ -4875,16 +4872,15 @@ async function loadBusinessObjectifs(){
       .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
   }
 
-  // Annual stats for 2026
   const objAnnuel=Number(objMap[`2026-annuel`]?.montant||0);
   const encaisseAnnee=factures.filter(f=>f.date_emission?.startsWith('2026'))
     .reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0);
   const pctAnnee=objAnnuel>0?Math.min(100,Math.round(encaisseAnnee/objAnnuel*100)):0;
   const resteAnnee=Math.max(0,objAnnuel-encaisseAnnee);
-  const barColorAnnee=pctAnnee>=100?'#10B981':pctAnnee>=70?'#F59E0B':pctAnnee>=40?'#F97316':'#EF4444';
+  const barColorAnnee=pctAnnee>=100?'#10B981':pctAnnee>=50?'#F59E0B':'#EF4444';
 
   el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
       <!-- GRILLE MENSUELLE -->
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px">
         <div style="font-size:15px;font-weight:700;margin-bottom:20px">🎯 Suivi mensuel — Juin 2026 → Juin 2027</div>
@@ -4896,62 +4892,89 @@ async function loadBusinessObjectifs(){
             const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
             const isCurrent=mois===moisCourant&&annee===anneeCourante;
             const isFuture=(annee>anneeCourante)||(annee===anneeCourante&&mois>moisCourant);
-            const barColor=pct>=100?'#10B981':pct>=70?'#F59E0B':pct>=40?'#F97316':'#EF4444';
+            const barColor=pct>=100?'#10B981':pct>=50?'#10B981':'#F59E0B';
             const label=pct>=100?'✅ ATTEINT':obj>0&&!isFuture?pct+'%':'';
-            const labelColor=pct>=100?'#10B981':pct>=70?'#F59E0B':pct>=40?'#F97316':'#EF4444';
+            const labelColor=pct>=50?'#10B981':'#F59E0B';
             return`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:${isCurrent?'#f5f3ee':'transparent'}">
-              <div style="width:40px;font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'}">
-                ${nom}${annee!==anneeCourante?`<span style="font-size:9px"> '27</span>`:''}
+              <div style="width:44px;font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?'#1a1a18':'var(--muted)'}">
+                ${nom}${annee!==anneeCourante?`<span style="font-size:9px;color:var(--muted)"> '27</span>`:''}
               </div>
               <input type="number" id="obj-${annee}-${mois}" value="${obj||''}" placeholder="—"
                 style="width:115px;font-size:12px;padding:4px 8px;border:1px solid ${isCurrent?'var(--accent)':'var(--border)'};border-radius:4px;text-align:right;font-family:'DM Mono',monospace;background:${isFuture?'#fafaf8':'#fff'}"
+                oninput="updateObjRow('${annee}',${mois},${reel})"
                 onblur="saveObjectif(${annee},${mois},this.value)">
               <span style="font-size:11px;color:var(--muted)">MAD</span>
-              <span style="font-size:12px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:120px;text-align:right;font-weight:${reel>0?'600':'400'}">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
-              <div style="flex:1;height:6px;background:#f0ece4;border-radius:3px;overflow:hidden">
-                ${obj>0&&!isFuture?`<div style="height:6px;background:${barColor};border-radius:3px;width:${pct}%;transition:width .3s"></div>`:''}
+              <span style="font-size:12px;font-family:'DM Mono',monospace;color:${reel>0?'#10B981':'var(--muted)'};width:110px;text-align:right;font-weight:${reel>0?'600':'400'}">${reel>0?reel.toLocaleString('fr-FR')+' MAD':'—'}</span>
+              <div id="bar-${annee}-${mois}" style="flex:1;height:6px;background:#f0ece4;border-radius:3px;overflow:hidden">
+                ${obj>0&&!isFuture?`<div style="height:6px;background:${barColor};border-radius:3px;width:${pct}%"></div>`:''}
               </div>
-              <span style="font-size:11px;font-weight:700;width:70px;text-align:right;color:${labelColor};white-space:nowrap">${label}</span>
-              ${obj>0&&!isFuture&&reste>0?`<span style="font-size:10px;color:#EF4444;white-space:nowrap">-${reste.toLocaleString('fr-FR')}</span>`:''}
+              <span id="lbl-${annee}-${mois}" style="font-size:11px;font-weight:700;width:70px;text-align:right;color:${labelColor};white-space:nowrap">${label}</span>
+              <span id="rst-${annee}-${mois}" style="font-size:10px;color:#F97316;white-space:nowrap;width:60px;text-align:right">${obj>0&&!isFuture&&reste>0?'-'+reste.toLocaleString('fr-FR'):''}</span>
             </div>`;
           }).join('')}
         </div>
       </div>
 
-      <!-- CARTE ANNUELLE DROITE -->
-      <div style="display:flex;flex-direction:column;gap:14px;position:sticky;top:20px">
-        <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px">
-          <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Objectif annuel 2026</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-            <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
-              style="flex:1;font-size:18px;font-weight:700;padding:8px 12px;border:1px solid var(--border);border-radius:6px;text-align:right;font-family:'DM Mono',monospace"
-              onblur="saveObjectif(2026,null,this.value)">
-            <span style="font-size:13px;color:var(--muted)">MAD</span>
+      <!-- CARTE ANNUELLE -->
+      <div style="position:sticky;top:20px">
+        <div style="background:#1a1a18;border-radius:var(--radius);padding:28px;color:#fff">
+          <div style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-bottom:16px">Objectif annuel 2026</div>
+          <div style="margin-bottom:20px">
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px">Objectif</div>
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <input type="number" id="obj-annuel-2026" value="${objAnnuel||''}" placeholder="0"
+                style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:24px;font-weight:700;padding:10px 14px;width:100%;font-family:'DM Mono',monospace;text-align:right"
+                oninput="updateAnnualCard(this.value,${encaisseAnnee})"
+                onblur="saveObjectif(2026,null,this.value)">
+              <span style="color:rgba(255,255,255,0.5);font-size:14px">MAD</span>
+            </div>
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
             <div>
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Encaissé</div>
-              <div style="font-size:22px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')}</div>
-              <div style="font-size:11px;color:var(--muted)">MAD</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">Encaissé</div>
+              <div style="font-size:24px;font-weight:700;color:#10B981;font-family:'DM Mono',monospace">${encaisseAnnee.toLocaleString('fr-FR')}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.4)">MAD</div>
             </div>
-            <div style="text-align:right">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Reste</div>
-              <div style="font-size:22px;font-weight:700;color:#EF4444;font-family:'DM Mono',monospace">${resteAnnee.toLocaleString('fr-FR')}</div>
-              <div style="font-size:11px;color:var(--muted)">MAD</div>
+            <div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">Reste</div>
+              <div id="ann-reste" style="font-size:24px;font-weight:700;color:#F97316;font-family:'DM Mono',monospace">${resteAnnee.toLocaleString('fr-FR')}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.4)">MAD</div>
             </div>
           </div>
-          <div style="height:10px;background:#f0ece4;border-radius:5px;overflow:hidden;margin-bottom:8px">
-            <div style="height:10px;background:${barColorAnnee};border-radius:5px;width:${pctAnnee}%;transition:width .4s"></div>
+          <div id="ann-bar-wrap" style="height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-bottom:10px">
+            <div id="ann-bar" style="height:8px;background:${barColorAnnee};border-radius:4px;width:${pctAnnee}%;transition:width .4s"></div>
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:11px;color:var(--muted)">${pctAnnee}% atteint</span>
-            <span style="font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;background:${pctAnnee>=100?'#F0FDF4':pctAnnee>=70?'#FFFBEB':pctAnnee>=40?'#FFF7ED':'#FEF2F2'};color:${barColorAnnee}">
-              ${pctAnnee>=100?'✅ OBJECTIF ATTEINT':pctAnnee>=70?'🟡 En bonne voie':pctAnnee>=40?'🟠 À accélérer':'🔴 En retard'}
-            </span>
-          </div>
+          <div id="ann-pct" style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7)">${pctAnnee}% atteint</div>
         </div>
       </div>
     </div>`;
+}
+
+function updateObjRow(annee, mois, reel){
+  const obj=Number(document.getElementById(`obj-${annee}-${mois}`)?.value||0);
+  const reste=Math.max(0,obj-reel);
+  const pct=obj>0?Math.min(100,Math.round(reel/obj*100)):0;
+  const isFuture=(Number(annee)>new Date().getFullYear())||(Number(annee)===new Date().getFullYear()&&mois>new Date().getMonth()+1);
+  const barColor=pct>=50?'#10B981':'#F59E0B';
+  const bar=document.getElementById(`bar-${annee}-${mois}`);
+  if(bar) bar.innerHTML=obj>0&&!isFuture?`<div style="height:6px;background:${barColor};border-radius:3px;width:${pct}%"></div>`:'';
+  const lbl=document.getElementById(`lbl-${annee}-${mois}`);
+  if(lbl){lbl.textContent=pct>=100?'✅ ATTEINT':obj>0&&!isFuture?pct+'%':'';lbl.style.color=pct>=50?'#10B981':'#F59E0B';}
+  const rst=document.getElementById(`rst-${annee}-${mois}`);
+  if(rst) rst.textContent=obj>0&&!isFuture&&reste>0?'-'+reste.toLocaleString('fr-FR'):'';
+}
+
+function updateAnnualCard(objVal, encaisse){
+  const obj=Number(objVal||0);
+  const reste=Math.max(0,obj-encaisse);
+  const pct=obj>0?Math.min(100,Math.round(encaisse/obj*100)):0;
+  const barColor=pct>=100?'#10B981':pct>=50?'#F59E0B':'#EF4444';
+  const bar=document.getElementById('ann-bar');
+  if(bar){bar.style.width=pct+'%';bar.style.background=barColor;}
+  const r=document.getElementById('ann-reste');
+  if(r) r.textContent=reste.toLocaleString('fr-FR');
+  const p=document.getElementById('ann-pct');
+  if(p) p.textContent=pct+'% atteint';
 }
 
 async function saveObjectif(annee, mois, montant){
@@ -5063,11 +5086,12 @@ async function loadBusiness(){
       <div style="font-size:13px;font-weight:600;margin-bottom:16px">Détail des factures</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
-          <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT</th>
+          <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">TOTAL TTC</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">ENCAISSÉ</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">RESTE</th>
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600">STATUT</th>
+          <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
           ${(factures||[]).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(f=>{
@@ -5078,13 +5102,14 @@ async function loadBusiness(){
             const badge=reste<=0?`<span style="color:#10B981;font-weight:600">✅ Soldé</span>`:enc>0?`<span style="color:#F59E0B;font-weight:600">${pct}% réglé</span>`:`<span style="color:#EF4444;font-weight:600">En attente</span>`;
             return`<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:10px 0">
-                <div style="font-weight:500">${f.clients?.nom||'—'}</div>
-                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${f.reference}</div>
+                <div style="font-weight:600;font-size:13px">${f.clients?.nom||'—'}${f.projet_nom?` <span style="font-weight:400;color:var(--muted)">— ${f.projet_nom}</span>`:''}</div>
+                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${f.reference} · ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
               </td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace">${ttc.toLocaleString('fr-FR')}</td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;color:#10B981">${enc.toLocaleString('fr-FR')}</td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;color:${reste>0?'#EF4444':'#10B981'}">${reste.toLocaleString('fr-FR')}</td>
               <td style="padding:10px 8px;text-align:center">${badge}</td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="printFacture('${f.id}')">📄 PDF</button></td>
             </tr>`;
           }).join('')}
         </tbody>
