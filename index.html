@@ -1160,7 +1160,7 @@ async function openDevisBuilder(devisId){
       if(document.getElementById('builder-remise')) document.getElementById('builder-remise').value=d.remise||0;
     }
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
-    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire)}))}));
+    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),remise:Number(a.remise||0)}))}));
   } else {
     document.getElementById('builder-ref').textContent='Nouveau devis';
     document.getElementById('builder-projet').value='';
@@ -1187,20 +1187,31 @@ function renderSections(){
         </div>
       </div>
       <table class="articles-table">
-        <thead><tr><th style="width:50%">Article</th><th style="width:15%">Qté</th><th style="width:20%">P.U. HT (MAD)</th><th style="width:12%">Total HT</th><th style="width:3%"></th></tr></thead>
+        <thead><tr>
+          <th style="width:45%">Article</th>
+          <th style="width:10%">Qté</th>
+          <th style="width:17%">P.U. HT (MAD)</th>
+          <th style="width:8%">Remise %</th>
+          <th style="width:15%">Total HT</th>
+          <th style="width:5%"></th>
+        </tr></thead>
         <tbody>
-          ${sec.articles.map((art,ai)=>`
+          ${sec.articles.map((art,ai)=>{
+            const remise=Number(art.remise||0);
+            const totalHT=art.quantite*art.prix_unitaire*(1-remise/100);
+            return`
           <tr data-ai="${ai}">
             <td><input type="text" value="${esc(art.description)}" placeholder="Description de l'article…" oninput="sectionsData[${si}].articles[${ai}].description=this.value"></td>
             <td><input type="number" value="${art.quantite}" min="0" step="0.5" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
             <td><input type="number" value="${art.prix_unitaire}" min="0" oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Number(this.value);updateTotals()" style="text-align:right"></td>
-            <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px">${fmtNum(art.quantite*art.prix_unitaire)}</td>
+            <td><input type="number" value="${remise||''}" min="0" max="100" step="0.5" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].remise=Number(this.value);updateTotals()" style="text-align:center;color:${remise>0?'#E05A2B':'inherit'}"></td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px;${remise>0?'color:#E05A2B':''}">${fmtNum(totalHT)}</td>
             <td><button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px" onclick="removeArticle(${si},${ai})">✕</button></td>
-          </tr>`).join('')}
+          </tr>`;}).join('')}
         </tbody>
       </table>
       <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
-      <div class="section-subtotal">Sous-total HT : <span>${fmtNum(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire,0))} MAD</span></div>
+      <div class="section-subtotal">Sous-total HT : <span>${fmtNum(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*(1-Number(a.remise||0)/100),0))} MAD</span></div>
     </div>`).join('');
   updateTotals();
 }
@@ -1216,11 +1227,11 @@ function addSection(){
 function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}sectionsData.splice(si,1);renderSections();}
 function moveSection(si,dir){const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
 function updateDevisTotal(){updateTotals();}
-function addArticle(si){sectionsData[si].articles.push({id:null,description:'',quantite:1,prix_unitaire:0});renderSections();}
+function addArticle(si){sectionsData[si].articles.push({id:null,description:'',quantite:1,prix_unitaire:0,remise:0});renderSections();}
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
-  const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+  const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0);
   const remisePct=Number(document.getElementById('builder-remise')?.value||0);
   const remiseMnt=ht*(remisePct/100);
   const htApresRemise=ht-remiseMnt;
@@ -1308,6 +1319,7 @@ async function saveDevisBuilder(){
         description:art.description||'',
         quantite:Number(art.quantite)||0,
         prix_unitaire:Number(art.prix_unitaire)||0,
+        remise:Number(art.remise||0),
         ordre:ai
       }).select().single();
       if(artErr){toast('Erreur article: '+artErr.message);return;}
@@ -1331,39 +1343,45 @@ async function printDevis(){
   const ref=document.getElementById('builder-ref').textContent;
   const projet=document.getElementById('builder-projet').value;
   const date=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
-  const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+  const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0);
 
-  const sectionsHTML=sectionsData.map(sec=>`
-    <div style="margin-bottom:28px">
-      <div style="background:#f5f3ee;padding:10px 14px;margin-bottom:0;border-radius:4px 4px 0 0">
+  const sectionsHTML=sectionsData.map(sec=>{
+    const arts=sec.articles.filter(a=>a.description);
+    const hasRemise=arts.some(a=>Number(a.remise||0)>0);
+    const sousTotal=arts.reduce((s,a)=>s+Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);
+    return`<div style="margin-bottom:24px">
+      <div style="background:#f5f3ee;padding:8px 14px;border-radius:4px 4px 0 0">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:monospace">${sec.nom||'Section'}</div>
-        ${sec.sous_titre?`<div style="font-size:12px;color:#aaa;margin-top:2px">${sec.sous_titre}</div>`:''}
+        ${sec.sous_titre?`<div style="font-size:11px;color:#aaa;margin-top:2px">${sec.sous_titre}</div>`:''}
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead>
-          <tr style="background:#f5f3ee">
-            <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc">ARTICLE</th>
-            <th style="padding:8px 14px;text-align:center;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:60px">QTÉ</th>
-            <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">P.U. HT (MAD)</th>
-            <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:120px">TOTAL HT (MAD)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sec.articles.filter(a=>a.description).map((a,i)=>`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+        <thead><tr style="background:#f5f3ee">
+          <th style="padding:7px 14px;text-align:left;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc">ARTICLE</th>
+          <th style="padding:7px 14px;text-align:center;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e8e4dc;width:50px">QTÉ</th>
+          <th style="padding:7px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e8e4dc;width:110px">P.U. HT</th>
+          ${hasRemise?`<th style="padding:7px 14px;text-align:center;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e8e4dc;width:60px">REMISE</th>`:''}
+          <th style="padding:7px 14px;text-align:right;font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e8e4dc;width:110px">TOTAL HT</th>
+        </tr></thead>
+        <tbody>${arts.map((a,i)=>{
+          const remise=Number(a.remise||0);
+          const total=Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-remise/100);
+          return`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
             <td style="padding:9px 14px;border-bottom:1px solid #f0ece4">${a.description}</td>
-            <td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4">${a.quantite}</td>
-            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire).toLocaleString('fr-FR')}</td>
-            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${(a.quantite*a.prix_unitaire).toLocaleString('fr-FR')}</td>
-          </tr>`).join('')}
-        </tbody>
+            <td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4;font-family:monospace">${a.quantite}</td>
+            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire||0).toLocaleString('fr-FR')}</td>
+            ${hasRemise?`<td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4;color:${remise>0?'#E05A2B':'#ccc'}">${remise>0?remise+'%':'—'}</td>`:''}
+            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${total.toLocaleString('fr-FR')}</td>
+          </tr>`;
+        }).join('')}</tbody>
       </table>
-      <div style="background:#f5f3ee;padding:8px 14px;text-align:right;font-size:12px;color:#888;border-radius:0 0 4px 4px">
-        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0).toLocaleString('fr-FR')} MAD</span>
+      <div style="background:#f5f3ee;padding:7px 14px;text-align:right;font-size:12px;color:#888;border-radius:0 0 4px 4px">
+        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${sousTotal.toLocaleString('fr-FR')} MAD</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const recapHTML=sectionsData.map(sec=>{
-    const st=sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0);
+    const st=sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);
     return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
 
