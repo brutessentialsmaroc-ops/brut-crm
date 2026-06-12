@@ -767,15 +767,6 @@ async function loadDashboard(){
 
   const recent=(commandes||[]).slice(0,5);
   document.getElementById('dash-commandes').innerHTML=recent.length?`<table><thead><tr><th>Client</th><th>Description</th><th>Statut</th></tr></thead><tbody>${recent.map(c=>`<tr><td>${c.clients?.nom||'—'}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aucune commande</div>';
-  const av=(commandes||[]).filter(c=>c.atelier_statut==='En cours').slice(0,5);
-  const colorsAv={'A lancer':'#378ADD','En cours':'#EF9F27','Terminé':'#5DCAA5'};
-  document.getElementById('dash-atelier').innerHTML=av.length?av.map(c=>`<div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-    <div>
-      <div style="font-size:13px;font-weight:500">${c.description||'—'}</div>
-      <div style="font-size:11px;color:var(--muted)">${c.clients?.nom||'—'}</div>
-    </div>
-    <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FDF0E3;color:#8A4000;font-weight:500">En cours</span>
-  </div>`).join(''):'<div class="empty">Aucun projet en cours</div>';
 
   // Missions en cours
   const elMissions=document.getElementById('dash-missions');
