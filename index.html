@@ -1278,17 +1278,26 @@ function renderSections(){
 
 function esc(s){return(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 
-function addSection(){
-  sectionsData.push({id:null,nom:'',sous_titre:'',ordre:sectionsData.length,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]});
-  renderSections();
-  // Scroll to new section
-  setTimeout(()=>document.querySelector('.add-section-btn').scrollIntoView({behavior:'smooth'}),100);
+function syncDOM(){
+  document.querySelectorAll('.section-block').forEach((block,si)=>{
+    if(!sectionsData[si])return;
+    block.querySelectorAll('.articles-table tbody tr').forEach((row,ai)=>{
+      if(!sectionsData[si].articles[ai])return;
+      const puTTCInput=row.querySelectorAll('td')[2]?.querySelector('input');
+      if(puTTCInput) sectionsData[si].articles[ai].prix_unitaire=Math.round(Number(puTTCInput.value||0)/1.2*100)/100;
+      const qtInput=row.querySelectorAll('td')[1]?.querySelector('input');
+      if(qtInput) sectionsData[si].articles[ai].quantite=Number(qtInput.value||1);
+      const remInput=row.querySelectorAll('td')[3]?.querySelector('input');
+      if(remInput) sectionsData[si].articles[ai].remise=Number(remInput.value||0);
+    });
+  });
 }
-function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}sectionsData.splice(si,1);renderSections();}
-function moveSection(si,dir){const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
+function addSection(){syncDOM();sectionsData.push({id:null,nom:'',sous_titre:'',ordre:sectionsData.length,articles:[{id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,remise:0}]});renderSections();setTimeout(()=>document.querySelector('.add-section-btn').scrollIntoView({behavior:'smooth'}),100);}
+function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}syncDOM();sectionsData.splice(si,1);renderSections();}
+function moveSection(si,dir){syncDOM();const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
 function updateDevisTotal(){updateTotals();}
-function addArticle(si){sectionsData[si].articles.push({id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,remise:0});renderSections();}
-function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
+function addArticle(si){syncDOM();sectionsData[si].articles.push({id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,remise:0});renderSections();}
+function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}syncDOM();sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
   const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0);
@@ -1305,8 +1314,13 @@ function updateTotals(){
   const tvaEl=document.getElementById('total-tva');
   if(tvaEl) tvaEl.textContent=Math.round(htNet*0.2).toLocaleString('fr-FR')+' MAD';
   // Update section subtotals
-  document.querySelectorAll('.section-subtotal span').forEach((el,i)=>{
-    if(sectionsData[i]){const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);el.textContent=fmtNum(st)+' MAD';}
+  document.querySelectorAll('.section-subtotal').forEach((el,i)=>{
+    if(sectionsData[i]){
+      const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);
+      const spans=el.querySelectorAll('span');
+      if(spans[0]) spans[0].textContent=Math.round(st).toLocaleString('fr-FR')+' MAD';
+      if(spans[1]) spans[1].textContent=Math.round(st*1.2).toLocaleString('fr-FR')+' MAD';
+    }
   });
   // Update article totals
   document.querySelectorAll('.articles-table tbody tr').forEach(row=>{
