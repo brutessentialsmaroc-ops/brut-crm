@@ -1564,8 +1564,8 @@ async function printDevisById(devisId){
             ${a.description?`<div style="font-size:11px;color:#aaa;margin-top:2px">${a.description}</div>`:''}
           </td>
           <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:center;font-family:monospace">${a.quantite||1}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace">${Number(a.prix_unitaire||0).toLocaleString('fr-FR')}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-weight:500">${(Number(a.quantite||1)*Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace">${Math.round(Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-weight:500">${Math.round(Number(a.quantite||1)*Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>`;
@@ -1940,13 +1940,13 @@ async function printFacture(id){
           <tr style="background:${i%2===0?'#fff':'#faf9f7'}">
             <td style="padding:8px 14px;border-bottom:1px solid #f0ece4">${a.description}</td>
             <td style="padding:8px 14px;text-align:center;border-bottom:1px solid #f0ece4">${a.quantite}</td>
-            <td style="padding:8px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire).toLocaleString('fr-FR')}</td>
-            <td style="padding:8px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${(a.quantite*a.prix_unitaire).toLocaleString('fr-FR')}</td>
+            <td style="padding:8px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Math.round(Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
+            <td style="padding:8px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${Math.round(a.quantite*Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
           </tr>`).join('')}
         </tbody>
       </table>
       <div style="background:#f5f3ee;padding:7px 14px;text-align:right;font-size:11px;color:#888;border-radius:0 0 4px 4px">
-        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${(sec.devis_articles||[]).reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0).toLocaleString('fr-FR')} MAD</span>
+        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${Math.round((sec.devis_articles||[]).reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0)).toLocaleString('fr-FR')} MAD</span>
       </div>
     </div>`).join('');
 
