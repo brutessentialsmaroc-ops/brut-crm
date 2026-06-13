@@ -3282,14 +3282,19 @@ async function deleteProspect(id){
   closeModal('rh-modal');toast('Supprimé');loadProspects();
 }
 
-function addProspectComment(){
+async function addProspectComment(){
   const input=document.getElementById('pr-new-comment');
   const statut=document.getElementById('pr-call-statut')?.value||'';
   const texte=input.value.trim();
   if(!statut&&!texte){toast('Choisissez un résultat ou écrivez une note');return;}
+  const id=document.getElementById('pr-id')?.value;
+  if(!id){toast('Enregistrez d\'abord le prospect');return;}
   const comments=JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"'));
   const newComment={date:new Date().toISOString(),texte,statut_appel:statut};
   comments.push(newComment);
+  // Sauvegarde immédiate en base
+  const{error}=await sb.from('prospects').update({commentaires:comments}).eq('id',id);
+  if(error){toast('Erreur: '+error.message);return;}
   document.getElementById('pr-comments-data').value=JSON.stringify(comments).replace(/"/g,'&quot;');
   const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','':'#9CA3AF'};
   const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','':'#F3F4F6'};
@@ -3305,6 +3310,7 @@ function addProspectComment(){
   list.insertBefore(div, list.firstChild);
   input.value='';
   if(document.getElementById('pr-call-statut')) document.getElementById('pr-call-statut').value='';
+  toast('Appel enregistré ✓');
 }
 
 async function uploadProspectPhotos(input,prospectId){
