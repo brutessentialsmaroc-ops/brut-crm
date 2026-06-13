@@ -3078,7 +3078,7 @@ const PROSPECT_COLS=[
 ];
 
 async function loadProspects(){
-  const{data}=await sb.from('prospects').select('*,devis(reference,projet_nom)').order('created_at',{ascending:false});
+  const{data}=await sb.from('prospects').select('*,devis(reference,projet_nom)').order('ordre',{ascending:true}).order('created_at',{ascending:false});
   const groups={};
   PROSPECT_COLS.forEach(c=>{groups[c.key]=[];});
   (data||[]).forEach(p=>{
@@ -3091,7 +3091,7 @@ async function loadProspects(){
     <div class="kanban-col" style="border-top:3px solid ${col.color}">
       <div class="kanban-header">${col.label} <span class="kanban-count">${groups[col.key].length}</span></div>
       <div class="kanban-col-body" data-col="${col.key}"
-        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragover="prospectDragOver(event)"
         ondragleave="this.classList.remove('drag-over')"
         ondrop="dropProspect(event,'${col.key}')">
         ${groups[col.key].length?groups[col.key].map(p=>renderProspectCard(p)).join('')
@@ -3133,15 +3133,59 @@ function renderProspectCard(p){
   </div>`;
 }
 
-let dragProspectId=null;
-function dragProspectStart(e,id){dragProspectId=id;setTimeout(()=>e.target.classList.add('dragging'),0);}
-async function dropProspect(e,col){
+let dragProspectId=null, dragProspectEl=null, prospectPlaceholder=null;
+
+function dragProspectStart(e, id){
+  dragProspectId=id;
+  dragProspectEl=e.currentTarget;
+  setTimeout(()=>{if(dragProspectEl)dragProspectEl.style.opacity='0.4';},0);
+  e.dataTransfer.effectAllowed='move';
+  prospectPlaceholder=document.createElement('div');
+  prospectPlaceholder.style.cssText=`height:${dragProspectEl.offsetHeight}px;border:2px dashed var(--border);border-radius:var(--radius);background:var(--bg);pointer-events:none;margin-bottom:8px`;
+  prospectPlaceholder.className='prospect-placeholder';
+}
+
+function dragEnd(e){
+  if(dragProspectEl)dragProspectEl.style.opacity='1';
+  prospectPlaceholder?.remove();prospectPlaceholder=null;dragProspectEl=null;
+}
+
+function prospectDragOver(e){
+  e.preventDefault();
+  const col=e.currentTarget;
+  col.classList.add('drag-over');
+  const cards=[...col.querySelectorAll('.kanban-card')];
+  const mouse=e.clientY;
+  let closest=null,closestDist=Infinity;
+  cards.forEach(c=>{
+    if(c===dragProspectEl)return;
+    const box=c.getBoundingClientRect();
+    const mid=box.top+box.height/2;
+    const dist=Math.abs(mouse-mid);
+    if(dist<closestDist){closestDist=dist;closest={el:c,above:mouse<mid};}
+  });
+  if(prospectPlaceholder){
+    if(!closest)col.appendChild(prospectPlaceholder);
+    else if(closest.above)col.insertBefore(prospectPlaceholder,closest.el);
+    else col.insertBefore(prospectPlaceholder,closest.el.nextSibling);
+  }
+}
+
+async function dropProspect(e, col){
   e.preventDefault();
   document.querySelectorAll('.kanban-col-body').forEach(c=>c.classList.remove('drag-over'));
-  if(!dragProspectId)return;
-  await sb.from('prospects').update({statut:col}).eq('id',dragProspectId);
-  dragProspectId=null;
-  loadProspects();
+  if(!dragProspectId||!dragProspectEl)return;
+  const colEl=e.currentTarget;
+  if(prospectPlaceholder&&prospectPlaceholder.parentNode===colEl){
+    colEl.insertBefore(dragProspectEl,prospectPlaceholder);
+  }
+  prospectPlaceholder?.remove();
+  dragProspectEl.style.opacity='1';
+  // Calcul nouvel ordre
+  const cards=[...colEl.querySelectorAll('.kanban-card')];
+  const ordre=cards.indexOf(dragProspectEl);
+  await sb.from('prospects').update({statut:col,ordre}).eq('id',dragProspectId);
+  dragProspectId=null;dragProspectEl=null;
 }
 
 async function openProspectModal(data={}){
