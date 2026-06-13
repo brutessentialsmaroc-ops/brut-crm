@@ -3103,13 +3103,21 @@ async function loadProspects(){
 function renderProspectCard(p){
   const safeData=JSON.stringify({id:p.id,nom:p.nom,telephone:p.telephone||'',email:p.email||'',source:p.source||'',source_autre:p.source_autre||'',besoin:p.besoin||'',budget:p.budget||'',statut:p.statut||'Nouveau',devis_id:p.devis_id||'',notes:p.notes||'',photos:p.photos||[],pdf_url:p.pdf_url||'',commentaires:p.commentaires||[],date_contact:p.date_contact||p.created_at||''}).replace(/"/g,'&quot;');
   const dateLabel=p.date_contact||p.created_at?new Date(p.date_contact||p.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):'';
+  // Dernier statut d'appel
+  const calls=(p.commentaires||[]).filter(c=>c.statut_appel);
+  const lastCall=calls.length?calls[calls.length-1]:null;
+  const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B'};
+  const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB'};
   return`<div class="kanban-card" draggable="true" data-id="${p.id}"
     ondragstart="dragProspectStart(event,'${p.id}')"
     ondragend="dragEnd(event)"
     onclick="openProspectModal(JSON.parse(this.dataset.prospect))"
     data-prospect="${safeData}">
     <div class="kanban-card-body">
-      <div class="kanban-card-title">${p.nom}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
+        <div class="kanban-card-title">${p.nom}</div>
+        ${lastCall?`<span style="flex-shrink:0;font-size:9px;padding:2px 7px;border-radius:20px;background:${statBg[lastCall.statut_appel]||'#F3F4F6'};color:${statColors[lastCall.statut_appel]||'#9CA3AF'};font-weight:600;white-space:nowrap">${lastCall.statut_appel}</span>`:''}
+      </div>
       <div class="kanban-card-sub">${p.telephone||p.email||'—'}</div>
       ${p.besoin?`<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.besoin}</div>`:''}
       ${p.devis?`<div style="margin-top:6px"><span class="badge badge-blue" style="font-size:10px">${p.devis.reference||''} ${p.devis.projet_nom||''}</span></div>`:''}
@@ -3311,6 +3319,8 @@ async function addProspectComment(){
   input.value='';
   if(document.getElementById('pr-call-statut')) document.getElementById('pr-call-statut').value='';
   toast('Appel enregistré ✓');
+  // Mettre à jour la carte dans le kanban en arrière-plan
+  loadProspects();
 }
 
 async function uploadProspectPhotos(input,prospectId){
