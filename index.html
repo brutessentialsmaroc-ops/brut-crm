@@ -1107,8 +1107,8 @@ async function loadDevisList(){
   el.innerHTML=(data||[]).map(d=>{
     const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const remise=Number(d.remise||0);
-    const htNet=ht*(1-remise/100);
-    const ttc=htNet*1.2;
+    const htNet=Math.round(ht*(1-remise/100));
+    const ttc=Math.round(htNet*1.2);
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="openDevisBuilder('${d.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
