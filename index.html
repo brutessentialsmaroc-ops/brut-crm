@@ -528,17 +528,15 @@
         <div class="add-section-btn" onclick="addSection()">+ Ajouter une pièce / section</div>
         <!-- TOTAL -->
         <div class="devis-total" id="devis-total-block">
-          <div class="devis-total-row"><span>Total HT</span><span id="total-ht">0 MAD</span></div>
           <div class="devis-total-row" style="align-items:center">
             <span style="display:flex;align-items:center;gap:8px">
-              Remise
+              Remise globale
               <input type="number" id="builder-remise" min="0" max="100" step="0.5" value="0"
                 oninput="updateDevisTotal()"
                 style="width:60px;font-size:13px;padding:3px 6px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;text-align:center"> %
             </span>
             <span id="total-remise">0 MAD</span>
           </div>
-          <div class="devis-total-row"><span>TVA 20%</span><span id="total-tva">0 MAD</span></div>
           <div class="devis-total-row"><span>TOTAL TTC</span><span id="total-ttc">0 MAD</span></div>
         </div>
       </div>
@@ -1190,28 +1188,31 @@ function renderSections(){
         <thead><tr>
           <th style="width:45%">Article</th>
           <th style="width:10%">Qté</th>
-          <th style="width:17%">P.U. HT (MAD)</th>
+          <th style="width:17%">P.U. TTC (MAD)</th>
           <th style="width:8%">Remise %</th>
-          <th style="width:15%">Total HT</th>
+          <th style="width:15%">Total TTC</th>
           <th style="width:5%"></th>
         </tr></thead>
         <tbody>
           ${sec.articles.map((art,ai)=>{
             const remise=Number(art.remise||0);
-            const totalHT=art.quantite*art.prix_unitaire*(1-remise/100);
+            const puTTC=Math.round(art.prix_unitaire*1.2*100)/100;
+            const totalTTC=Math.round(art.quantite*puTTC*(1-remise/100)*100)/100;
             return`
           <tr data-ai="${ai}">
             <td><input type="text" value="${esc(art.description)}" placeholder="Description de l'article…" oninput="sectionsData[${si}].articles[${ai}].description=this.value"></td>
             <td><input type="number" value="${art.quantite}" min="0" step="0.5" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
-            <td><input type="number" value="${art.prix_unitaire}" min="0" oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Number(this.value);updateTotals()" style="text-align:right"></td>
+            <td><input type="number" value="${puTTC||''}" min="0" step="0.01" placeholder="0"
+              oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Math.round(Number(this.value)/1.2*100)/100;updateTotals()"
+              style="text-align:right"></td>
             <td><input type="number" value="${remise||''}" min="0" max="100" step="0.5" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].remise=Number(this.value);updateTotals()" style="text-align:center;color:${remise>0?'#E05A2B':'inherit'}"></td>
-            <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px;${remise>0?'color:#E05A2B':''}">${fmtNum(totalHT)}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px;${remise>0?'color:#E05A2B':''}">${fmtNum(totalTTC)}</td>
             <td><button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px" onclick="removeArticle(${si},${ai})">✕</button></td>
           </tr>`;}).join('')}
         </tbody>
       </table>
       <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
-      <div class="section-subtotal">Sous-total HT : <span>${fmtNum(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*(1-Number(a.remise||0)/100),0))} MAD</span></div>
+      <div class="section-subtotal">Sous-total TTC : <span>${fmtNum(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*1.2*(1-Number(a.remise||0)/100),0))} MAD</span></div>
     </div>`).join('');
   updateTotals();
 }
@@ -1231,17 +1232,22 @@ function addArticle(si){sectionsData[si].articles.push({id:null,description:'',q
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
+  // sectionsData stocke prix_unitaire en HT — on affiche TTC dans le builder
   const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0);
   const remisePct=Number(document.getElementById('builder-remise')?.value||0);
   const remiseMnt=ht*(remisePct/100);
-  const htApresRemise=ht-remiseMnt;
-  const tva=htApresRemise*0.2;
-  const ttc=htApresRemise+tva;
-  document.getElementById('total-ht').textContent=ht.toLocaleString('fr-FR')+' MAD';
+  const htNet=ht-remiseMnt;
+  const ttc=htNet*1.2;
+  const ttcAvantRemise=ht*1.2;
+  const remiseTTC=ttcAvantRemise*(remisePct/100);
   const remiseEl=document.getElementById('total-remise');
-  if(remiseEl) remiseEl.textContent=remisePct>0?'-'+remiseMnt.toLocaleString('fr-FR')+' MAD':'0 MAD';
-  document.getElementById('total-tva').textContent=tva.toLocaleString('fr-FR')+' MAD';
-  document.getElementById('total-ttc').textContent=ttc.toLocaleString('fr-FR')+' MAD';
+  if(remiseEl) remiseEl.textContent=remisePct>0?'-'+fmtNum(remiseTTC)+' MAD':'0 MAD';
+  const ttcEl=document.getElementById('total-ttc');
+  if(ttcEl) ttcEl.textContent=fmtNum(ttc)+' MAD';
+  const htEl=document.getElementById('total-ht');
+  if(htEl) htEl.textContent=fmtNum(ht)+' MAD';
+  const tvaEl=document.getElementById('total-tva');
+  if(tvaEl) tvaEl.textContent=fmtNum(htNet*0.2)+' MAD';
   // Update section subtotals
   document.querySelectorAll('.section-subtotal span').forEach((el,i)=>{
     if(sectionsData[i]){const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);el.textContent=fmtNum(st)+' MAD';}
@@ -1253,8 +1259,9 @@ function updateTotals(){
     if(sectionsData[si]&&sectionsData[si].articles[ai]){
       const a=sectionsData[si].articles[ai];
       const remise=Number(a.remise||0);
-      const totalCell=row.querySelectorAll('td')[4]; // 5th col = Total HT (after remise col)
-      if(totalCell)totalCell.textContent=fmtNum(a.quantite*a.prix_unitaire*(1-remise/100));
+      const totalTTC=Math.round(a.quantite*a.prix_unitaire*1.2*(1-remise/100)*100)/100;
+      const totalCell=row.querySelectorAll('td')[4];
+      if(totalCell)totalCell.textContent=fmtNum(totalTTC);
       const remiseInput=row.querySelectorAll('td')[3]?.querySelector('input');
       if(remiseInput&&remise>0)remiseInput.style.color='#E05A2B';
     }
