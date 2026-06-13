@@ -1190,7 +1190,18 @@ function setSectionNom(si,val){
   sectionsData[si].nom=val;renderSections();
 }
 function setArticleDesc(si,ai,val){
-  if(val==='__custom__'){sectionsData[si].articles[ai].description='';renderSections();return;}
+  if(val==='__custom__'){
+    sectionsData[si].articles[ai].description='__custom__';
+    renderSections();
+    // Focus sur le champ texte qui vient d'apparaître
+    setTimeout(()=>{
+      const rows=document.querySelectorAll(`.section-block[data-si="${si}"] .articles-table tbody tr`);
+      const input=rows[ai]?.querySelector('input[type="text"]');
+      if(input){input.focus();input.value='';}
+      sectionsData[si].articles[ai].description='';
+    },50);
+    return;
+  }
   sectionsData[si].articles[ai].description=val;
 }
 function renderSections(){
@@ -1230,7 +1241,7 @@ function renderSections(){
           const remise=Number(art.remise||0);
           const puTTC=Math.round(art.prix_unitaire*1.2);
           const totalTTC=Math.round(art.quantite*art.prix_unitaire*1.2*(1-remise/100));
-          const isCustomArt=art.description&&!articlesForPiece.includes(art.description);
+          const isCustomArt=art.description==='__custom__'||(art.description&&!articlesForPiece.includes(art.description));
           const artOpts=articlesForPiece.map(a=>`<option value="${a}" ${art.description===a?'selected':''}>${a}</option>`).join('');
           return`<tr data-ai="${ai}">
             <td style="display:flex;flex-direction:column;gap:3px">
@@ -1241,7 +1252,8 @@ function renderSections(){
                   ${artOpts}
                   <option value="__custom__" ${isCustomArt?'selected':''}>✏️ Saisie libre…</option>
                 </select>`:''}
-                ${isCustomArt||!articlesForPiece.length?`<input type="text" value="${esc(art.description)}" placeholder="Description…" oninput="sectionsData[${si}].articles[${ai}].description=this.value" style="border:none;border-bottom:1px solid var(--border);background:transparent;font-size:13px;color:var(--text);padding:2px 4px;min-width:180px;flex:1">`:''}
+                ${isCustomArt||!articlesForPiece.length?`<input type="text" value="${esc(art.description==="__custom__"?"":art.description)}" placeholder="Saisir l'article…" oninput="sectionsData[${si}].articles[${ai}].description=this.value" style="border:none;border-bottom:1px solid var(--accent);background:transparent;font-size:13px;color:var(--text);padding:2px 4px;min-width:200px;flex:1">`:""}
+
               </div>
               <input type="text" value="${esc(art.sous_titre||'')}" placeholder="Dimensions, couleur, matière…"
                 oninput="sectionsData[${si}].articles[${ai}].sous_titre=this.value"
