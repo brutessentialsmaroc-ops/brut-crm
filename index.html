@@ -1430,7 +1430,7 @@ async function printDevis(){
     const arts=sec.articles.filter(a=>a.description);
     const hasRemise=arts.some(a=>Number(a.remise||0)>0);
     const sousTotal=Math.round(arts.reduce((s,a)=>s+Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0));
-    return`<div style="margin-bottom:24px">
+    return`<div style="margin-bottom:24px;page-break-inside:avoid">
       <div style="background:#f5f3ee;padding:8px 14px;border-radius:4px 4px 0 0">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:monospace">${sec.nom||'Section'}</div>
         ${sec.sous_titre?`<div style="font-size:11px;color:#aaa;margin-top:2px">${sec.sous_titre}</div>`:''}
