@@ -3118,6 +3118,7 @@ function renderProspectCard(p){
         <div class="kanban-card-title">${p.nom}</div>
         ${lastCall?`<span style="flex-shrink:0;font-size:9px;padding:2px 7px;border-radius:20px;background:${statBg[lastCall.statut_appel]||'#F3F4F6'};color:${statColors[lastCall.statut_appel]||'#9CA3AF'};font-weight:600;white-space:nowrap">${lastCall.statut_appel}</span>`:''}
       </div>
+      ${lastCall?`<div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace">📞 ${new Date(lastCall.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</div>`:''}
       <div class="kanban-card-sub">${p.telephone||p.email||'—'}</div>
       ${p.besoin?`<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.besoin}</div>`:''}
       ${p.devis?`<div style="margin-top:6px"><span class="badge badge-blue" style="font-size:10px">${p.devis.reference||''} ${p.devis.projet_nom||''}</span></div>`:''}
