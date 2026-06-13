@@ -3119,6 +3119,7 @@ function renderProspectCard(p){
         ${lastCall?`<span style="flex-shrink:0;font-size:9px;padding:2px 7px;border-radius:20px;background:${statBg[lastCall.statut_appel]||'#F3F4F6'};color:${statColors[lastCall.statut_appel]||'#9CA3AF'};font-weight:600;white-space:nowrap">${lastCall.statut_appel}</span>`:''}
       </div>
       ${lastCall?`<div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace">📞 ${new Date(lastCall.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</div>`:''}
+      ${p.next_relance?`<div style="font-size:10px;margin-top:2px;color:#F59E0B;font-weight:600">🔔 Relance : ${new Date(p.next_relance+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</div>`:''}
       <div class="kanban-card-sub">${p.telephone||p.email||'—'}</div>
       ${p.besoin?`<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.besoin}</div>`:''}
       ${p.devis?`<div style="margin-top:6px"><span class="badge badge-blue" style="font-size:10px">${p.devis.reference||''} ${p.devis.projet_nom||''}</span></div>`:''}
@@ -3214,6 +3215,11 @@ async function openProspectModal(data={}){
             <option>Rappeler</option>
           </select>
         </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:11px;color:var(--muted);white-space:nowrap">📅 Prochaine relance</label>
+          <input type="date" id="pr-next-relance" value="${data.next_relance||''}"
+            style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px">
+        </div>
         <div style="display:flex;gap:8px">
           <input id="pr-new-comment" placeholder="Note optionnelle…" style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')addProspectComment()">
           <button class="btn btn-sm btn-primary" onclick="addProspectComment()">📞 Enregistrer</button>
@@ -3276,6 +3282,7 @@ async function saveProspect(){
     statut:document.getElementById('pr-statut').value,
     devis_id:document.getElementById('pr-devis').value||null,
     notes:document.getElementById('pr-notes').value,
+    next_relance:document.getElementById('pr-next-relance')?.value||null,
     commentaires:JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"')),
     photos:JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'))
   };
@@ -3301,8 +3308,9 @@ async function addProspectComment(){
   const comments=JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"'));
   const newComment={date:new Date().toISOString(),texte,statut_appel:statut};
   comments.push(newComment);
+  const nextRelance=document.getElementById('pr-next-relance')?.value||null;
   // Sauvegarde immédiate en base
-  const{error}=await sb.from('prospects').update({commentaires:comments}).eq('id',id);
+  const{error}=await sb.from('prospects').update({commentaires:comments,next_relance:nextRelance}).eq('id',id);
   if(error){toast('Erreur: '+error.message);return;}
   document.getElementById('pr-comments-data').value=JSON.stringify(comments).replace(/"/g,'&quot;');
   const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','':'#9CA3AF'};
