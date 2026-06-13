@@ -1268,7 +1268,7 @@ function renderSections(){
         </tbody>
       </table>
       <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
-      <div class="section-subtotal">Sous-total TTC : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*1.2*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span></div>
+      <div class="section-subtotal">Sous-total HT : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span></div>
     </div>`;}).join('');
   updateTotals();
 }
@@ -1412,7 +1412,7 @@ async function printDevis(){
   const sectionsHTML=sectionsData.map(sec=>{
     const arts=sec.articles.filter(a=>a.description);
     const hasRemise=arts.some(a=>Number(a.remise||0)>0);
-    const sousTotal=arts.reduce((s,a)=>s+Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);
+    const sousTotal=Math.round(arts.reduce((s,a)=>s+Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0));
     return`<div style="margin-bottom:24px">
       <div style="background:#f5f3ee;padding:8px 14px;border-radius:4px 4px 0 0">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#888;font-family:monospace">${sec.nom||'Section'}</div>
@@ -1428,28 +1428,28 @@ async function printDevis(){
         </tr></thead>
         <tbody>${arts.map((a,i)=>{
           const remise=Number(a.remise||0);
-          const total=Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-remise/100);
+          const puHT=Math.round(Number(a.prix_unitaire||0));
+          const total=Math.round(Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-remise/100));
           return`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
             <td style="padding:9px 14px;border-bottom:1px solid #f0ece4">
               <div>${a.description}</div>
               ${a.sous_titre?`<div style="font-size:10px;color:#aaa;margin-top:2px">${a.sous_titre}</div>`:''}
             </td>
             <td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4;font-family:monospace">${a.quantite}</td>
-            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire||0).toLocaleString('fr-FR')}</td>
+            <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${puHT.toLocaleString('fr-FR')}</td>
             ${hasRemise?`<td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4;color:${remise>0?'#E05A2B':'#ccc'}">${remise>0?remise+'%':'—'}</td>`:''}
             <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace;font-weight:500">${total.toLocaleString('fr-FR')}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>
       <div style="background:#f5f3ee;padding:7px 14px;text-align:right;font-size:12px;color:#888;border-radius:0 0 4px 4px">
-        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${sousTotal.toLocaleString('fr-FR')} MAD</span>
-      </div>
+        SOUS-TOTAL HT <span style="font-weight:600;color:#1a1a18;font-family:monospace;margin-left:12px">${sousTotal.toLocaleString('fr-FR')} MAD</span>      </div>
     </div>`;
   }).join('');
 
   const recapHTML=sectionsData.map(sec=>{
-    const st=sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);
-    return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
+    const st=Math.round(sec.articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0));
+    return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${Math.round(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
 
   const remisePct=Number(document.getElementById('builder-remise')?.value||0);
