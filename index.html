@@ -3229,11 +3229,11 @@ async function dropProspect(e, col){
   }
   prospectPlaceholder?.remove();
   dragProspectEl.style.opacity='1';
-  // Calcul nouvel ordre
+  // Sauvegarder statut + ordre de toutes les cartes de la colonne
   const cards=[...colEl.querySelectorAll('.kanban-card')];
-  const ordre=cards.indexOf(dragProspectEl);
-  await sb.from('prospects').update({statut:col,ordre}).eq('id',dragProspectId);
+  await Promise.all(cards.map((c,i)=>sb.from('prospects').update({statut:col,ordre:i}).eq('id',c.dataset.id)));
   dragProspectId=null;dragProspectEl=null;
+  toast('Position sauvegardée ✓');
 }
 
 async function openProspectModal(data={}){
