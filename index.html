@@ -1158,7 +1158,7 @@ async function openDevisBuilder(devisId){
       if(document.getElementById('builder-remise')) document.getElementById('builder-remise').value=d.remise||0;
     }
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
-    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),remise:Number(a.remise||0)}))}));
+    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,sous_titre:a.sous_titre||'',quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),remise:Number(a.remise||0)}))}));
   } else {
     document.getElementById('builder-ref').textContent='Nouveau devis';
     document.getElementById('builder-projet').value='';
@@ -1233,14 +1233,19 @@ function renderSections(){
           const isCustomArt=art.description&&!articlesForPiece.includes(art.description);
           const artOpts=articlesForPiece.map(a=>`<option value="${a}" ${art.description===a?'selected':''}>${a}</option>`).join('');
           return`<tr data-ai="${ai}">
-            <td style="display:flex;align-items:center;gap:6px">
-              ${articlesForPiece.length?`<select onchange="setArticleDesc(${si},${ai},this.value)"
-                style="flex:1;border:none;background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);padding:2px 0;cursor:pointer">
-                <option value="">— Article —</option>
-                ${artOpts}
-                <option value="__custom__" ${isCustomArt?'selected':''}>✏️ Saisie libre…</option>
-              </select>`:''}
-              ${isCustomArt||!articlesForPiece.length?`<input type="text" value="${esc(art.description)}" placeholder="Description…" oninput="sectionsData[${si}].articles[${ai}].description=this.value" style="border:none;border-bottom:1px solid var(--border);background:transparent;font-size:13px;color:var(--text);padding:2px 4px;min-width:180px;flex:1">`:''}
+            <td style="display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;align-items:center;gap:6px">
+                ${articlesForPiece.length?`<select onchange="setArticleDesc(${si},${ai},this.value)"
+                  style="flex:1;border:none;background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);padding:2px 0;cursor:pointer">
+                  <option value="">— Article —</option>
+                  ${artOpts}
+                  <option value="__custom__" ${isCustomArt?'selected':''}>✏️ Saisie libre…</option>
+                </select>`:''}
+                ${isCustomArt||!articlesForPiece.length?`<input type="text" value="${esc(art.description)}" placeholder="Description…" oninput="sectionsData[${si}].articles[${ai}].description=this.value" style="border:none;border-bottom:1px solid var(--border);background:transparent;font-size:13px;color:var(--text);padding:2px 4px;min-width:180px;flex:1">`:''}
+              </div>
+              <input type="text" value="${esc(art.sous_titre||'')}" placeholder="Dimensions, couleur, matière…"
+                oninput="sectionsData[${si}].articles[${ai}].sous_titre=this.value"
+                style="border:none;background:transparent;font-size:11px;color:var(--muted);font-family:'DM Sans',sans-serif;padding:0 4px;width:100%">
             </td>
             <td><input type="number" value="${art.quantite}" min="0" step="0.5" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
             <td><input type="number" value="${puTTC||''}" min="0" step="1" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Math.round(Number(this.value)/1.2*100)/100;updateTotals()" style="text-align:right"></td>
@@ -1267,7 +1272,7 @@ function addSection(){
 function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}sectionsData.splice(si,1);renderSections();}
 function moveSection(si,dir){const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
 function updateDevisTotal(){updateTotals();}
-function addArticle(si){sectionsData[si].articles.push({id:null,description:'',quantite:1,prix_unitaire:0,remise:0});renderSections();}
+function addArticle(si){sectionsData[si].articles.push({id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,remise:0});renderSections();}
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
@@ -1363,6 +1368,7 @@ async function saveDevisBuilder(){
       const{data:artData,error:artErr}=await sb.from('devis_articles').insert({
         section_id:secId,
         description:art.description||'',
+        sous_titre:art.sous_titre||'',
         quantite:Number(art.quantite)||0,
         prix_unitaire:Number(art.prix_unitaire)||0,
         remise:Number(art.remise||0),
@@ -1412,7 +1418,10 @@ async function printDevis(){
           const remise=Number(a.remise||0);
           const total=Number(a.quantite||1)*Number(a.prix_unitaire||0)*(1-remise/100);
           return`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
-            <td style="padding:9px 14px;border-bottom:1px solid #f0ece4">${a.description}</td>
+            <td style="padding:9px 14px;border-bottom:1px solid #f0ece4">
+              <div>${a.description}</div>
+              ${a.sous_titre?`<div style="font-size:10px;color:#aaa;margin-top:2px">${a.sous_titre}</div>`:''}
+            </td>
             <td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4;font-family:monospace">${a.quantite}</td>
             <td style="padding:9px 14px;text-align:right;border-bottom:1px solid #f0ece4;font-family:monospace">${Number(a.prix_unitaire||0).toLocaleString('fr-FR')}</td>
             ${hasRemise?`<td style="padding:9px 14px;text-align:center;border-bottom:1px solid #f0ece4;color:${remise>0?'#E05A2B':'#ccc'}">${remise>0?remise+'%':'—'}</td>`:''}
