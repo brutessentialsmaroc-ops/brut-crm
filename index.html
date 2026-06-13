@@ -1196,8 +1196,8 @@ function renderSections(){
         <tbody>
           ${sec.articles.map((art,ai)=>{
             const remise=Number(art.remise||0);
-            const puTTC=Math.round(art.prix_unitaire*1.2*100)/100;
-            const totalTTC=Math.round(art.quantite*puTTC*(1-remise/100)*100)/100;
+            const puTTC=Math.round(art.prix_unitaire*1.2);
+            const totalTTC=Math.round(art.quantite*art.prix_unitaire*1.2*(1-remise/100));
             return`
           <tr data-ai="${ai}">
             <td><input type="text" value="${esc(art.description)}" placeholder="Description de l'article…" oninput="sectionsData[${si}].articles[${ai}].description=this.value"></td>
@@ -1212,7 +1212,7 @@ function renderSections(){
         </tbody>
       </table>
       <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
-      <div class="section-subtotal">Sous-total TTC : <span>${fmtNum(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*1.2*(1-Number(a.remise||0)/100),0))} MAD</span></div>
+      <div class="section-subtotal">Sous-total TTC : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*1.2*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span></div>
     </div>`).join('');
   updateTotals();
 }
@@ -1232,22 +1232,19 @@ function addArticle(si){sectionsData[si].articles.push({id:null,description:'',q
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
-  // sectionsData stocke prix_unitaire en HT — on affiche TTC dans le builder
   const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0);
   const remisePct=Number(document.getElementById('builder-remise')?.value||0);
-  const remiseMnt=ht*(remisePct/100);
-  const htNet=ht-remiseMnt;
-  const ttc=htNet*1.2;
-  const ttcAvantRemise=ht*1.2;
-  const remiseTTC=ttcAvantRemise*(remisePct/100);
+  const htNet=ht*(1-remisePct/100);
+  const ttc=Math.round(htNet*1.2);
+  const remiseTTC=Math.round(ht*1.2*(remisePct/100));
   const remiseEl=document.getElementById('total-remise');
-  if(remiseEl) remiseEl.textContent=remisePct>0?'-'+fmtNum(remiseTTC)+' MAD':'0 MAD';
+  if(remiseEl) remiseEl.textContent=remisePct>0?'-'+remiseTTC.toLocaleString('fr-FR')+' MAD':'0 MAD';
   const ttcEl=document.getElementById('total-ttc');
-  if(ttcEl) ttcEl.textContent=fmtNum(ttc)+' MAD';
+  if(ttcEl) ttcEl.textContent=ttc.toLocaleString('fr-FR')+' MAD';
   const htEl=document.getElementById('total-ht');
-  if(htEl) htEl.textContent=fmtNum(ht)+' MAD';
+  if(htEl) htEl.textContent=Math.round(ht).toLocaleString('fr-FR')+' MAD';
   const tvaEl=document.getElementById('total-tva');
-  if(tvaEl) tvaEl.textContent=fmtNum(htNet*0.2)+' MAD';
+  if(tvaEl) tvaEl.textContent=Math.round(htNet*0.2).toLocaleString('fr-FR')+' MAD';
   // Update section subtotals
   document.querySelectorAll('.section-subtotal span').forEach((el,i)=>{
     if(sectionsData[i]){const st=sectionsData[i].articles.reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0);el.textContent=fmtNum(st)+' MAD';}
@@ -1259,9 +1256,9 @@ function updateTotals(){
     if(sectionsData[si]&&sectionsData[si].articles[ai]){
       const a=sectionsData[si].articles[ai];
       const remise=Number(a.remise||0);
-      const totalTTC=Math.round(a.quantite*a.prix_unitaire*1.2*(1-remise/100)*100)/100;
+      const totalTTC=Math.round(a.quantite*a.prix_unitaire*1.2*(1-remise/100));
       const totalCell=row.querySelectorAll('td')[4];
-      if(totalCell)totalCell.textContent=fmtNum(totalTTC);
+      if(totalCell)totalCell.textContent=totalTTC.toLocaleString('fr-FR');
       const remiseInput=row.querySelectorAll('td')[3]?.querySelector('input');
       if(remiseInput&&remise>0)remiseInput.style.color='#E05A2B';
     }
