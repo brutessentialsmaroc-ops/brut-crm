@@ -4258,7 +4258,7 @@ async function openSuiviFiche(id){
     <!-- ONGLET COMMENTAIRES -->
     <div id="stab-content-commentaires" class="hidden">
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <div id="suivi-updates-list" style="max-height:460px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+        <div id="suivi-updates-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
           ${(updates||[]).map(u=>renderUpdate(u)).join('')}
           ${!updates?.length?`<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px">Aucun commentaire — soyez le premier !</div>`:''}
         </div>
@@ -4469,6 +4469,29 @@ async function openMissionModal(id=null){
         ${(projets||[]).map(p=>`<option value="${p.id}" ${data.projet_id===p.id?'selected':''}>${p.nom}</option>`).join('')}
       </select>
     </div>
+    <div class="form-group">
+      <label>Commentaires</label>
+      <div id="ms-comments-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;max-height:180px;overflow-y:auto">
+        ${(data.commentaires||[]).slice().reverse().map((c,i,arr)=>{
+          const realIdx=arr.length-1-i;
+          return`<div id="ms-comment-${realIdx}" style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+              <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${new Date(c.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+              <div style="display:flex;gap:6px">
+                <button onclick="editMissionComment(${realIdx})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px">✏️</button>
+                <button onclick="deleteMissionComment(${realIdx})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px">🗑️</button>
+              </div>
+            </div>
+            <div id="ms-comment-text-${realIdx}">${c.texte}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="ms-new-comment" placeholder="Ajouter un commentaire…" style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')addMissionComment()">
+        <button class="btn btn-sm" onclick="addMissionComment()">+</button>
+      </div>
+      <input type="hidden" id="ms-comments-data" value="${JSON.stringify(data.commentaires||[]).replace(/"/g,'&quot;')}">
+    </div>
     <div class="modal-footer">
       ${id?`<button class="btn btn-sm btn-danger" onclick="deleteMission('${id}');closeModal('rh-modal')">Supprimer</button>`:''}
       <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
@@ -4500,6 +4523,7 @@ async function saveMission(){
     date_cible:document.getElementById('ms-date-cible').value||null,
     salaries_ids:JSON.parse(document.getElementById('ms-salaries-data').value.replace(/&quot;/g,'"')),
     projet_id:document.getElementById('ms-projet').value||null,
+    commentaires:JSON.parse(document.getElementById('ms-comments-data').value.replace(/&quot;/g,'"')),
   };
   let error;
   if(id){({error}=await sb.from('missions').update(payload).eq('id',id));}
@@ -4508,6 +4532,64 @@ async function saveMission(){
   closeModal('rh-modal');
   toast(id?'Mission mise à jour ✓':'Mission créée ✓');
   loadMissions();
+}
+
+function getMissionComments(){
+  return JSON.parse(document.getElementById('ms-comments-data').value.replace(/&quot;/g,'"'));
+}
+function setMissionComments(arr){
+  document.getElementById('ms-comments-data').value=JSON.stringify(arr).replace(/"/g,'&quot;');
+}
+
+function addMissionComment(){
+  const input=document.getElementById('ms-new-comment');
+  const texte=input.value.trim();if(!texte)return;
+  const comments=getMissionComments();
+  comments.push({date:new Date().toISOString(),texte});
+  setMissionComments(comments);
+  const list=document.getElementById('ms-comments-list');
+  const idx=comments.length-1;
+  const div=document.createElement('div');
+  div.id=`ms-comment-${idx}`;
+  div.style.cssText='padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px';
+  div.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+    <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+    <div style="display:flex;gap:6px">
+      <button onclick="editMissionComment(${idx})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px">✏️</button>
+      <button onclick="deleteMissionComment(${idx})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px">🗑️</button>
+    </div>
+  </div><div id="ms-comment-text-${idx}">${texte}</div>`;
+  list.insertBefore(div, list.firstChild);
+  input.value='';
+}
+
+function editMissionComment(idx){
+  const el=document.getElementById(`ms-comment-text-${idx}`);
+  if(!el)return;
+  const current=el.textContent;
+  el.innerHTML=`<div style="display:flex;gap:6px">
+    <input value="${current}" style="flex:1;font-size:12px;border:1px solid var(--accent);border-radius:4px;padding:2px 6px" id="ms-edit-input-${idx}">
+    <button onclick="saveMissionCommentEdit(${idx})" class="btn btn-sm">✓</button>
+    <button onclick="document.getElementById('ms-comment-text-${idx}').textContent='${current.replace(/'/g,"\\'")}'" class="btn btn-sm">✕</button>
+  </div>`;
+  document.getElementById(`ms-edit-input-${idx}`)?.focus();
+}
+
+function saveMissionCommentEdit(idx){
+  const input=document.getElementById(`ms-edit-input-${idx}`);
+  if(!input)return;
+  const newText=input.value.trim();if(!newText)return;
+  const comments=getMissionComments();
+  if(comments[idx])comments[idx].texte=newText;
+  setMissionComments(comments);
+  document.getElementById(`ms-comment-text-${idx}`).textContent=newText;
+}
+
+function deleteMissionComment(idx){
+  const comments=getMissionComments();
+  comments.splice(idx,1);
+  setMissionComments(comments);
+  document.getElementById(`ms-comment-${idx}`)?.remove();
 }
 
 const ARTICLE_STATUTS=[
