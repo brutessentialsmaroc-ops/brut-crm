@@ -1158,7 +1158,7 @@ async function openDevisBuilder(devisId){
       if(document.getElementById('builder-remise')) document.getElementById('builder-remise').value=d.remise||0;
     }
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
-    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,sous_titre:a.sous_titre||'',quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),remise:Number(a.remise||0)}))}));
+    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,sous_titre:a.sous_titre||'',quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),prix_ttc:Math.round(Number(a.prix_unitaire)*1.2),remise:Number(a.remise||0)}))}));
   } else {
     document.getElementById('builder-ref').textContent='Nouveau devis';
     document.getElementById('builder-projet').value='';
@@ -1239,7 +1239,7 @@ function renderSections(){
         </tr></thead>
         <tbody>${sec.articles.map((art,ai)=>{
           const remise=Number(art.remise||0);
-          const puTTC=Math.round(art.prix_unitaire*1.2);
+          const puTTC=art.prix_ttc!==undefined?Math.round(art.prix_ttc):Math.round(art.prix_unitaire*1.2);
           const totalTTC=Math.round(art.quantite*art.prix_unitaire*1.2*(1-remise/100));
           const isCustomArt=art.description==='__custom__'||(art.description&&!articlesForPiece.includes(art.description));
           const artOpts=articlesForPiece.map(a=>`<option value="${a}" ${art.description===a?'selected':''}>${a}</option>`).join('');
@@ -1259,9 +1259,9 @@ function renderSections(){
                 oninput="sectionsData[${si}].articles[${ai}].sous_titre=this.value"
                 style="border:none;background:transparent;font-size:11px;color:var(--muted);font-family:'DM Sans',sans-serif;padding:0 4px;width:100%">
             </td>
-            <td><input type="number" value="${art.quantite}" min="0" step="0.5" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
-            <td><input type="number" value="${puTTC||''}" min="0" step="1" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Math.round(Number(this.value)/1.2*100)/100;updateTotals()" style="text-align:right"></td>
-            <td><input type="number" value="${remise||''}" min="0" max="100" step="0.5" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].remise=Number(this.value);updateTotals()" style="text-align:center;color:${remise>0?'#E05A2B':'inherit'}"></td>
+            <td><input type="number" value="${art.quantite}" min="0" step="0.5" data-field="qt" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
+            <td><input type="number" value="${puTTC||''}" min="0" step="1" placeholder="0" data-field="puttc" oninput="sectionsData[${si}].articles[${ai}].prix_ttc=Number(this.value);sectionsData[${si}].articles[${ai}].prix_unitaire=Math.round(Number(this.value)/1.2*100)/100;updateTotals()" style="text-align:right"></td>
+            <td><input type="number" value="${remise||''}" min="0" max="100" step="0.5" placeholder="0" data-field="remise" oninput="sectionsData[${si}].articles[${ai}].remise=Number(this.value);updateTotals()" style="text-align:center;color:${remise>0?'#E05A2B':'inherit'}"></td>
             <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px;${remise>0?'color:#E05A2B':''}">${fmtNum(totalTTC)}</td>
             <td><button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px" onclick="removeArticle(${si},${ai})">✕</button></td>
           </tr>`;}).join('')}
@@ -1283,20 +1283,20 @@ function syncDOM(){
     if(!sectionsData[si])return;
     block.querySelectorAll('.articles-table tbody tr').forEach((row,ai)=>{
       if(!sectionsData[si].articles[ai])return;
-      const puTTCInput=row.querySelectorAll('td')[2]?.querySelector('input');
-      if(puTTCInput) sectionsData[si].articles[ai].prix_unitaire=Math.round(Number(puTTCInput.value||0)/1.2*100)/100;
-      const qtInput=row.querySelectorAll('td')[1]?.querySelector('input');
-      if(qtInput) sectionsData[si].articles[ai].quantite=Number(qtInput.value||1);
-      const remInput=row.querySelectorAll('td')[3]?.querySelector('input');
-      if(remInput) sectionsData[si].articles[ai].remise=Number(remInput.value||0);
+      const qt=row.querySelector('[data-field="qt"]');
+      if(qt) sectionsData[si].articles[ai].quantite=Number(qt.value||1);
+      const puttc=row.querySelector('[data-field="puttc"]');
+      if(puttc){const v=Number(puttc.value||0);sectionsData[si].articles[ai].prix_ttc=v;sectionsData[si].articles[ai].prix_unitaire=Math.round(v/1.2*100)/100;}
+      const rem=row.querySelector('[data-field="remise"]');
+      if(rem) sectionsData[si].articles[ai].remise=Number(rem.value||0);
     });
   });
 }
-function addSection(){syncDOM();sectionsData.push({id:null,nom:'',sous_titre:'',ordre:sectionsData.length,articles:[{id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,remise:0}]});renderSections();setTimeout(()=>document.querySelector('.add-section-btn').scrollIntoView({behavior:'smooth'}),100);}
+function addSection(){syncDOM();sectionsData.push({id:null,nom:'',sous_titre:'',ordre:sectionsData.length,articles:[{id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,prix_ttc:0,remise:0}]});renderSections();setTimeout(()=>document.querySelector('.add-section-btn').scrollIntoView({behavior:'smooth'}),100);}
 function removeSection(si){if(sectionsData.length<=1){toast('Gardez au moins une section');return}syncDOM();sectionsData.splice(si,1);renderSections();}
 function moveSection(si,dir){syncDOM();const tmp=sectionsData[si+dir];sectionsData[si+dir]=sectionsData[si];sectionsData[si]=tmp;renderSections();}
 function updateDevisTotal(){updateTotals();}
-function addArticle(si){syncDOM();sectionsData[si].articles.push({id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,remise:0});renderSections();}
+function addArticle(si){syncDOM();sectionsData[si].articles.push({id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,prix_ttc:0,remise:0});renderSections();}
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}syncDOM();sectionsData[si].articles.splice(ai,1);renderSections();}
 
 function updateTotals(){
