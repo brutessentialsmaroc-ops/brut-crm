@@ -1169,14 +1169,47 @@ async function openDevisBuilder(devisId){
   showPage('devis-builder',null);
 }
 
+const PIECES_LIST=['Entrée','Salon','Salle à manger','Cuisine','Chambre','Suite parentale','Dressing','Bureau','Salle de bain','WC','Buanderie','Terrasse','Autre'];
+const ARTICLES_MAP={
+  'Entrée':['Console','Placard','Meuble entrée','Armoire à chaussures'],
+  'Salon':['Meuble TV','Canapé','Canapé d\'angle','Fauteuil','Pouf','Bibliothèque','Table basse','Buffet','Console','Habillage mural'],
+  'Salle à manger':['Table à manger','Table basse','Table d\'appoint','Chaises','Buffet','Bar'],
+  'Cuisine':['Cuisine','Chaise haute','Îlot central'],
+  'Chambre':['Lit adulte (sommier+tête de lit+cadre)','Lit enfant (sommier+tête de lit+cadre)','Dressing','Placard','Lit sommier','Cadre de lit','Tête de lit','Chevet','Bureau','Bibliothèque'],
+  'Suite parentale':['Lit adulte (sommier+tête de lit+cadre)','Dressing','Lit sommier','Cadre de lit','Tête de lit','Banc de lit','Chevet','Bureau','Bibliothèque','Placard'],
+  'Dressing':['Dressing ouvert','Dressing fermé','Îlot dressing','Coiffeuse'],
+  'Bureau':['Bureau','Chaise','Bibliothèque','Rangements','Table réunion'],
+  'Salle de bain':['Meuble vasque','Colonne rangement','Miroir'],
+  'WC':['Meuble lave-mains','Rangements'],
+  'Buanderie':['Rangements','Placards','Plan de travail'],
+  'Terrasse':['Banquette','Bar extérieur','Rangements'],
+  'Autre':['Habillage mural','Habillage porte','Habillage ascenseur']
+};
+function setSectionNom(si,val){
+  if(val==='__custom__'){sectionsData[si].nom='';renderSections();return;}
+  sectionsData[si].nom=val;renderSections();
+}
+function setArticleDesc(si,ai,val){
+  if(val==='__custom__'){sectionsData[si].articles[ai].description='';renderSections();return;}
+  sectionsData[si].articles[ai].description=val;
+}
 function renderSections(){
   const container=document.getElementById('sections-container');
-  container.innerHTML=sectionsData.map((sec,si)=>`
-    <div class="section-block" data-si="${si}">
+  container.innerHTML=sectionsData.map((sec,si)=>{
+    const pieceOpts=PIECES_LIST.map(p=>`<option value="${p}" ${sec.nom===p?'selected':''}>${p}</option>`).join('');
+    const isCustomPiece=sec.nom&&!PIECES_LIST.includes(sec.nom);
+    const articlesForPiece=ARTICLES_MAP[sec.nom]||[];
+    return`<div class="section-block" data-si="${si}">
       <div class="section-header">
-        <div style="flex:1">
-          <input type="text" value="${esc(sec.nom)}" placeholder="Nom de la pièce (ex: Salon, Chambre 1…)" oninput="sectionsData[${si}].nom=this.value" style="border:none;background:transparent;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--text);width:100%;padding:0">
-          <input type="text" value="${esc(sec.sous_titre)}" placeholder="Sous-titre optionnel…" oninput="sectionsData[${si}].sous_titre=this.value" style="border:none;background:transparent;font-size:11px;font-family:'DM Sans',sans-serif;color:var(--muted);width:100%;padding:0;margin-top:3px">
+        <div style="flex:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <select onchange="setSectionNom(${si},this.value)"
+            style="border:none;border-bottom:2px solid var(--accent);background:transparent;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text);padding:2px 4px;cursor:pointer;min-width:160px">
+            <option value="">— Choisir la pièce —</option>
+            ${pieceOpts}
+            <option value="__custom__" ${isCustomPiece?'selected':''}>✏️ Autre nom…</option>
+          </select>
+          ${isCustomPiece?`<input type="text" value="${esc(sec.nom)}" placeholder="Nom personnalisé…" oninput="sectionsData[${si}].nom=this.value" style="border:none;border-bottom:1px solid var(--border);background:transparent;font-size:13px;font-weight:500;color:var(--text);padding:2px 4px;width:160px">`:''}
+          <input type="text" value="${esc(sec.sous_titre)}" placeholder="Sous-titre optionnel…" oninput="sectionsData[${si}].sous_titre=this.value" style="border:none;background:transparent;font-size:11px;font-family:'DM Sans',sans-serif;color:var(--muted);padding:0 4px;width:180px">
         </div>
         <div class="section-actions">
           ${si>0?`<button class="btn btn-sm" onclick="moveSection(${si},-1)">↑</button>`:''}
@@ -1193,18 +1226,24 @@ function renderSections(){
           <th style="width:15%">Total TTC</th>
           <th style="width:5%"></th>
         </tr></thead>
-        <tbody>
-          ${sec.articles.map((art,ai)=>{
-            const remise=Number(art.remise||0);
-            const puTTC=Math.round(art.prix_unitaire*1.2);
-            const totalTTC=Math.round(art.quantite*art.prix_unitaire*1.2*(1-remise/100));
-            return`
-          <tr data-ai="${ai}">
-            <td><input type="text" value="${esc(art.description)}" placeholder="Description de l'article…" oninput="sectionsData[${si}].articles[${ai}].description=this.value"></td>
+        <tbody>${sec.articles.map((art,ai)=>{
+          const remise=Number(art.remise||0);
+          const puTTC=Math.round(art.prix_unitaire*1.2);
+          const totalTTC=Math.round(art.quantite*art.prix_unitaire*1.2*(1-remise/100));
+          const isCustomArt=art.description&&!articlesForPiece.includes(art.description);
+          const artOpts=articlesForPiece.map(a=>`<option value="${a}" ${art.description===a?'selected':''}>${a}</option>`).join('');
+          return`<tr data-ai="${ai}">
+            <td style="display:flex;align-items:center;gap:6px">
+              ${articlesForPiece.length?`<select onchange="setArticleDesc(${si},${ai},this.value)"
+                style="flex:1;border:none;background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);padding:2px 0;cursor:pointer">
+                <option value="">— Article —</option>
+                ${artOpts}
+                <option value="__custom__" ${isCustomArt?'selected':''}>✏️ Saisie libre…</option>
+              </select>`:''}
+              ${isCustomArt||!articlesForPiece.length?`<input type="text" value="${esc(art.description)}" placeholder="Description…" oninput="sectionsData[${si}].articles[${ai}].description=this.value" style="border:none;border-bottom:1px solid var(--border);background:transparent;font-size:13px;color:var(--text);padding:2px 4px;min-width:180px;flex:1">`:''}
+            </td>
             <td><input type="number" value="${art.quantite}" min="0" step="0.5" oninput="sectionsData[${si}].articles[${ai}].quantite=Number(this.value);updateTotals()" style="text-align:center"></td>
-            <td><input type="number" value="${puTTC||''}" min="0" step="0.01" placeholder="0"
-              oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Math.round(Number(this.value)/1.2*100)/100;updateTotals()"
-              style="text-align:right"></td>
+            <td><input type="number" value="${puTTC||''}" min="0" step="1" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].prix_unitaire=Math.round(Number(this.value)/1.2*100)/100;updateTotals()" style="text-align:right"></td>
             <td><input type="number" value="${remise||''}" min="0" max="100" step="0.5" placeholder="0" oninput="sectionsData[${si}].articles[${ai}].remise=Number(this.value);updateTotals()" style="text-align:center;color:${remise>0?'#E05A2B':'inherit'}"></td>
             <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;padding-right:8px;${remise>0?'color:#E05A2B':''}">${fmtNum(totalTTC)}</td>
             <td><button style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px" onclick="removeArticle(${si},${ai})">✕</button></td>
@@ -1213,7 +1252,7 @@ function renderSections(){
       </table>
       <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
       <div class="section-subtotal">Sous-total TTC : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*1.2*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span></div>
-    </div>`).join('');
+    </div>`;}).join('');
   updateTotals();
 }
 
