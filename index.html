@@ -1268,7 +1268,10 @@ function renderSections(){
         </tbody>
       </table>
       <div class="add-article-btn" onclick="addArticle(${si})">+ Ajouter un article</div>
-      <div class="section-subtotal">Sous-total HT : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span></div>
+      <div class="section-subtotal">
+        Sous-total HT : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span>
+        &nbsp;·&nbsp; TTC : <span>${Math.round(sec.articles.reduce((s,a)=>s+a.quantite*a.prix_unitaire*1.2*(1-Number(a.remise||0)/100),0)).toLocaleString('fr-FR')} MAD</span>
+      </div>
     </div>`;}).join('');
   updateTotals();
 }
