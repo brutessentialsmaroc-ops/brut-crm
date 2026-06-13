@@ -3179,17 +3179,36 @@ async function openProspectModal(data={}){
     </div>
     <div class="form-group"><label>Notes</label><textarea id="pr-notes">${data.notes||''}</textarea></div>
     <div class="form-group">
-      <label>Commentaires d'appel</label>
-      <div id="pr-comments-list" style="margin-bottom:8px;max-height:180px;overflow-y:auto">
-        ${(data.commentaires||[]).slice().reverse().map(c=>`
-          <div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px">
-            <div style="color:var(--muted);margin-bottom:3px;font-family:'DM Mono',monospace;font-size:10px">${new Date(c.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
-            <div>${c.texte}</div>
-          </div>`).join('')}
+      <label>Journal des appels</label>
+      <div id="pr-comments-list" style="margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
+        ${(data.commentaires||[]).slice().reverse().map(c=>{
+          const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','':'#9CA3AF'};
+          const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','':'#F3F4F6'};
+          const sc=statColors[c.statut_appel||'']||'#9CA3AF';
+          const sb=statBg[c.statut_appel||'']||'#F3F4F6';
+          return`<div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${new Date(c.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+              ${c.statut_appel?`<span style="font-size:10px;padding:1px 8px;border-radius:20px;background:${sb};color:${sc};font-weight:600">${c.statut_appel}</span>`:''}
+            </div>
+            ${c.texte?`<div>${c.texte}</div>`:''}
+          </div>`;
+        }).join('')}
       </div>
-      <div style="display:flex;gap:8px">
-        <input id="pr-new-comment" placeholder="Ajouter un commentaire d'appel…" style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')addProspectComment()">
-        <button class="btn btn-sm" onclick="addProspectComment()">+</button>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="pr-call-statut" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;flex:1">
+            <option value="">— Résultat de l'appel —</option>
+            <option>Répondeur</option>
+            <option>Plus intéressé</option>
+            <option>Devis à réaliser</option>
+            <option>Rappeler</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="pr-new-comment" placeholder="Note optionnelle…" style="flex:1;font-size:13px" onkeydown="if(event.key==='Enter')addProspectComment()">
+          <button class="btn btn-sm btn-primary" onclick="addProspectComment()">📞 Enregistrer</button>
+        </div>
       </div>
       <input type="hidden" id="pr-comments-data" value="${JSON.stringify(data.commentaires||[]).replace(/"/g,'&quot;')}">
     </div>
@@ -3265,19 +3284,27 @@ async function deleteProspect(id){
 
 function addProspectComment(){
   const input=document.getElementById('pr-new-comment');
+  const statut=document.getElementById('pr-call-statut')?.value||'';
   const texte=input.value.trim();
-  if(!texte)return;
+  if(!statut&&!texte){toast('Choisissez un résultat ou écrivez une note');return;}
   const comments=JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"'));
-  const newComment={date:new Date().toISOString(),texte};
+  const newComment={date:new Date().toISOString(),texte,statut_appel:statut};
   comments.push(newComment);
   document.getElementById('pr-comments-data').value=JSON.stringify(comments).replace(/"/g,'&quot;');
+  const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','':'#9CA3AF'};
+  const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','':'#F3F4F6'};
+  const sc=statColors[statut]||'#9CA3AF';
+  const sbg=statBg[statut]||'#F3F4F6';
   const list=document.getElementById('pr-comments-list');
   const div=document.createElement('div');
-  div.style.cssText='padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px';
-  const now=new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  div.innerHTML=`<div style="color:var(--muted);margin-bottom:3px;font-family:'DM Mono',monospace;font-size:10px">${now}</div><div>${texte}</div>`;
+  div.style.cssText='padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px';
+  div.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+    ${statut?`<span style="font-size:10px;padding:1px 8px;border-radius:20px;background:${sbg};color:${sc};font-weight:600">${statut}</span>`:''}
+  </div>${texte?`<div>${texte}</div>`:''}`;
   list.insertBefore(div, list.firstChild);
   input.value='';
+  if(document.getElementById('pr-call-statut')) document.getElementById('pr-call-statut').value='';
 }
 
 async function uploadProspectPhotos(input,prospectId){
