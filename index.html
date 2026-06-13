@@ -1470,9 +1470,11 @@ async function printDevis(){
   }).join('');
 
   const remisePct=Number(document.getElementById('builder-remise')?.value||0);
-  const remiseMnt=ht*(remisePct/100);
-  const htNet=ht-remiseMnt;
-  const tva=htNet*0.2; const ttc=htNet+tva;
+  const remiseMnt=Math.round(ht*(remisePct/100));
+  const htNet=Math.round(ht-remiseMnt);
+  const tva=Math.round(htNet*0.2);
+  const ttc=Math.round(htNet+tva);
+  const htRound=Math.round(ht);
 
   document.getElementById('pdf-preview').innerHTML=`
     <style>
@@ -1508,7 +1510,7 @@ async function printDevis(){
       <div style="margin-top:28px;page-break-inside:avoid">
         <table style="width:100%;border-collapse:collapse;max-width:380px;margin-left:auto">
           ${recapHTML}
-          <tr><td style="padding:10px 0 6px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:10px 0 6px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${ht.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr><td style="padding:10px 0 6px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:10px 0 6px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${htRound.toLocaleString('fr-FR')} MAD</td></tr>
           ${remiseMnt>0?`<tr><td style="padding:4px 0;color:#E05A2B">Remise</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#E05A2B">- ${remiseMnt.toLocaleString('fr-FR')} MAD</td></tr>`:''}
           <tr><td style="padding:4px 0;color:#888">TVA 20%</td><td style="padding:4px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
           <tr style="background:#1a1a18;color:#fff">
@@ -1517,7 +1519,7 @@ async function printDevis(){
           </tr>
         </table>
         <div style="margin-top:16px;padding:12px 16px;background:#f5f3ee;border-radius:var(--radius,4px);font-size:11px;color:#555;line-height:1.6">
-          Pour valider la commande, merci d'effectuer un paiement de <strong>50% du montant du devis</strong> soit <strong>${(ttc/2).toLocaleString('fr-FR')} MAD TTC</strong>.
+          Pour valider la commande, merci d'effectuer un paiement de <strong>50% du montant du devis</strong> soit <strong>${Math.round(ttc/2).toLocaleString('fr-FR')} MAD TTC</strong>.
         </div>
       </div>
       <!-- PIED DE PAGE -->
@@ -1540,8 +1542,8 @@ async function printDevisById(devisId){
   const projet=d.projet_nom||'Projet';
   const date=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
   const sections=(d.devis_sections||[]).sort((a,b)=>a.ordre-b.ordre);
-  const ht=sections.reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-  const tva=ht*0.2; const ttc=ht+tva;
+  const ht=Math.round(sections.reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0));
+  const tva=Math.round(ht*0.2); const ttc=Math.round(ht+tva);
   const sectionsHTML=sections.map(sec=>{
     const arts=(sec.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre);
     return`<div style="margin-bottom:28px">
@@ -1569,8 +1571,8 @@ async function printDevisById(devisId){
     </div>`;
   }).join('');
   const recapHTML=sections.map(sec=>{
-    const st=(sec.devis_articles||[]).reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0),0);
-    return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
+    const st=Math.round((sec.devis_articles||[]).reduce((s,a)=>s+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0));
+    return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${Math.round(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
   document.getElementById('pdf-preview').innerHTML=`
     <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0}@page{margin:15mm 20mm}</style>
@@ -1606,7 +1608,7 @@ async function printDevisById(devisId){
           </tr>
         </table>
         <div style="margin-top:16px;padding:12px 16px;background:#f5f3ee;border-radius:4px;font-size:11px;color:#555;line-height:1.6">
-          Pour valider la commande, merci d'effectuer un paiement de <strong>50% du montant du devis</strong> soit <strong>${(ttc/2).toLocaleString('fr-FR')} MAD TTC</strong>.
+          Pour valider la commande, merci d'effectuer un paiement de <strong>50% du montant du devis</strong> soit <strong>${Math.round(ttc/2).toLocaleString('fr-FR')} MAD TTC</strong>.
         </div>
       </div>
       <div style="margin-top:auto;padding-top:12px;border-top:1px solid #e8e4dc;font-size:9px;color:#aaa;text-align:center;line-height:1.8">
