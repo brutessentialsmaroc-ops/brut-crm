@@ -428,6 +428,7 @@
         <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
           <button class="rh-tab active" id="suivi-tab-projets" onclick="showSuiviMainTab('projets',this)">◑ Projets</button>
           <button class="rh-tab" id="suivi-tab-missions" onclick="showSuiviMainTab('missions',this)">⚡ Suivi Missions Tâches Atelier</button>
+          <button class="rh-tab" id="suivi-tab-fiches" onclick="showSuiviMainTab('fiches',this)">📋 Fiches Commande</button>
         </div>
         <!-- PROJETS -->
         <div id="suivi-tab-content-projets">
@@ -449,6 +450,10 @@
             </select>
           </div>
           <div id="missions-list"></div>
+        </div>
+        <!-- FICHES COMMANDE -->
+        <div id="suivi-tab-content-fiches" class="hidden">
+          <div id="fiches-list"></div>
         </div>
       </div>
       <!-- ADMIN -->
@@ -4198,19 +4203,22 @@ const SUIVI_STATUTS = {
 const UPDATE_TYPES = ['💬 Info','✅ Avancement','🔴 Bloqué','📦 Livraison','📋 Action requise'];
 
 function showSuiviMainTab(tab, el){
-  ['projets','missions'].forEach(t=>{
+  ['projets','missions','fiches'].forEach(t=>{
     document.getElementById('suivi-tab-content-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('suivi-tab-'+t).classList.toggle('active', t===tab);
   });
   if(tab==='missions') loadMissions();
+  else if(tab==='fiches') loadFichesCommande();
   else loadSuiviKanban();
 }
 
 async function loadSuivi(){
   document.getElementById('suivi-tab-content-projets').classList.remove('hidden');
   document.getElementById('suivi-tab-content-missions').classList.add('hidden');
+  document.getElementById('suivi-tab-content-fiches').classList.add('hidden');
   document.getElementById('suivi-tab-projets').classList.add('active');
   document.getElementById('suivi-tab-missions').classList.remove('active');
+  document.getElementById('suivi-tab-fiches').classList.remove('active');
   loadSuiviKanban();
 }
 
@@ -4508,6 +4516,192 @@ const MISSION_STATUTS={
   'Terminé':  {color:'#10B981',bg:'#F0FDF4',icon:'✅'},
   'Bloqué':   {color:'#EF4444',bg:'#FEF2F2',icon:'🔴'},
 };
+
+// ─── FICHES COMMANDE ──────────────────────────────────────────────────────────
+const ATELIERS_LIST=['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronnerie'];
+
+async function loadFichesCommande(){
+  const el=document.getElementById('fiches-list');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const{data:devis}=await sb.from('devis')
+    .select('*,clients(nom,telephone),devis_sections(nom,sous_titre,devis_articles(description,sous_titre,quantite))')
+    .eq('statut','Accepté')
+    .order('created_at',{ascending:false});
+  if(!(devis||[]).length){
+    el.innerHTML='<div class="empty">Aucun devis accepté.</div>';return;
+  }
+  el.innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      ${(devis||[]).map(d=>`
+        <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-weight:600;font-size:15px">${d.clients?.nom||'—'}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${d.reference} · ${d.projet_nom||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
+          </div>
+          <button class="btn btn-primary" onclick="openFicheModal('${d.id}')">📋 Créer la fiche</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function openFicheModal(devisId){
+  const{data:d}=await sb.from('devis')
+    .select('*,clients(nom,telephone),devis_sections(nom,sous_titre,devis_articles(description,sous_titre,quantite))')
+    .eq('id',devisId).single();
+  if(!d){toast('Devis introuvable');return;}
+
+  const articles=[];
+  (d.devis_sections||[]).forEach(sec=>{
+    (sec.devis_articles||[]).filter(a=>a.description&&a.description!=='__custom__').forEach(a=>{
+      articles.push({description:a.description,sous_titre:a.sous_titre||'',quantite:a.quantite||1,section:sec.nom||''});
+    });
+  });
+
+  const html=`<div class="modal" style="max-width:680px">
+    <div class="modal-title">📋 Fiche Commande — ${d.clients?.nom||'—'}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">${d.reference} · ${d.projet_nom||''} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Ateliers impliqués dans cette commande</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${ATELIERS_LIST.map(a=>`
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:500;user-select:none"
+            id="atelier-label-${a.replace(/[^a-z]/gi,'_')}">
+            <input type="checkbox" id="atelier-${a.replace(/[^a-z]/gi,'_')}" value="${a}" checked
+              onchange="toggleAtelierLabel('${a.replace(/[^a-z]/gi,'_')}')"> ${a}
+          </label>`).join('')}
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">
+      <thead><tr style="background:var(--bg)">
+        <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Article</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Ateliers (ordre de passage)</th>
+      </tr></thead>
+      <tbody id="fiche-articles-body">
+        ${articles.map((a,i)=>`
+          <tr style="border-bottom:0.5px solid var(--border)">
+            <td style="padding:10px 12px">
+              <div style="font-weight:500">${a.description}</div>
+              ${a.sous_titre?`<div style="font-size:11px;color:var(--muted)">${a.sous_titre}</div>`:''}
+              <div style="font-size:11px;color:var(--muted)">${a.quantite} pièce${a.quantite>1?'s':''} · ${a.section}</div>
+            </td>
+            <td style="padding:10px 12px">
+              <div style="display:flex;flex-wrap:wrap;gap:4px" id="art-ateliers-${i}">
+                ${ATELIERS_LIST.map(at=>`
+                  <span class="atelier-chip" data-art="${i}" data-atelier="${at}"
+                    onclick="toggleChip(this)"
+                    style="cursor:pointer;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg);color:var(--muted);user-select:none">
+                    ${at}
+                  </span>`).join('')}
+              </div>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="printFicheCommande(${JSON.stringify({id:d.id,client:d.clients?.nom||'—',ref:d.reference,projet:d.projet_nom||'',date:d.date_envoi||'',articles}).replace(/"/g,'&quot;')})">🖨 Imprimer PDF</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+function toggleAtelierLabel(key){
+  const cb=document.getElementById('atelier-'+key);
+  const label=document.getElementById('atelier-label-'+key);
+  if(cb&&label){
+    label.style.background=cb.checked?'var(--accent)':'';
+    label.style.color=cb.checked?'#fff':'';
+    label.style.borderColor=cb.checked?'var(--accent)':'var(--border)';
+  }
+}
+
+function toggleChip(el){
+  const active=el.dataset.active==='1';
+  if(!active){
+    el.dataset.active='1';
+    el.style.background='#1a1a18';
+    el.style.color='#fff';
+    el.style.borderColor='#1a1a18';
+  } else {
+    el.dataset.active='';
+    el.style.background='var(--bg)';
+    el.style.color='var(--muted)';
+    el.style.borderColor='var(--border)';
+  }
+}
+
+function printFicheCommande(dataStr){
+  const data=typeof dataStr==='string'?JSON.parse(dataStr.replace(/&quot;/g,'"')):dataStr;
+  // Lire les ateliers cochés globaux
+  const ateliersGlobaux=ATELIERS_LIST.filter(a=>{
+    const cb=document.getElementById('atelier-'+a.replace(/[^a-z]/gi,'_'));
+    return cb&&cb.checked;
+  });
+  // Lire les ateliers par article
+  const articlesWithAteliers=data.articles.map((art,i)=>{
+    const chips=[...document.querySelectorAll(`#art-ateliers-${i} .atelier-chip[data-active="1"]`)];
+    return {...art, ateliers:chips.map(c=>c.dataset.atelier)};
+  });
+
+  const date=data.date?new Date(data.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}):'—';
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+      body{font-family:'DM Sans',sans-serif;margin:0}
+      @page{margin:12mm 16mm;size:A4}
+      table{border-collapse:collapse;width:100%}
+    </style>
+    <div style="min-height:calc(297mm - 24mm);display:flex;flex-direction:column">
+      <!-- EN-TÊTE -->
+      <div style="background:#042C53;padding:18px 24px;border-radius:6px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div style="font-size:22px;font-weight:600;color:#fff">${data.client}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px">${data.ref}${data.projet?' · '+data.projet:''}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:1px">Devis du ${date}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.1);border-radius:6px;padding:10px 18px;text-align:center">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.5)">Fiche Commande</div>
+            <div style="font-size:11px;font-weight:500;color:#fff;margin-top:4px">BRUT ESSENTIALS</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${ateliersGlobaux.map(a=>`<span style="font-size:11px;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.1);border-radius:20px;padding:3px 12px">${a}</span>`).join('')}
+        </div>
+      </div>
+
+      <!-- TABLEAU -->
+      <table style="font-size:12px;flex:1">
+        <thead>
+          <tr>
+            <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#888;background:#f5f3ee;border-bottom:1px solid #e8e4dc">Article</th>
+            <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#888;background:#f5f3ee;border-bottom:1px solid #e8e4dc">Ateliers</th>
+            <th style="padding:8px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#888;background:#f5f3ee;border-bottom:1px solid #e8e4dc;width:60px">✓</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${articlesWithAteliers.map((art,i)=>`
+            <tr style="border-bottom:0.5px solid #e8e4dc;background:${i%2===0?'#fff':'#faf9f7'}">
+              <td style="padding:12px 14px">
+                <div style="font-weight:500;font-size:13px">${art.description}</div>
+                ${art.sous_titre?`<div style="font-size:11px;color:#aaa;margin-top:2px">${art.sous_titre}</div>`:''}
+                <div style="font-size:11px;color:#aaa;margin-top:1px">${art.quantite} pièce${art.quantite>1?'s':''} · ${art.section}</div>
+              </td>
+              <td style="padding:12px 14px">
+                <span style="font-size:12px;color:#555">${art.ateliers.length?art.ateliers.join(' → '):'—'}</span>
+              </td>
+              <td style="padding:12px 14px;text-align:center">
+                <div style="width:24px;height:24px;border:2px solid #d1d5db;border-radius:5px;display:inline-block"></div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  closeModal('rh-modal');
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
 
 async function loadMissions(){
   const el=document.getElementById('missions-list');
