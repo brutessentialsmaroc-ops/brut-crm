@@ -2599,11 +2599,7 @@ async function loadPaie(){
         const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
         const p=paieMap[s.id];
         const base=Number(s.salaire_base||0);
-        const jourTravail=26;
         const net=p?Math.round(Number(p.net_a_payer)):base;
-        const deducAbsAff=p?Number(p.deduction_absences):deducAbs;
-        const deducRetAff=p?Number(p.deduction_retards):deducRet;
-        const hSupMontantAff=p?Number(p.heures_sup_montant):hSupMontant;
         return`<tr>
           <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
