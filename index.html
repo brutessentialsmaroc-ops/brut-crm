@@ -120,7 +120,8 @@
 
   /* KANBAN */
   .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  #prospects-kanban{display:flex!important;grid-template-columns:none!important}
+  #prospects-kanban{display:flex!important;grid-template-columns:unset!important;overflow-x:auto}
+  #prospects-kanban .kanban-col{min-width:255px;max-width:255px;flex-shrink:0}
   .kanban-col{background:var(--bg);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;overflow:hidden}
   .kanban-col-body{flex:1;overflow-y:auto;min-height:60px;border-radius:var(--radius);transition:background 0.15s;padding:2px}
   .kanban-col-body.drag-over{background:rgba(26,26,24,0.06);border:2px dashed var(--border)}
@@ -472,9 +473,7 @@
       </div>
       <!-- PROSPECTS -->
       <div id="page-prospects" class="hidden">
-        <div style="overflow-x:auto;margin:0 -20px;padding:0 20px">
-          <div class="kanban" id="prospects-kanban" style="display:flex;gap:16px;width:max-content;min-width:100%"></div>
-        </div>
+        <div id="prospects-kanban" style="display:flex;gap:16px;overflow-x:auto;padding-bottom:16px"></div>
       </div>
       <!-- ACHATS -->
       <div id="page-achats" class="hidden">
@@ -3173,7 +3172,7 @@ async function loadProspects(){
   });
   const kanban=document.getElementById('prospects-kanban');
   kanban.innerHTML=PROSPECT_COLS.map(col=>`
-    <div class="kanban-col" style="border-top:3px solid ${col.color};min-width:260px;flex-shrink:0">
+    <div class="kanban-col" style="border-top:3px solid ${col.color}">
       <div class="kanban-header">${col.label} <span class="kanban-count">${groups[col.key].length}</span></div>
       <div class="kanban-col-body" data-col="${col.key}"
         ondragover="prospectDragOver(event)"
