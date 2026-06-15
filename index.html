@@ -3397,6 +3397,12 @@ async function saveProspect(){
   const id=document.getElementById('pr-id').value;
   const nom=document.getElementById('pr-nom').value.trim();
   if(!nom){toast('Le nom est requis');return;}
+  // Pour un prospect existant, on lit le statut actuel en base pour ne pas écraser la colonne kanban
+  let statutActuel=document.getElementById('pr-statut').value;
+  if(id){
+    const{data:current}=await sb.from('prospects').select('statut').eq('id',id).single();
+    if(current?.statut) statutActuel=current.statut;
+  }
   const payload={
     nom,source:document.getElementById('pr-source').value,
     source_autre:document.getElementById('pr-source-autre')?.value||null,
@@ -3405,14 +3411,13 @@ async function saveProspect(){
     date_contact:document.getElementById('pr-date-contact').value||null,
     besoin:document.getElementById('pr-besoin').value,
     budget:Number(document.getElementById('pr-budget').value)||null,
-    statut:document.getElementById('pr-statut').value,
+    statut:statutActuel,
     devis_id:document.getElementById('pr-devis').value||null,
     notes:document.getElementById('pr-notes').value,
     next_relance:document.getElementById('pr-next-relance')?.value||null,
     commentaires:JSON.parse(document.getElementById('pr-comments-data').value.replace(/&quot;/g,'"')),
     photos:JSON.parse(document.getElementById('pr-photos-data').value.replace(/&quot;/g,'"'))
   };
-  // pdf_url handled separately via uploadProspectPdf
   if(id)await sb.from('prospects').update(payload).eq('id',id);
   else await sb.from('prospects').insert(payload);
   closeModal('rh-modal');toast('Prospect enregistré ✓');loadProspects();
