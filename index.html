@@ -2813,7 +2813,25 @@ async function openModifierPaie(salId, mois, annee){
   const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
   const base=Number(s.salaire_base||0);
-  const html=`<div class="modal">
+  const avancesInit=p&&p.avances?p.avances:[];
+  const todayStr=new Date().toISOString().split('T')[0];
+  const avancesJson=JSON.stringify(avancesInit).replace(/"/g,'&quot;');
+
+  function renderAvancesHTML(avances){
+    if(!avances.length) return '<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucune avance enregistrée</div>';
+    return avances.map((a,i)=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
+        <span style="font-weight:500">${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
+        <button onclick="removeAvance(${i},${base})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px" title="Supprimer">×</button>
+      </div>`).join('');
+  }
+
+  const totalAvancesInit=avancesInit.reduce((s,a)=>s+Number(a.montant),0);
+  const netInit=p?Number(p.net_a_payer):Math.max(0,base-totalAvancesInit);
+  const resteInit=Math.max(0,netInit-totalAvancesInit);
+
+  const html=`<div class="modal" style="max-width:560px">
     <div class="modal-title">Modifier paie — ${s.prenom||''} ${s.nom}</div>
     <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px">
       <strong>Salaire de base :</strong> ${base.toLocaleString('fr-FR')} MAD
@@ -2828,12 +2846,38 @@ async function openModifierPaie(salId, mois, annee){
       <input type="number" id="pm-hsup-mad" min="0" step="1" placeholder="0" value="${p?Number(p.heures_sup_montant).toFixed(0):0}" oninput="calcNetModif(${base})">
     </div>
     <div class="form-group"><label>Autres primes / déductions (MAD)</label>
-      <input type="number" id="pm-autres" step="1" placeholder="Positif = prime, négatif = déduction" value="0" oninput="calcNetModif(${base})">
+      <input type="number" id="pm-autres" step="1" placeholder="Positif = prime, négatif = déduction" value="${p&&p.autres_primes?Number(p.autres_primes).toFixed(0):0}" oninput="calcNetModif(${base})">
     </div>
-    <div style="background:var(--text);color:#fff;border-radius:var(--radius);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-      <span style="font-weight:500">NET À PAYER</span>
-      <span id="pm-net" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600">${p?Number(p.net_a_payer).toLocaleString('fr-FR'):base.toLocaleString('fr-FR')} MAD</span>
+
+    <!-- AVANCES -->
+    <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+      <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Avances versées</div>
+      <div style="padding:12px 14px">
+        <div id="pm-avances-list">${renderAvancesHTML(avancesInit)}</div>
+        <input type="hidden" id="pm-avances-data" value="${avancesJson}">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px;align-items:center">
+          <input type="number" id="pm-avance-montant" placeholder="Montant (MAD)" min="0" step="1" style="font-size:13px">
+          <input type="date" id="pm-avance-date" value="${todayStr}" style="font-size:13px;width:150px">
+          <button class="btn btn-sm" onclick="addAvance(${base})">+ Ajouter</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+          <span>Total avances</span>
+          <span id="pm-total-avances" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${totalAvancesInit.toLocaleString('fr-FR')} MAD</span>
+        </div>
+      </div>
     </div>
+
+    <div style="background:var(--text);color:#fff;border-radius:var(--radius);padding:14px 16px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:500;font-size:13px">NET À PAYER</span>
+        <span id="pm-net" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600">${netInit.toLocaleString('fr-FR')} MAD</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,0.2)">
+        <span style="font-size:13px;opacity:0.8">Reste à donner</span>
+        <span id="pm-reste" style="font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#7fffa8">${resteInit.toLocaleString('fr-FR')} MAD</span>
+      </div>
+    </div>
+
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
       <button class="btn btn-primary" onclick="savePaieModif('${salId}',${mois},${annee},${base})">Enregistrer</button>
@@ -2842,13 +2886,58 @@ async function openModifierPaie(salId, mois, annee){
   showModal('rh-modal', html);
 }
 
+function getAvances(){
+  try{return JSON.parse(document.getElementById('pm-avances-data').value.replace(/&quot;/g,'"'));}catch(e){return[];}
+}
+
+function addAvance(base){
+  const montant=Number(document.getElementById('pm-avance-montant').value);
+  const date=document.getElementById('pm-avance-date').value;
+  if(!montant||montant<=0){toast('Montant invalide');return;}
+  if(!date){toast('Date requise');return;}
+  const avances=getAvances();
+  avances.push({montant,date});
+  document.getElementById('pm-avances-data').value=JSON.stringify(avances).replace(/"/g,'&quot;');
+  document.getElementById('pm-avance-montant').value='';
+  refreshAvancesUI(avances,base);
+}
+
+function removeAvance(index,base){
+  const avances=getAvances();
+  avances.splice(index,1);
+  document.getElementById('pm-avances-data').value=JSON.stringify(avances).replace(/"/g,'&quot;');
+  refreshAvancesUI(avances,base);
+}
+
+function refreshAvancesUI(avances,base){
+  const total=avances.reduce((s,a)=>s+Number(a.montant),0);
+  document.getElementById('pm-total-avances').textContent=total.toLocaleString('fr-FR')+' MAD';
+  if(!avances.length){
+    document.getElementById('pm-avances-list').innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucune avance enregistrée</div>';
+  } else {
+    document.getElementById('pm-avances-list').innerHTML=avances.map((a,i)=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
+        <span style="font-weight:500">${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
+        <button onclick="removeAvance(${i},${base})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px" title="Supprimer">×</button>
+      </div>`).join('');
+  }
+  calcNetModif(base);
+}
+
 function calcNetModif(base){
   const abs=Number(document.getElementById('pm-abs-mad').value)||0;
   const ret=Number(document.getElementById('pm-ret-mad').value)||0;
   const hsup=Number(document.getElementById('pm-hsup-mad').value)||0;
   const autres=Number(document.getElementById('pm-autres').value)||0;
+  const avances=getAvances();
+  const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
   const net=Math.max(0,base+hsup-abs-ret+autres);
+  const reste=Math.max(0,net-totalAvances);
   document.getElementById('pm-net').textContent=net.toLocaleString('fr-FR')+' MAD';
+  document.getElementById('pm-reste').textContent=reste.toLocaleString('fr-FR')+' MAD';
+  if(document.getElementById('pm-total-avances'))
+    document.getElementById('pm-total-avances').textContent=totalAvances.toLocaleString('fr-FR')+' MAD';
 }
 
 async function savePaieModif(salId,mois,annee,base){
@@ -2856,16 +2945,24 @@ async function savePaieModif(salId,mois,annee,base){
   const deducRet=Number(document.getElementById('pm-ret-mad').value)||0;
   const hSupMontant=Number(document.getElementById('pm-hsup-mad').value)||0;
   const autres=Number(document.getElementById('pm-autres').value)||0;
+  const avances=getAvances();
+  const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
   const net=Math.max(0,base+hSupMontant-deducAbs-deducRet+autres);
-  await sb.from('paie').upsert({
+  const reste=Math.max(0,net-totalAvances);
+  const{error}=await sb.from('paie').upsert({
     salarie_id:salId,mois,annee,
     salaire_base:base,
     deduction_absences:deducAbs,
     deduction_retards:deducRet,
     heures_sup_montant:hSupMontant,
+    autres_primes:autres,
+    avances:avances,
+    total_avances:totalAvances,
+    reste_a_donner:reste,
     net_a_payer:net,
     statut:'En attente'
   },{onConflict:'salarie_id,mois,annee'});
+  if(error){toast('Erreur: '+error.message);return;}
   closeModal('rh-modal');
   toast('Paie mise à jour ✓');
   loadPaie();
