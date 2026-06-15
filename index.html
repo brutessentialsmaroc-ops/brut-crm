@@ -3169,9 +3169,12 @@ async function loadProspects(){
     else groups['Nouveau'].push(p);
   });
   const kanban=document.getElementById('prospects-kanban');
-  kanban.style.gridTemplateColumns='repeat(5,1fr)';
+  kanban.style.display='flex';
+  kanban.style.gap='16px';
+  kanban.style.overflowX='auto';
+  kanban.style.paddingBottom='12px';
   kanban.innerHTML=PROSPECT_COLS.map(col=>`
-    <div class="kanban-col" style="border-top:3px solid ${col.color}">
+    <div class="kanban-col" style="border-top:3px solid ${col.color};min-width:280px;flex-shrink:0">
       <div class="kanban-header">${col.label} <span class="kanban-count">${groups[col.key].length}</span></div>
       <div class="kanban-col-body" data-col="${col.key}"
         ondragover="prospectDragOver(event)"
