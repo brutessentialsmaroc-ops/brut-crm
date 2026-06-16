@@ -1383,7 +1383,9 @@ async function openDevisBuilder(devisId){
           document.getElementById('builder-remise').value=d.remise_mad;
           setRemiseType('mad');
         } else {
-          document.getElementById('builder-remise').value=d.remise||0;
+          // clamp % between 0 and 100
+          const safePct=Math.min(Math.max(Number(d.remise||0),0),100);
+          document.getElementById('builder-remise').value=safePct;
           setRemiseType('pct');
         }
       }
@@ -1546,8 +1548,12 @@ function updateTotals(){
   const remiseVal=Number(document.getElementById('builder-remise')?.value||0);
   const ttcBrut=ht*1.2;
   let remiseTTC=0;
-  if(remiseType==='pct') remiseTTC=Math.round(ttcBrut*(remiseVal/100));
-  else remiseTTC=remiseVal;
+  if(remiseType==='pct'){
+    const pct=Math.min(Math.max(remiseVal,0),100); // clamp 0-100
+    remiseTTC=Math.round(ttcBrut*(pct/100));
+  } else {
+    remiseTTC=Math.min(remiseVal, ttcBrut); // can't exceed total
+  }
   const ttc=Math.round(ttcBrut-remiseTTC);
   const htNet=ttc/1.2;
   const remiseEl=document.getElementById('total-remise');
