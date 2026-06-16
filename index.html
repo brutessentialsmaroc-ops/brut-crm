@@ -3273,6 +3273,7 @@ const PROSPECT_COLS=[
   {key:'Devis à réaliser',label:'DEVIS À RÉALISER',color:'#10B981'},
   {key:'Devis envoyé',label:'DEVIS ENVOYÉ',color:'#9B6DD6'},
   {key:'Converti',label:'CONVERTI',color:'#5DCAA5'},
+  {key:'Traité',label:'TRAITÉ',color:'#0EA5E9'},
   {key:'Perdu',label:'PERDU',color:'#E05A5A'}
 ];
 
@@ -3304,8 +3305,8 @@ function renderProspectCard(p){
   // Dernier statut d'appel
   const calls=(p.commentaires||[]).filter(c=>c.statut_appel);
   const lastCall=calls.length?calls[calls.length-1]:null;
-  const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B'};
-  const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB'};
+  const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','Résumé de l'appel':'#6366F1','Traité':'#0EA5E9'};
+  const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','Résumé de l'appel':'#EEF2FF','Traité':'#E0F2FE'};
   return`<div class="kanban-card" draggable="true" data-id="${p.id}"
     ondragstart="dragProspectStart(event,'${p.id}')"
     ondragend="dragEnd(event)"
@@ -3434,8 +3435,8 @@ async function openProspectModal(data={}){
       <label>Journal des appels</label>
       <div id="pr-comments-list" style="margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
         ${(data.commentaires||[]).slice().reverse().map(c=>{
-          const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','':'#9CA3AF'};
-          const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','':'#F3F4F6'};
+          const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','Résumé de l'appel':'#6366F1','Traité':'#0EA5E9','':'#9CA3AF'};
+          const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','Résumé de l'appel':'#EEF2FF','Traité':'#E0F2FE','':'#F3F4F6'};
           const sc=statColors[c.statut_appel||'']||'#9CA3AF';
           const sb=statBg[c.statut_appel||'']||'#F3F4F6';
           return`<div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px">
@@ -3452,9 +3453,11 @@ async function openProspectModal(data={}){
           <select id="pr-call-statut" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;flex:1">
             <option value="">— Résultat de l'appel —</option>
             <option>Répondeur</option>
+            <option>Résumé de l'appel</option>
             <option>Plus intéressé</option>
             <option>Devis à réaliser</option>
             <option>Rappeler</option>
+            <option>Traité</option>
           </select>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -3560,8 +3563,8 @@ async function addProspectComment(){
   const{error}=await sb.from('prospects').update({commentaires:comments,next_relance:nextRelance}).eq('id',id);
   if(error){toast('Erreur: '+error.message);return;}
   document.getElementById('pr-comments-data').value=JSON.stringify(comments).replace(/"/g,'&quot;');
-  const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','':'#9CA3AF'};
-  const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','':'#F3F4F6'};
+  const statColors={'Répondeur':'#9CA3AF','Plus intéressé':'#EF4444','Devis à réaliser':'#10B981','Rappeler':'#F59E0B','Résumé de l'appel':'#6366F1','Traité':'#0EA5E9','':'#9CA3AF'};
+  const statBg={'Répondeur':'#F3F4F6','Plus intéressé':'#FEF2F2','Devis à réaliser':'#F0FDF4','Rappeler':'#FFFBEB','Résumé de l'appel':'#EEF2FF','Traité':'#E0F2FE','':'#F3F4F6'};
   const sc=statColors[statut]||'#9CA3AF';
   const sbg=statBg[statut]||'#F3F4F6';
   const list=document.getElementById('pr-comments-list');
