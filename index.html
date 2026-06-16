@@ -1257,6 +1257,20 @@ function saveDafClient(clientId){
   renderDevisAFaire();
 }
 
+function toggleDaf(id){
+  const item=devisAFaireList.find(d=>d.id===id);
+  if(item) item.fait=!item.fait;
+  saveDevisAFaire();
+  renderDevisAFaire();
+}
+
+function deleteDaf(id){
+  if(!confirm('Supprimer ce client ?')) return;
+  devisAFaireList=devisAFaireList.filter(d=>d.id!==id);
+  saveDevisAFaire();
+  renderDevisAFaire();
+}
+
 function renderDevisAFaire(){
   const el=document.getElementById('daf-list');
   if(!devisAFaireList.length){el.innerHTML='<div class="empty">Aucun devis à faire. Cliquez sur "+ Nouveau client".</div>';return;}
