@@ -1722,11 +1722,14 @@ async function printDevis(){
     return`<tr><td style="padding:8px 0;border-bottom:1px solid #f0ece4;font-size:13px">${sec.nom||'Section'}</td><td style="padding:8px 0;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-size:13px">${Math.round(st*1.2).toLocaleString('fr-FR')}</td></tr>`;
   }).join('');
 
-  const remisePct=Number(document.getElementById('builder-remise')?.value||0);
-  const remiseMnt=Math.round(ht*(remisePct/100));
-  const htNet=Math.round(ht-remiseMnt);
+  const remiseVal=Math.abs(Number(document.getElementById('builder-remise')?.value||0));
+  const ttcBrut=Math.round(ht*1.2);
+  let remiseMnt=0;
+  if(remiseType==='mad') remiseMnt=Math.min(remiseVal, ttcBrut);
+  else remiseMnt=Math.round(ttcBrut*(Math.min(remiseVal,100)/100));
+  const ttc=Math.max(0, ttcBrut-remiseMnt);
+  const htNet=Math.round(ttc/1.2);
   const tva=Math.round(htNet*0.2);
-  const ttc=Math.round(htNet+tva);
   const htRound=Math.round(ht);
 
   document.getElementById('pdf-preview').innerHTML=`
