@@ -414,20 +414,18 @@
         </div>
       </div>
       <!-- DEVIS LIST -->
-      <!-- DEVIS LIST -->
       <div id="page-devis" class="hidden">
-        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
-          <button class="rh-tab active" id="dtab-liste" onclick="showDevisTab('liste',this)">◧ Devis</button>
-          <button class="rh-tab" id="dtab-afaire" onclick="showDevisTab('afaire',this)">📋 Devis à faire</button>
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:nowrap;overflow-x:auto">
+          <button class="rh-tab active" id="dtab-liste" onclick="showDevisTab('liste',this)" style="white-space:nowrap">◧ Devis</button>
+          <button class="rh-tab" id="dtab-afaire" onclick="showDevisTab('afaire',this)" style="white-space:nowrap">📋 Devis à faire</button>
         </div>
         <div id="dtab-content-liste"><div id="devis-list"></div></div>
         <div id="dtab-content-afaire" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <button class="btn btn-primary btn-sm" onclick="openAddDafModal()">+ Nouveau client</button>
-            <button class="btn btn-sm" onclick="printDevisAFaire()">&#128424; Imprimer</button>
           </div>
           <div id="daf-list"></div>
-        </div></div>
+        </div>
       </div>
       <!-- FACTURES -->
       <div id="page-factures" class="hidden">
