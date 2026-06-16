@@ -548,11 +548,15 @@
         <!-- TOTAL -->
         <div class="devis-total" id="devis-total-block">
           <div class="devis-total-row" style="align-items:center">
-            <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               Remise globale
-              <input type="number" id="builder-remise" min="0" max="100" step="0.5" value="0"
+              <input type="number" id="builder-remise" min="0" step="0.5" value="0"
                 oninput="updateDevisTotal()"
-                style="width:60px;font-size:13px;padding:3px 6px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;text-align:center"> %
+                style="width:70px;font-size:13px;padding:3px 6px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;text-align:center">
+              <span style="display:flex;border:1px solid rgba(255,255,255,0.3);border-radius:4px;overflow:hidden;font-size:12px">
+                <button id="remise-type-pct" onclick="setRemiseType('pct')" style="padding:3px 8px;background:rgba(255,255,255,0.9);color:#1a1a18;border:none;cursor:pointer;font-weight:600">%</button>
+                <button id="remise-type-mad" onclick="setRemiseType('mad')" style="padding:3px 8px;background:transparent;color:#fff;border:none;cursor:pointer">MAD</button>
+              </span>
             </span>
             <span id="total-remise">0 MAD</span>
           </div>
@@ -1374,7 +1378,15 @@ async function openDevisBuilder(devisId){
       document.getElementById('builder-projet').value=d.projet_nom||'';
       document.getElementById('builder-statut').value=d.statut||'En attente';
       document.getElementById('builder-ref').textContent=d.reference||'';
-      if(document.getElementById('builder-remise')) document.getElementById('builder-remise').value=d.remise||0;
+      if(document.getElementById('builder-remise')){
+        if(d.remise_mad&&d.remise_mad>0){
+          document.getElementById('builder-remise').value=d.remise_mad;
+          setRemiseType('mad');
+        } else {
+          document.getElementById('builder-remise').value=d.remise||0;
+          setRemiseType('pct');
+        }
+      }
     }
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
     sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,sous_titre:a.sous_titre||'',quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),prix_ttc:Math.round(Number(a.prix_unitaire)*1.2),remise:Number(a.remise||0)}))}));
@@ -1518,18 +1530,32 @@ function updateDevisTotal(){updateTotals();}
 function addArticle(si){syncDOM();sectionsData[si].articles.push({id:null,description:'',sous_titre:'',quantite:1,prix_unitaire:0,prix_ttc:0,remise:0});renderSections();}
 function removeArticle(si,ai){if(sectionsData[si].articles.length<=1){toast('Gardez au moins un article');return}syncDOM();sectionsData[si].articles.splice(ai,1);renderSections();}
 
+let remiseType='pct'; // 'pct' or 'mad'
+
+function setRemiseType(type){
+  remiseType=type;
+  const btnPct=document.getElementById('remise-type-pct');
+  const btnMad=document.getElementById('remise-type-mad');
+  if(btnPct){ btnPct.style.background=type==='pct'?'rgba(255,255,255,0.9)':'transparent'; btnPct.style.color=type==='pct'?'#1a1a18':'#fff'; btnPct.style.fontWeight=type==='pct'?'600':'400'; }
+  if(btnMad){ btnMad.style.background=type==='mad'?'rgba(255,255,255,0.9)':'transparent'; btnMad.style.color=type==='mad'?'#1a1a18':'#fff'; btnMad.style.fontWeight=type==='mad'?'600':'400'; }
+  updateDevisTotal();
+}
+
 function updateTotals(){
   const ht=sectionsData.reduce((s,sec)=>s+sec.articles.reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0);
-  const remisePct=Number(document.getElementById('builder-remise')?.value||0);
-  const htNet=ht*(1-remisePct/100);
-  const ttc=Math.round(htNet*1.2);
-  const remiseTTC=Math.round(ht*1.2*(remisePct/100));
+  const remiseVal=Number(document.getElementById('builder-remise')?.value||0);
+  const ttcBrut=ht*1.2;
+  let remiseTTC=0;
+  if(remiseType==='pct') remiseTTC=Math.round(ttcBrut*(remiseVal/100));
+  else remiseTTC=remiseVal;
+  const ttc=Math.round(ttcBrut-remiseTTC);
+  const htNet=ttc/1.2;
   const remiseEl=document.getElementById('total-remise');
-  if(remiseEl) remiseEl.textContent=remisePct>0?'-'+remiseTTC.toLocaleString('fr-FR')+' MAD':'0 MAD';
+  if(remiseEl) remiseEl.textContent=remiseVal>0?'-'+remiseTTC.toLocaleString('fr-FR')+' MAD':'0 MAD';
   const ttcEl=document.getElementById('total-ttc');
   if(ttcEl) ttcEl.textContent=ttc.toLocaleString('fr-FR')+' MAD';
   const htEl=document.getElementById('total-ht');
-  if(htEl) htEl.textContent=Math.round(ht).toLocaleString('fr-FR')+' MAD';
+  if(htEl) htEl.textContent=Math.round(htNet).toLocaleString('fr-FR')+' MAD';
   const tvaEl=document.getElementById('total-tva');
   if(tvaEl) tvaEl.textContent=Math.round(htNet*0.2).toLocaleString('fr-FR')+' MAD';
   // Update section subtotals
@@ -1584,7 +1610,8 @@ async function saveDevisBuilder(){
     const{data,error}=await sb.from('devis').insert({
       reference:ref, client_id:clientId, projet_nom:projetNom,
       statut, date_envoi:new Date().toISOString().split('T')[0],
-      remise:Number(document.getElementById('builder-remise')?.value||0)
+      remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
+      remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
     }).select().single();
     if(error){toast('Erreur création: '+error.message);return;}
     devisId=data.id;
@@ -1593,7 +1620,8 @@ async function saveDevisBuilder(){
   } else {
     const{error}=await sb.from('devis').update({
       client_id:clientId, projet_nom:projetNom, statut,
-      remise:Number(document.getElementById('builder-remise')?.value||0)
+      remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
+      remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
     }).eq('id',devisId);
     if(error){toast('Erreur mise à jour: '+error.message);return;}
   }
