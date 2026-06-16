@@ -423,9 +423,13 @@
         <div id="dtab-content-liste"><div id="devis-list"></div></div>
         <div id="dtab-content-afaire" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <div style="display:flex;gap:8px">
-              <input type="text" id="daf-nom" placeholder="Nom client" style="width:180px;font-size:13px">
-              <input type="text" id="daf-produit" placeholder="Produit / description" style="width:260px;font-size:13px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="daf-nom" placeholder="Nom client" style="width:160px;font-size:13px">
+              <input type="text" id="daf-produit" placeholder="Produit / description" style="width:230px;font-size:13px">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--muted);background:var(--surface);white-space:nowrap">
+                🖼 <span id="daf-img-label">Image</span>
+                <input type="file" id="daf-img" accept="image/*" style="display:none" onchange="previewDafImg(this)">
+              </label>
               <button class="btn btn-primary btn-sm" onclick="addDevisAFaire()">+ Ajouter</button>
             </div>
             <button class="btn btn-sm" onclick="printDevisAFaire()" style="gap:6px">🖨 Imprimer</button>
@@ -1167,15 +1171,36 @@ function showDevisTab(tab,btn){
 let devisAFaireList=JSON.parse(localStorage.getItem('daf_list')||'[]');
 function saveDevisAFaire(){localStorage.setItem('daf_list',JSON.stringify(devisAFaireList));}
 
+function previewDafImg(input){
+  const f=input.files[0];
+  document.getElementById('daf-img-label').textContent=f?f.name.slice(0,14)+'...':'Image';
+}
+
 function addDevisAFaire(){
   const nom=document.getElementById('daf-nom').value.trim();
   const produit=document.getElementById('daf-produit').value.trim();
   if(!nom&&!produit){toast('Remplis au moins un champ');return;}
-  devisAFaireList.push({id:Date.now(),nom,produit,fait:false,date:new Date().toLocaleDateString('fr-FR')});
-  saveDevisAFaire();
-  document.getElementById('daf-nom').value='';
-  document.getElementById('daf-produit').value='';
-  renderDevisAFaire();
+  const imgInput=document.getElementById('daf-img');
+  const file=imgInput.files[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      devisAFaireList.push({id:Date.now(),nom,produit,img:e.target.result,fait:false,date:new Date().toLocaleDateString('fr-FR')});
+      saveDevisAFaire();
+      document.getElementById('daf-nom').value='';
+      document.getElementById('daf-produit').value='';
+      imgInput.value='';
+      document.getElementById('daf-img-label').textContent='Image';
+      renderDevisAFaire();
+    };
+    reader.readAsDataURL(file);
+  } else {
+    devisAFaireList.push({id:Date.now(),nom,produit,img:null,fait:false,date:new Date().toLocaleDateString('fr-FR')});
+    saveDevisAFaire();
+    document.getElementById('daf-nom').value='';
+    document.getElementById('daf-produit').value='';
+    renderDevisAFaire();
+  }
 }
 
 function toggleDaf(id){
@@ -1200,6 +1225,7 @@ function renderDevisAFaire(){
         <th style="padding:10px 14px;width:32px"></th>
         <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">CLIENT</th>
         <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">PRODUIT / DESCRIPTION</th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">IMAGE</th>
         <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">DATE</th>
         <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">STATUT</th>
         <th style="width:40px"></th>
@@ -1209,6 +1235,7 @@ function renderDevisAFaire(){
           <td style="padding:12px 14px"><input type="checkbox" ${d.fait?'checked':''} onchange="toggleDaf(${d.id})" style="cursor:pointer;width:16px;height:16px;accent-color:var(--text)"></td>
           <td style="padding:12px 14px;font-weight:500;font-size:14px;${d.fait?'text-decoration:line-through':''}">${d.nom||'—'}</td>
           <td style="padding:12px 14px;font-size:13px;color:var(--muted)">${d.produit||'—'}</td>
+          <td style="padding:8px 14px">${d.img?`<img src="${d.img}" onclick="dafImgZoom('${d.id}')" style="width:54px;height:54px;object-fit:cover;border-radius:6px;cursor:zoom-in;border:1px solid var(--border)">`:'<span style="font-size:11px;color:var(--muted)">—</span>'}</td>
           <td style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${d.date}</td>
           <td style="padding:12px 14px"><span class="badge ${d.fait?'badge-green':'badge-amber'}">${d.fait?'Fait':'A faire'}</span></td>
           <td style="padding:12px 14px"><button onclick="deleteDaf(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">x</button></td>
@@ -1216,6 +1243,17 @@ function renderDevisAFaire(){
       </tbody>
     </table>
   </div>`;
+}
+
+function dafImgZoom(id){
+  const item=devisAFaireList.find(d=>String(d.id)===String(id));
+  if(!item||!item.img) return;
+  const html=`<div class="modal" style="max-width:700px;text-align:center">
+    <div class="modal-title">${item.nom||''} — ${item.produit||''}</div>
+    <img src="${item.img}" style="max-width:100%;max-height:70vh;border-radius:8px;object-fit:contain">
+    <div class="modal-footer"><button class="btn" onclick="closeModal('rh-modal')">Fermer</button></div>
+  </div>`;
+  showModal('rh-modal',html);
 }
 
 function printDevisAFaire(){
