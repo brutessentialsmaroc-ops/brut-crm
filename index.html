@@ -414,7 +414,25 @@
         </div>
       </div>
       <!-- DEVIS LIST -->
-      <div id="page-devis" class="hidden"><div id="devis-list"></div></div>
+      <!-- DEVIS LIST -->
+      <div id="page-devis" class="hidden">
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
+          <button class="rh-tab active" id="dtab-liste" onclick="showDevisTab('liste',this)">◧ Devis</button>
+          <button class="rh-tab" id="dtab-afaire" onclick="showDevisTab('afaire',this)">📋 Devis à faire</button>
+        </div>
+        <div id="dtab-content-liste"><div id="devis-list"></div></div>
+        <div id="dtab-content-afaire" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="display:flex;gap:8px">
+              <input type="text" id="daf-nom" placeholder="Nom client" style="width:180px;font-size:13px">
+              <input type="text" id="daf-produit" placeholder="Produit / description" style="width:260px;font-size:13px">
+              <button class="btn btn-primary btn-sm" onclick="addDevisAFaire()">+ Ajouter</button>
+            </div>
+            <button class="btn btn-sm" onclick="printDevisAFaire()" style="gap:6px">🖨 Imprimer</button>
+          </div>
+          <div id="daf-list"></div>
+        </div>
+      </div>
       <!-- FACTURES -->
       <div id="page-factures" class="hidden">
         <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)">
@@ -1137,6 +1155,99 @@ async function loadDevisList(){
   }).join('');
 }
 async function deleteDevis(id){if(!confirm('Supprimer ce devis ?'))return;await sb.from('devis').delete().eq('id',id);toast('Supprimé');loadDevisList();}
+
+function showDevisTab(tab,btn){
+  document.querySelectorAll('#page-devis .rh-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('dtab-content-liste').classList.toggle('hidden',tab!=='liste');
+  document.getElementById('dtab-content-afaire').classList.toggle('hidden',tab!=='afaire');
+  if(tab==='afaire') renderDevisAFaire();
+}
+
+let devisAFaireList=JSON.parse(localStorage.getItem('daf_list')||'[]');
+function saveDevisAFaire(){localStorage.setItem('daf_list',JSON.stringify(devisAFaireList));}
+
+function addDevisAFaire(){
+  const nom=document.getElementById('daf-nom').value.trim();
+  const produit=document.getElementById('daf-produit').value.trim();
+  if(!nom&&!produit){toast('Remplis au moins un champ');return;}
+  devisAFaireList.push({id:Date.now(),nom,produit,fait:false,date:new Date().toLocaleDateString('fr-FR')});
+  saveDevisAFaire();
+  document.getElementById('daf-nom').value='';
+  document.getElementById('daf-produit').value='';
+  renderDevisAFaire();
+}
+
+function toggleDaf(id){
+  const item=devisAFaireList.find(d=>d.id===id);
+  if(item) item.fait=!item.fait;
+  saveDevisAFaire();
+  renderDevisAFaire();
+}
+
+function deleteDaf(id){
+  devisAFaireList=devisAFaireList.filter(d=>d.id!==id);
+  saveDevisAFaire();
+  renderDevisAFaire();
+}
+
+function renderDevisAFaire(){
+  const el=document.getElementById('daf-list');
+  if(!devisAFaireList.length){el.innerHTML='<div class="empty">Aucun devis à faire. Ajoutez-en un ci-dessus.</div>';return;}
+  el.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--bg)">
+        <th style="padding:10px 14px;width:32px"></th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">CLIENT</th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">PRODUIT / DESCRIPTION</th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">DATE</th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">STATUT</th>
+        <th style="width:40px"></th>
+      </tr></thead>
+      <tbody>
+        ${devisAFaireList.map(d=>`<tr style="border-top:1px solid var(--border);${d.fait?'opacity:0.5':''}">
+          <td style="padding:12px 14px"><input type="checkbox" ${d.fait?'checked':''} onchange="toggleDaf(${d.id})" style="cursor:pointer;width:16px;height:16px;accent-color:var(--text)"></td>
+          <td style="padding:12px 14px;font-weight:500;font-size:14px;${d.fait?'text-decoration:line-through':''}">${d.nom||'—'}</td>
+          <td style="padding:12px 14px;font-size:13px;color:var(--muted)">${d.produit||'—'}</td>
+          <td style="padding:12px 14px;font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${d.date}</td>
+          <td style="padding:12px 14px"><span class="badge ${d.fait?'badge-green':'badge-amber'}">${d.fait?'Fait':'A faire'}</span></td>
+          <td style="padding:12px 14px"><button onclick="deleteDaf(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">x</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function printDevisAFaire(){
+  const rows=devisAFaireList.map(d=>`
+    <tr>
+      <td style="padding:13px 16px;border-bottom:1px solid #e8e4dc;font-size:13px;font-weight:500">${d.nom||'—'}</td>
+      <td style="padding:13px 16px;border-bottom:1px solid #e8e4dc;font-size:13px;color:#666">${d.produit||'—'}</td>
+      <td style="padding:13px 16px;border-bottom:1px solid #e8e4dc;font-size:12px;color:#999;font-family:monospace">${d.date}</td>
+      <td style="padding:13px 16px;border-bottom:1px solid #e8e4dc;text-align:center">
+        <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${d.fait?'#dcfce7':'#fef3c7'};color:${d.fait?'#16a34a':'#d97706'}">${d.fait?'Fait':'A faire'}</span>
+      </td>
+    </tr>`).join('');
+  const emptyCount=Math.max(0,20-devisAFaireList.length);
+  const emptyRows=Array(emptyCount).fill('<tr><td style="padding:13px 16px;border-bottom:1px solid #e8e4dc">&nbsp;</td><td style="padding:13px 16px;border-bottom:1px solid #e8e4dc"></td><td style="padding:13px 16px;border-bottom:1px solid #e8e4dc"></td><td style="padding:13px 16px;border-bottom:1px solid #e8e4dc"></td></tr>').join('');
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>body{font-family:sans-serif;margin:0}@page{margin:14mm;size:A4}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>
+    <div style="border-bottom:2px solid #1a1a18;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end">
+      <div><div style="font-size:22px;font-weight:700;letter-spacing:3px">BRUT</div><div style="font-size:11px;color:#888">Atelier de fabrication · Marrakech</div></div>
+      <div style="text-align:right"><div style="font-size:16px;font-weight:600">DEVIS A FAIRE</div><div style="font-size:11px;color:#888">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#f8f6f1">
+        <th style="padding:10px 16px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc;width:25%">CLIENT</th>
+        <th style="padding:10px 16px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">PRODUIT / DESCRIPTION</th>
+        <th style="padding:10px 16px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc;width:15%">DATE</th>
+        <th style="padding:10px 16px;text-align:center;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc;width:12%">STATUT</th>
+      </tr></thead>
+      <tbody>${rows}${emptyRows}</tbody>
+    </table>`;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
 
 // ─── DEVIS BUILDER ────────────────────────────────────────────────────────────
 async function openDevisBuilder(devisId){
