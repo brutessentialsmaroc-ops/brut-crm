@@ -1636,10 +1636,20 @@ async function saveDevisBuilder(){
     if(error){toast('Erreur mise à jour: '+error.message);return;}
   }
 
-  // 2. Supprimer toutes les sections existantes (cascade supprime les articles)
+  // 2. Garde-fou anti-perte de données : si on s'apprête à sauvegarder beaucoup MOINS
+  // de sections qu'il n'en existe déjà en base, on bloque et on demande confirmation explicite.
+  const{data:existingSections}=await sb.from('devis_sections').select('id').eq('devis_id',devisId);
+  const existingCount=(existingSections||[]).length;
+  const newCount=sectionsData.length;
+  if(existingCount>0 && newCount < existingCount){
+    const ok=confirm(`⚠️ ATTENTION : ce devis a actuellement ${existingCount} section(s) en base, mais vous n'en avez que ${newCount} chargée(s) à l'écran.\n\nContinuer va SUPPRIMER DÉFINITIVEMENT ${existingCount-newCount} section(s) et leurs articles.\n\nÊtes-vous certain de vouloir continuer ?`);
+    if(!ok){ toast('Sauvegarde annulée — aucune donnée supprimée'); return; }
+  }
+
+  // 3. Supprimer toutes les sections existantes (cascade supprime les articles)
   await sb.from('devis_sections').delete().eq('devis_id',devisId);
 
-  // 3. Réinsérer sections + articles proprement
+  // 4. Réinsérer sections + articles proprement
   for(let si=0;si<sectionsData.length;si++){
     const sec=sectionsData[si];
     const{data:secData,error:secErr}=await sb.from('devis_sections').insert({
