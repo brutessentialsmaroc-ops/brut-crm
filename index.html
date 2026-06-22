@@ -2962,17 +2962,10 @@ async function genererPaie(){
   for(const s of sal||[]){
     const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
     const base=Number(s.salaire_base||0);
-    const jourTravail=26;
-    const deducAbs=Math.round(base/jourTravail*pt.absences);
-    const deducRet=Math.round(base/jourTravail*0.5*pt.retards);
-    const hSupMontant=Math.round(base/jourTravail/8*1.25*pt.hSup);
-    const net=Math.max(0,base+hSupMontant-deducAbs-deducRet);
+    const net=base;
     await sb.from('paie').upsert({
       salarie_id:s.id,mois,annee,
       salaire_base:base,
-      heures_sup_montant:hSupMontant,
-      deduction_absences:deducAbs,
-      deduction_retards:deducRet,
       net_a_payer:net,
       statut:'En attente'
     },{onConflict:'salarie_id,mois,annee'});
@@ -3255,13 +3248,9 @@ function refreshAvancesUI(avances,base){
 }
 
 function calcNetModif(base){
-  const abs=Number(document.getElementById('pm-abs-mad').value)||0;
-  const ret=Number(document.getElementById('pm-ret-mad').value)||0;
-  const hsup=Number(document.getElementById('pm-hsup-mad').value)||0;
-  const autres=Number(document.getElementById('pm-autres').value)||0;
   const avances=getAvances();
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
-  const net=Math.max(0,base+hsup-abs-ret+autres);
+  const net=base;
   const reste=Math.max(0,net-totalAvances);
   document.getElementById('pm-net').textContent=net.toLocaleString('fr-FR')+' MAD';
   document.getElementById('pm-reste').textContent=reste.toLocaleString('fr-FR')+' MAD';
@@ -3276,7 +3265,7 @@ async function savePaieModif(salId,mois,annee,base){
   const autres=Number(document.getElementById('pm-autres').value)||0;
   const avances=getAvances();
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
-  const net=Math.max(0,base+hSupMontant-deducAbs-deducRet+autres);
+  const net=base;
   const reste=Math.max(0,net-totalAvances);
   const{error}=await sb.from('paie').upsert({
     salarie_id:salId,mois,annee,
