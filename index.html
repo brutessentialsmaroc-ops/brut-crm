@@ -489,12 +489,14 @@
       </div>
       <!-- ACHATS -->
       <div id="page-achats" class="hidden">
-        <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px">
+        <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px;flex-wrap:wrap">
           <button class="rh-tab active" id="achat-tab-suivi" onclick="showAchatTab('suivi',this)">📋 Suivi mensuel</button>
           <button class="rh-tab" id="achat-tab-bilan" onclick="showAchatTab('bilan',this)">📊 Bilan des dépenses</button>
+          <button class="rh-tab" id="achat-tab-fournisseurs" onclick="showAchatTab('fournisseurs',this)">🏭 Fournisseurs</button>
         </div>
         <div id="achat-suivi"><div class="loading">Chargement…</div></div>
         <div id="achat-bilan" class="hidden"><div class="loading">Chargement…</div></div>
+        <div id="achat-fournisseurs" class="hidden"><div class="loading">Chargement…</div></div>
       </div>
       <!-- RH -->
       <div id="page-rh" class="hidden">
@@ -4309,8 +4311,176 @@ function showAchatTab(tab, el){
   el.classList.add('active');
   document.getElementById('achat-suivi').classList.toggle('hidden', tab!=='suivi');
   document.getElementById('achat-bilan').classList.toggle('hidden', tab!=='bilan');
+  document.getElementById('achat-fournisseurs').classList.toggle('hidden', tab!=='fournisseurs');
   if(tab==='suivi') loadAchatsSuivi();
-  else loadAchatsBilan();
+  else if(tab==='bilan') loadAchatsBilan();
+  else loadFournisseurs();
+}
+
+
+// ─── FOURNISSEURS ─────────────────────────────────────────────────────────────
+async function loadFournisseurs(){
+  const el=document.getElementById('achat-fournisseurs');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const{data:fournisseurs}=await sb.from('fournisseurs').select('*').order('created_at',{ascending:false});
+  const{data:mouvements}=await sb.from('fournisseur_mouvements').select('*').order('date',{ascending:false});
+
+  const movByFourn={};
+  (mouvements||[]).forEach(m=>{
+    if(!movByFourn[m.fournisseur_id]) movByFourn[m.fournisseur_id]=[];
+    movByFourn[m.fournisseur_id].push(m);
+  });
+
+  el.innerHTML=`
+    <div style="margin-bottom:20px">
+      <button class="btn btn-primary btn-sm" onclick="openAddFournisseurModal()">+ Nouveau fournisseur</button>
+    </div>
+    <div id="fourn-list">
+      ${!fournisseurs||!fournisseurs.length?'<div class="empty">Aucun fournisseur. Cliquez sur "+ Nouveau fournisseur".</div>':
+      fournisseurs.map(f=>{
+        const movs=movByFourn[f.id]||[];
+        const credits=movs.filter(m=>m.type==='credit').reduce((s,m)=>s+Number(m.montant),0);
+        const depenses=movs.filter(m=>m.type==='depense').reduce((s,m)=>s+Number(m.montant),0);
+        const solde=credits-depenses;
+        return `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg);border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:600;font-size:16px">${f.nom}</div>
+              ${f.notes?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${f.notes}</div>`:''}
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="text-align:right">
+                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">SOLDE RESTANT</div>
+                <div style="font-size:18px;font-weight:700;color:${solde>=0?'var(--green)':'var(--red)'}">${solde.toLocaleString('fr-FR')} MAD</div>
+              </div>
+              <button class="btn btn-sm" onclick="openAddCreditModal('${f.id}')">+ Crédit</button>
+              <button class="btn btn-sm" onclick="openAddDepenseFournModal('${f.id}')">+ Dépense</button>
+              <button onclick="deleteFournisseur('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0 6px">×</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:20px;padding:10px 18px;background:var(--bg);font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">
+            <span>Crédit total: <strong style="color:var(--text)">${credits.toLocaleString('fr-FR')} MAD</strong></span>
+            <span>Dépensé: <strong style="color:var(--text)">${depenses.toLocaleString('fr-FR')} MAD</strong></span>
+          </div>
+          <div style="padding:6px 0">
+            ${!movs.length?'<div style="padding:14px 18px;font-size:13px;color:var(--muted)">Aucun mouvement</div>':
+            movs.map(m=>`
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;min-width:80px">${new Date(m.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                  <span class="badge ${m.type==='credit'?'badge-green':'badge-amber'}">${m.type==='credit'?'Crédit':'Dépense'}</span>
+                  <span style="font-size:13px">${m.description||'—'}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:${m.type==='credit'?'var(--green)':'var(--red)'}">${m.type==='credit'?'+':'-'}${Number(m.montant).toLocaleString('fr-FR')} MAD</span>
+                  <button onclick="deleteFournMouvement('${m.id}','${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px">×</button>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function openAddFournisseurModal(){
+  const html=`<div class="modal">
+    <div class="modal-title">Nouveau fournisseur</div>
+    <div class="form-group"><label>Nom du fournisseur</label>
+      <input type="text" id="fourn-nom" placeholder="Ex: BOIS BERREZOUQ">
+    </div>
+    <div class="form-group"><label>Notes (optionnel)</label>
+      <input type="text" id="fourn-notes" placeholder="Téléphone, adresse...">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveFournisseur()">Créer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveFournisseur(){
+  const nom=document.getElementById('fourn-nom').value.trim();
+  if(!nom){toast('Nom requis');return;}
+  const notes=document.getElementById('fourn-notes').value.trim();
+  const{error}=await sb.from('fournisseurs').insert({nom,notes});
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast('Fournisseur créé ✓');
+  loadFournisseurs();
+}
+
+async function deleteFournisseur(id){
+  if(!confirm('Supprimer ce fournisseur et tous ses mouvements ?'))return;
+  await sb.from('fournisseur_mouvements').delete().eq('fournisseur_id',id);
+  await sb.from('fournisseurs').delete().eq('id',id);
+  toast('Supprimé');
+  loadFournisseurs();
+}
+
+function openAddCreditModal(fournisseurId){
+  const todayStr=new Date().toISOString().split('T')[0];
+  const html=`<div class="modal">
+    <div class="modal-title">Ajouter un crédit</div>
+    <div class="form-group"><label>Montant (MAD)</label>
+      <input type="number" id="fourn-mvt-montant" min="0" step="1" placeholder="10000">
+    </div>
+    <div class="form-group"><label>Date</label>
+      <input type="date" id="fourn-mvt-date" value="${todayStr}">
+    </div>
+    <div class="form-group"><label>Description (optionnel)</label>
+      <input type="text" id="fourn-mvt-desc" placeholder="Ex: Crédit déposé">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveFournMouvement('${fournisseurId}','credit')">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+function openAddDepenseFournModal(fournisseurId){
+  const todayStr=new Date().toISOString().split('T')[0];
+  const html=`<div class="modal">
+    <div class="modal-title">Ajouter une dépense</div>
+    <div class="form-group"><label>Montant (MAD)</label>
+      <input type="number" id="fourn-mvt-montant" min="0" step="1" placeholder="1500">
+    </div>
+    <div class="form-group"><label>Date</label>
+      <input type="date" id="fourn-mvt-date" value="${todayStr}">
+    </div>
+    <div class="form-group"><label>Description</label>
+      <input type="text" id="fourn-mvt-desc" placeholder="Ex: Achat planches chêne">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveFournMouvement('${fournisseurId}','depense')">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveFournMouvement(fournisseurId,type){
+  const montant=Number(document.getElementById('fourn-mvt-montant').value);
+  const date=document.getElementById('fourn-mvt-date').value;
+  const description=document.getElementById('fourn-mvt-desc').value.trim();
+  if(!montant||montant<=0){toast('Montant invalide');return;}
+  if(!date){toast('Date requise');return;}
+  const{error}=await sb.from('fournisseur_mouvements').insert({
+    fournisseur_id:fournisseurId, type, montant, date, description
+  });
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast(type==='credit'?'Crédit ajouté ✓':'Dépense ajoutée ✓');
+  loadFournisseurs();
+}
+
+async function deleteFournMouvement(id,fournisseurId){
+  if(!confirm('Supprimer ce mouvement ?'))return;
+  await sb.from('fournisseur_mouvements').delete().eq('id',id);
+  toast('Supprimé');
+  loadFournisseurs();
 }
 
 function navAchat(dir){
