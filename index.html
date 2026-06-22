@@ -1971,120 +1971,146 @@ async function loadPaiements(){
     el.innerHTML='<div class="empty">Aucune facture en attente de paiement.</div>';return;
   }
   el.innerHTML=`
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead>
-        <tr style="border-bottom:2px solid var(--border)">
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">FACTURE</th>
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">CLIENT</th>
-          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">TOTAL TTC</th>
-          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f9f8f6" colspan="3">ACOMPTE 1</th>
-          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);background:#f5f3ee" colspan="3">ACOMPTE 2</th>
-          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted)">RESTE À PAYER</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${factures.map(f=>{
-          const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-          const remise=Number(f.remise||0);
-          const htNet=ht*(1-remise/100);
-          const ttc=Math.round(htNet*1.2*100)/100;
-          const a1=Number(f.acompte1||0);
-          const a2=Number(f.acompte2||0);
-          const reste=Math.round((ttc-a1-a2)*100)/100;
-          const pct=ttc>0?Math.round(((a1+a2)/ttc)*100):0;
-          const modeOptions=['','Chèque','Virement','Cash'].map(m=>`<option value="${m}" ${f.mode_paiement===m?'selected':''}>${m||'Mode…'}</option>`).join('');
-          return`<tr id="prow-${f.id}" style="border-bottom:1px solid var(--border);vertical-align:middle">
-            <td style="padding:12px;color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;white-space:nowrap">
-              ${f.reference}<br><span style="font-size:10px">${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</span>
-            </td>
-            <td style="padding:12px;font-weight:500">${f.clients?.nom||'—'}<br>
-              <span style="font-size:11px;color:var(--muted)">${f.projet_nom||''}</span>
-            </td>
-            <td style="padding:12px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap" data-ttc="${ttc}">${ttc.toLocaleString('fr-FR')} MAD</td>
-            <td style="padding:8px;background:#f9f8f6">
-              <input type="number" id="pa1-${f.id}" value="${a1||''}" placeholder="Montant…" min="0" step="0.01"
-                style="width:100px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                oninput="recalcPaiement('${f.id}',${ttc})" onblur="savePaiement('${f.id}',${ttc})">
-            </td>
-            <td style="padding:8px;background:#f9f8f6">
-              <input type="date" id="pd1-${f.id}" value="${f.acompte1_date||''}"
-                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                onchange="savePaiement('${f.id}',${ttc})">
-            </td>
-            <td style="padding:8px;background:#f9f8f6">
-              <select id="pm1-${f.id}" onchange="savePaiement('${f.id}',${ttc})"
-                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted);width:110px">
-                ${modeOptions}
-              </select>
-            </td>
-            <td style="padding:8px;background:#f5f3ee">
-              <input type="number" id="pa2-${f.id}" value="${a2||''}" placeholder="Montant…" min="0" step="0.01"
-                style="width:100px;font-size:12px;text-align:right;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                oninput="recalcPaiement('${f.id}',${ttc})" onblur="savePaiement('${f.id}',${ttc})">
-            </td>
-            <td style="padding:8px;background:#f5f3ee">
-              <input type="date" id="pd2-${f.id}" value="${f.acompte2_date||''}"
-                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px"
-                onchange="savePaiement('${f.id}',${ttc})">
-            </td>
-            <td style="padding:8px;background:#f5f3ee">
-              <select id="pm2-${f.id}" onchange="savePaiement('${f.id}',${ttc})"
-                style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted);width:110px">
-                ${['','Chèque','Virement','Cash'].map(m=>`<option value="${m}" ${f.mode_paiement2===m?'selected':''}>${m||'Mode…'}</option>`).join('')}
-              </select>
-            </td>
-            <td style="padding:12px;text-align:right">
-              ${renderReste(f.id, ttc, a1, a2)}
-            </td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
+    <div style="display:flex;flex-direction:column;gap:14px">
+    ${factures.map(f=>{
+      const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+      const remise=Number(f.remise||0);
+      const htNet=ht*(1-remise/100);
+      const ttc=Math.round(htNet*1.2*100)/100;
+      const paiements=getPaiementsArr(f);
+      return renderPaiementCard(f, ttc, paiements);
+    }).join('')}
     </div>`;
 }
 
-function renderReste(fid, ttc, a1, a2){
-  const reste=Math.max(0,Math.round((ttc-a1-a2)*100)/100);
-  const pct=ttc>0?Math.min(100,Math.round(((a1+a2)/ttc)*100)):0;
-  const barColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#e8e4dc';
-  const badgeBg=reste<=0?'#F0FDF4':pct>0?'#FFFBEB':'#FEF2F2';
-  const badgeColor=reste<=0?'#10B981':pct>0?'#F59E0B':'#EF4444';
-  const badgeText=reste<=0?'✅ Soldé':pct>0?`${pct}% réglé`:'En attente';
-  return`<div id="reste-${fid}">
-    <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:14px;color:${reste<=0?'#10B981':'#1a1a18'}">${reste<=0?'0':reste.toLocaleString('fr-FR')} MAD</div>
-    <div style="margin-top:6px;height:4px;background:#e8e4dc;border-radius:2px;width:80px;margin-left:auto">
-      <div style="height:4px;background:${barColor};border-radius:2px;width:${pct}%"></div>
+function getPaiementsArr(f){
+  // Migrate legacy acompte1/acompte2 columns into the new array format if present and array empty
+  let arr=[];
+  try{ arr = f.paiements ? (typeof f.paiements==='string'?JSON.parse(f.paiements):f.paiements) : []; }catch(e){ arr=[]; }
+  if((!arr||!arr.length) && (Number(f.acompte1||0)>0 || Number(f.acompte2||0)>0)){
+    arr=[];
+    if(Number(f.acompte1||0)>0) arr.push({montant:Number(f.acompte1),date:f.acompte1_date||null,mode:f.mode_paiement||null});
+    if(Number(f.acompte2||0)>0) arr.push({montant:Number(f.acompte2),date:f.acompte2_date||null,mode:f.mode_paiement2||null});
+  }
+  return arr||[];
+}
+
+function renderPaiementCard(f, ttc, paiements){
+  const total=paiements.reduce((s,p)=>s+Number(p.montant||0),0);
+  const reste=Math.round((ttc-total)*100)/100;
+  const pct=ttc>0?Math.round((total/ttc)*100):0;
+  const modeOpts=(selected)=>['','Chèque','Virement','Cash'].map(m=>`<option value="${m}" ${selected===m?'selected':''}>${m||'Mode…'}</option>`).join('');
+  const rows=[0,1,2,3,4].map(i=>{
+    const p=paiements[i]||{};
+    const visible = i < Math.max(1, paiements.length); // always show at least 1, plus existing ones
+    return`<div class="acompte-row" data-idx="${i}" style="display:${visible?'flex':'none'};gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--muted);width:64px;flex-shrink:0">Acompte ${i+1}</span>
+      <input type="number" class="acompte-montant" data-idx="${i}" value="${p.montant||''}" placeholder="Montant…" min="0" step="0.01"
+        style="width:110px;font-size:12px;text-align:right;padding:6px 8px;border:1px solid var(--border);border-radius:4px"
+        oninput="recalcPaiementCard('${f.id}',${ttc})" onblur="savePaiementCard('${f.id}',${ttc})">
+      <input type="date" class="acompte-date" data-idx="${i}" value="${p.date||''}"
+        style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px"
+        onchange="savePaiementCard('${f.id}',${ttc})">
+      <select class="acompte-mode" data-idx="${i}" onchange="savePaiementCard('${f.id}',${ttc})"
+        style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted);width:110px">
+        ${modeOpts(p.mode||'')}
+      </select>
+      ${i>0?`<button onclick="removeAcompteRow('${f.id}',${ttc},${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0 4px">×</button>`:''}
+    </div>`;
+  }).join('');
+
+  let badgeBg, badgeColor, badgeText;
+  if(reste===0){ badgeBg='#F0FDF4'; badgeColor='#10B981'; badgeText='✅ Soldé'; }
+  else if(reste<0){ badgeBg='#FEF2F2'; badgeColor='#EF4444'; badgeText=`⚠️ Trop-perçu : ${Math.abs(reste).toLocaleString('fr-FR')} MAD`; }
+  else if(total>0){ badgeBg='#FFFBEB'; badgeColor='#F59E0B'; badgeText=`${pct}% réglé`; }
+  else { badgeBg='#FDF6EC'; badgeColor='#EF9F27'; badgeText='En attente'; }
+
+  return`<div id="pcard-${f.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-weight:600;font-size:14px">${f.clients?.nom||'—'} <span style="color:var(--muted);font-weight:400;font-size:12px">— ${f.projet_nom||''}</span></div>
+        <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${f.reference} · ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:15px">${ttc.toLocaleString('fr-FR')} MAD</div>
+        <div id="reste-${f.id}" style="font-size:11px;margin-top:3px;padding:2px 10px;border-radius:20px;background:${badgeBg};color:${badgeColor};display:inline-block;font-weight:600">${badgeText}</div>
+      </div>
     </div>
-    <div style="font-size:10px;margin-top:4px;padding:2px 8px;border-radius:20px;background:${badgeBg};color:${badgeColor};display:inline-block;font-weight:600">${badgeText}</div>
+    <div id="acompte-rows-${f.id}">${rows}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm" onclick="addAcompteRow('${f.id}')" ${paiements.length>=5?'disabled style="opacity:0.4;cursor:not-allowed"':''}>+ Ajouter un acompte</button>
+      <div style="font-size:12px;color:var(--muted)">Total versé : <strong style="color:var(--text);font-family:'DM Mono',monospace">${total.toLocaleString('fr-FR')} MAD</strong> · Reste : <strong style="color:${reste<0?'#EF4444':reste===0?'#10B981':'#1a1a18'};font-family:'DM Mono',monospace">${reste.toLocaleString('fr-FR')} MAD</strong></div>
+    </div>
   </div>`;
 }
 
-function recalcPaiement(fid, ttc){
-  const a1=Number(document.getElementById('pa1-'+fid)?.value||0);
-  const a2=Number(document.getElementById('pa2-'+fid)?.value||0);
-  const el=document.getElementById('reste-'+fid);
-  if(el) el.outerHTML=renderReste(fid, ttc, a1, a2);
+function addAcompteRow(fid){
+  const container=document.getElementById('acompte-rows-'+fid);
+  const rows=container.querySelectorAll('.acompte-row');
+  for(const row of rows){
+    if(row.style.display==='none'){ row.style.display='flex'; break; }
+  }
 }
 
-async function savePaiement(factureId, ttc){
-  const a1=Number(document.getElementById('pa1-'+factureId)?.value||0);
-  const a2=Number(document.getElementById('pa2-'+factureId)?.value||0);
+function removeAcompteRow(fid, ttc, idx){
+  const container=document.getElementById('acompte-rows-'+fid);
+  const row=container.querySelector(`.acompte-row[data-idx="${idx}"]`);
+  if(row){
+    row.querySelector('.acompte-montant').value='';
+    row.querySelector('.acompte-date').value='';
+    row.querySelector('.acompte-mode').value='';
+    row.style.display='none';
+  }
+  savePaiementCard(fid, ttc);
+}
+
+function collectAcomptes(fid){
+  const container=document.getElementById('acompte-rows-'+fid);
+  const rows=container.querySelectorAll('.acompte-row');
+  const result=[];
+  rows.forEach(row=>{
+    if(row.style.display==='none') return;
+    const montant=Number(row.querySelector('.acompte-montant').value||0);
+    const date=row.querySelector('.acompte-date').value||null;
+    const mode=row.querySelector('.acompte-mode').value||null;
+    if(montant>0) result.push({montant,date,mode});
+  });
+  return result;
+}
+
+function recalcPaiementCard(fid, ttc){
+  const paiements=collectAcomptes(fid);
+  const total=paiements.reduce((s,p)=>s+Number(p.montant||0),0);
+  const reste=Math.round((ttc-total)*100)/100;
+  const pct=ttc>0?Math.round((total/ttc)*100):0;
+  let badgeBg, badgeColor, badgeText;
+  if(reste===0){ badgeBg='#F0FDF4'; badgeColor='#10B981'; badgeText='✅ Soldé'; }
+  else if(reste<0){ badgeBg='#FEF2F2'; badgeColor='#EF4444'; badgeText=`⚠️ Trop-perçu : ${Math.abs(reste).toLocaleString('fr-FR')} MAD`; }
+  else if(total>0){ badgeBg='#FFFBEB'; badgeColor='#F59E0B'; badgeText=`${pct}% réglé`; }
+  else { badgeBg='#FDF6EC'; badgeColor='#EF9F27'; badgeText='En attente'; }
+  const el=document.getElementById('reste-'+fid);
+  if(el){ el.style.background=badgeBg; el.style.color=badgeColor; el.textContent=badgeText; }
+}
+
+async function savePaiementCard(factureId, ttc){
+  const paiements=collectAcomptes(factureId);
+  const total=paiements.reduce((s,p)=>s+Number(p.montant||0),0);
   const update={
-    acompte1:a1||null,
-    acompte1_date:document.getElementById('pd1-'+factureId)?.value||null,
-    mode_paiement:document.getElementById('pm1-'+factureId)?.value||null,
-    acompte2:a2||null,
-    acompte2_date:document.getElementById('pd2-'+factureId)?.value||null,
-    mode_paiement2:document.getElementById('pm2-'+factureId)?.value||null,
+    paiements:paiements,
+    // keep legacy columns roughly in sync for backward compatibility
+    acompte1:paiements[0]?.montant||null,
+    acompte1_date:paiements[0]?.date||null,
+    mode_paiement:paiements[0]?.mode||null,
+    acompte2:paiements[1]?.montant||null,
+    acompte2_date:paiements[1]?.date||null,
+    mode_paiement2:paiements[1]?.mode||null,
   };
   await sb.from('factures').update(update).eq('id',factureId);
-  // Si soldé, proposer de marquer payée
-  if(a1+a2>=ttc-0.01&&ttc>0){
+  recalcPaiementCard(factureId, ttc);
+  if(Math.abs(total-ttc)<0.01 && ttc>0){
     if(confirm('Le total est réglé. Marquer la facture comme Payée ?')){
       await sb.from('factures').update({statut:'Payée'}).eq('id',factureId);
       toast('Facture marquée Payée ✓');
-      loadPaiements();
     }
   }
 }
@@ -2201,6 +2227,9 @@ async function printFacture(id){
   const tva=htNet*0.2; const ttc=htNet+tva;
   const date=f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
   const echeance=f.date_echeance?new Date(f.date_echeance).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):'—';
+  const paiements=getPaiementsArr(f);
+  const totalVerse=paiements.reduce((s,p)=>s+Number(p.montant||0),0);
+  const resteAPayer=Math.round((ttc-totalVerse)*100)/100;
 
   const sectionsHTML=sections.map(sec=>`
     <div style="margin-bottom:14px;page-break-inside:avoid">
@@ -2272,6 +2301,25 @@ async function printFacture(id){
             <td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:600;border-radius:0 3px 3px 0;font-size:13px">${ttc.toLocaleString('fr-FR')} MAD</td>
           </tr>
         </table>
+        ${paiements.length?`
+        <div style="margin-top:10px;padding:8px 12px;background:#FBF1E6;border-radius:3px;border-left:3px solid #C2703D">
+          <div style="font-weight:700;font-size:10px;letter-spacing:0.5px;color:#8A5A36;margin-bottom:4px;font-family:monospace;text-transform:uppercase">PAIEMENTS REÇUS</div>
+          <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+            ${paiements.map((p,i)=>`<tr>
+              <td style="padding:2px 0;color:#5C3D24">Acompte ${i+1}${p.mode?' — '+p.mode:''}</td>
+              <td style="padding:2px 0;color:#888;font-family:monospace">${p.date?new Date(p.date).toLocaleDateString('fr-FR'):'—'}</td>
+              <td style="padding:2px 0;text-align:right;font-family:monospace;font-weight:600">${Number(p.montant).toLocaleString('fr-FR')} MAD</td>
+            </tr>`).join('')}
+            <tr style="border-top:1px solid #e8d4bc">
+              <td style="padding:4px 0;font-weight:600;color:#5C3D24" colspan="2">Total versé</td>
+              <td style="padding:4px 0;text-align:right;font-family:monospace;font-weight:700">${totalVerse.toLocaleString('fr-FR')} MAD</td>
+            </tr>
+            <tr>
+              <td style="padding:2px 0;font-weight:600;color:${resteAPayer<0?'#EF4444':'#1a1a18'}" colspan="2">${resteAPayer<0?'Trop-perçu':'Reste à payer'}</td>
+              <td style="padding:2px 0;text-align:right;font-family:monospace;font-weight:700;color:${resteAPayer<0?'#EF4444':'#1a1a18'}">${Math.abs(resteAPayer).toLocaleString('fr-FR')} MAD</td>
+            </tr>
+          </table>
+        </div>`:''}
         <!-- COORDONNÉES BANCAIRES -->
         <div style="margin-top:12px;padding:8px 12px;background:#f5f3ee;border-radius:3px;font-size:10px;color:#444;line-height:1.7">
           <div style="font-weight:700;font-size:10.5px;letter-spacing:0.5px;margin-bottom:2px">CERAMICS DESIGN</div>
