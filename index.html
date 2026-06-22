@@ -2913,7 +2913,7 @@ async function loadPaie(){
       <button class="btn btn-primary btn-sm" onclick="genererPaie()">Générer toutes les fiches</button>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Salarié</th><th>Base</th><th>Absences</th><th>Retards</th><th>H.Sup</th><th>Net à payer</th><th>Avances</th><th>Reste à donner</th><th>Statut</th><th></th></tr></thead>
+      <thead><tr><th>Salarié</th><th>Base</th><th>Absences</th><th>Retards</th><th>H.Sup</th><th>Primes</th><th>Net à payer</th><th>Avances</th><th>Reste à donner</th><th>Statut</th><th></th></tr></thead>
       <tbody>${(sal||[]).map(s=>{
         const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
         const p=paieMap[s.id];
@@ -2922,12 +2922,15 @@ async function loadPaie(){
         const avances=p&&p.avances?p.avances:[];
         const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
         const reste=Math.max(0,net-totalAvances);
+        const hSupMontant=p?Number(p.heures_sup_montant||0):0;
+        const primesMontant=p?Number(p.autres_primes||0):0;
         return`<tr>
           <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
           <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences}j</td>
           <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}×</td>
-          <td style="text-align:center;color:var(--green)">${pt.hSup>0?'+'+pt.hSup+'h':'—'}</td>
+          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
+          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${primesMontant>0?'var(--green)':primesMontant<0?'var(--red)':'var(--muted)'}">${primesMontant!==0?(primesMontant>0?'+':'')+primesMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px;color:${totalAvances>0?'var(--red)':'var(--muted)'}">${totalAvances>0?'-'+totalAvances.toLocaleString('fr-FR')+' MAD':'—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--green)">${totalAvances>0?reste.toLocaleString('fr-FR')+' MAD':'—'}</td>
@@ -2987,12 +2990,10 @@ async function printFichePaie(salId,mois,annee){
   const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
   const base=Number(s.salaire_base||0);
-  const deducAbs=p?Math.round(Number(p.deduction_absences)):0;
-  const deducRet=p?Math.round(Number(p.deduction_retards)):0;
-  const hSupMontant=p?Math.round(Number(p.heures_sup_montant)):0;
-  const autres=p?Math.round(Number(p.autres_primes||0)):0;
   const net=p?Math.round(Number(p.net_a_payer)):base;
   const avances=p&&p.avances?p.avances:[];
+  const hsupListe=p&&p.heures_sup_liste?p.heures_sup_liste:[];
+  const primesListe=p&&p.primes_liste?p.primes_liste:[];
   const totalAvances=Math.round(avances.reduce((s,a)=>s+Number(a.montant),0));
   const reste=Math.max(0,net-totalAvances);
   const moisLabel=new Date(annee,mois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
@@ -3003,6 +3004,24 @@ async function printFichePaie(salId,mois,annee){
   const absences=(pts||[]).filter(p=>p.statut==='Absent').length;
   const retards=(pts||[]).filter(p=>p.statut==='Retard').length;
   const jourTravail=26;
+
+  const histoBlock=(title, list, colorPos, colorNeg)=>{
+    if(!list.length) return '';
+    return `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <table style="border-collapse:collapse;min-width:300px">
+        <tr><td colspan="3" style="padding:8px 14px;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:1px solid #e8e4dc">${title}</td></tr>
+        ${list.map(a=>{
+          const m=Number(a.montant);
+          const color=m>=0?colorPos:colorNeg;
+          return `<tr>
+            <td style="padding:6px 14px;font-size:12px;color:#888;border-bottom:1px solid #f0ece4">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}</td>
+            <td style="padding:6px 14px;font-size:12px;color:#888;border-bottom:1px solid #f0ece4">${a.label||''}</td>
+            <td style="padding:6px 14px;text-align:right;font-family:monospace;color:${color};border-bottom:1px solid #f0ece4">${m>=0?'+':''}${m.toLocaleString('fr-FR')}</td>
+          </tr>`;
+        }).join('')}
+      </table>
+    </div>`;
+  };
 
   document.getElementById('pdf-preview').innerHTML=`
     <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif}@page{margin:18mm}</style>
@@ -3031,14 +3050,10 @@ async function printFichePaie(salId,mois,annee){
       </tr></thead>
       <tbody>
         <tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Salaire de base</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;border-bottom:1px solid #f0ece4">+ ${base.toLocaleString('fr-FR')}</td></tr>
-        ${hSupMontant>0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Heures supplémentaires</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:#2d7a4f;border-bottom:1px solid #f0ece4">+ ${hSupMontant.toLocaleString('fr-FR')}</td></tr>`:''}
-        ${deducAbs>0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Déduction absences</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:#a32d2d;border-bottom:1px solid #f0ece4">- ${deducAbs.toLocaleString('fr-FR')}</td></tr>`:''}
-        ${deducRet>0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">Déduction retards</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:#a32d2d;border-bottom:1px solid #f0ece4">- ${deducRet.toLocaleString('fr-FR')}</td></tr>`:''}
-        ${autres!==0?`<tr><td style="padding:10px 14px;border-bottom:1px solid #f0ece4">${autres>0?'Prime':'Déduction'}</td><td style="padding:10px 14px;text-align:right;font-family:monospace;font-weight:500;color:${autres>0?'#2d7a4f':'#a32d2d'};border-bottom:1px solid #f0ece4">${autres>0?'+':''} ${autres.toLocaleString('fr-FR')}</td></tr>`:''}
       </tbody>
     </table>
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:${avances.length?'16px':'0'}">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:${(avances.length||hsupListe.length||primesListe.length)?'16px':'0'}">
       <table style="border-collapse:collapse;min-width:300px">
         <tr style="background:#1a1a18;color:#fff">
           <td style="padding:14px 18px;font-weight:600;font-size:15px;border-radius:4px 0 0 4px">NET À PAYER</td>
@@ -3046,6 +3061,9 @@ async function printFichePaie(salId,mois,annee){
         </tr>
       </table>
     </div>
+
+    ${histoBlock('HEURES SUPPLÉMENTAIRES', hsupListe, '#2d7a4f', '#a32d2d')}
+    ${histoBlock('PRIMES / DÉDUCTIONS', primesListe, '#2d7a4f', '#a32d2d')}
 
     ${avances.length?`
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
@@ -3141,19 +3159,24 @@ async function openModifierPaie(salId, mois, annee){
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
   const base=Number(s.salaire_base||0);
   const avancesInit=p&&p.avances?p.avances:[];
+  const hsupInit=p&&p.heures_sup_liste?p.heures_sup_liste:[];
+  const primesInit=p&&p.primes_liste?p.primes_liste:[];
   const todayStr=new Date().toISOString().split('T')[0];
   const avancesJson=JSON.stringify(avancesInit).replace(/"/g,'&quot;');
+  const hsupJson=JSON.stringify(hsupInit).replace(/"/g,'&quot;');
+  const primesJson=JSON.stringify(primesInit).replace(/"/g,'&quot;');
   const totalAvancesInit=avancesInit.reduce((s,a)=>s+Number(a.montant),0);
   const netInit=p?Number(p.net_a_payer):base;
   const resteInit=Math.max(0,netInit-totalAvancesInit);
 
-  function renderAvancesHTML(avances){
-    if(!avances.length) return '<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucune avance enregistrée</div>';
-    return avances.map((a,i)=>`
+  function renderListHTML(list, removeFn, base, emptyLabel){
+    if(!list.length) return `<div style="font-size:12px;color:var(--muted);padding:8px 0">${emptyLabel}</div>`;
+    return list.map((a,i)=>`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
         <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
-        <span style="font-weight:500">${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
-        <button onclick="removeAvance(${i},${base})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px">×</button>
+        ${a.label?`<span style="font-size:12px;color:var(--muted);flex:1;margin:0 8px;text-align:center">${a.label}</span>`:'<span style="flex:1"></span>'}
+        <span style="font-weight:500;color:${Number(a.montant)<0?'var(--red, #EF4444)':'inherit'}">${Number(a.montant)>=0?'+':''}${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
+        <button onclick="${removeFn}(${i},${base})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px;margin-left:6px">×</button>
       </div>`).join('');
   }
 
@@ -3162,22 +3185,50 @@ async function openModifierPaie(salId, mois, annee){
     <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px">
       <strong>Salaire de base :</strong> ${base.toLocaleString('fr-FR')} MAD
     </div>
-    <div class="form-group"><label>Déduction absences (MAD)</label>
-      <input type="number" id="pm-abs-mad" min="0" step="1" placeholder="0" value="${p?Number(p.deduction_absences).toFixed(0):0}" oninput="calcNetModif(${base})">
+
+    <!-- HEURES SUP -->
+    <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+      <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Heures supplémentaires</div>
+      <div style="padding:12px 14px">
+        <div id="pm-hsup-list">${renderListHTML(hsupInit,'removeHsup',base,'Aucune heure sup enregistrée')}</div>
+        <input type="hidden" id="pm-hsup-data" value="${hsupJson}">
+        <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;margin-top:8px;align-items:center">
+          <input type="text" id="pm-hsup-label" placeholder="Note (optionnel)" style="font-size:13px">
+          <input type="number" id="pm-hsup-montant" placeholder="Montant (MAD)" step="1" style="font-size:13px">
+          <input type="date" id="pm-hsup-date" value="${todayStr}" style="font-size:13px;width:140px">
+          <button class="btn btn-sm" onclick="addHsup(${base})">+ Ajouter</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+          <span>Total heures sup</span>
+          <span id="pm-total-hsup" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${hsupInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} MAD</span>
+        </div>
+      </div>
     </div>
-    <div class="form-group"><label>Déduction retards (MAD)</label>
-      <input type="number" id="pm-ret-mad" min="0" step="1" placeholder="0" value="${p?Number(p.deduction_retards).toFixed(0):0}" oninput="calcNetModif(${base})">
+
+    <!-- PRIMES / DEDUCTIONS -->
+    <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+      <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Primes / Déductions</div>
+      <div style="padding:12px 14px">
+        <div id="pm-primes-list">${renderListHTML(primesInit,'removePrime',base,'Aucune prime/déduction enregistrée')}</div>
+        <input type="hidden" id="pm-primes-data" value="${primesJson}">
+        <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;margin-top:8px;align-items:center">
+          <input type="text" id="pm-prime-label" placeholder="Note (optionnel)" style="font-size:13px">
+          <input type="number" id="pm-prime-montant" placeholder="+ prime / - déduction" step="1" style="font-size:13px">
+          <input type="date" id="pm-prime-date" value="${todayStr}" style="font-size:13px;width:140px">
+          <button class="btn btn-sm" onclick="addPrime(${base})">+ Ajouter</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+          <span>Total primes/déductions</span>
+          <span id="pm-total-primes" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${primesInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} MAD</span>
+        </div>
+      </div>
     </div>
-    <div class="form-group"><label>Heures supplémentaires (MAD)</label>
-      <input type="number" id="pm-hsup-mad" min="0" step="1" placeholder="0" value="${p?Number(p.heures_sup_montant).toFixed(0):0}" oninput="calcNetModif(${base})">
-    </div>
-    <div class="form-group"><label>Autres primes / déductions (MAD)</label>
-      <input type="number" id="pm-autres" step="1" placeholder="Positif = prime, négatif = déduction" value="${p&&p.autres_primes?Number(p.autres_primes).toFixed(0):0}" oninput="calcNetModif(${base})">
-    </div>
+
+    <!-- AVANCES -->
     <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
       <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Avances versées</div>
       <div style="padding:12px 14px">
-        <div id="pm-avances-list">${renderAvancesHTML(avancesInit)}</div>
+        <div id="pm-avances-list">${renderListHTML(avancesInit,'removeAvance',base,'Aucune avance enregistrée')}</div>
         <input type="hidden" id="pm-avances-data" value="${avancesJson}">
         <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px;align-items:center">
           <input type="number" id="pm-avance-montant" placeholder="Montant (MAD)" min="0" step="1" style="font-size:13px">
@@ -3190,6 +3241,7 @@ async function openModifierPaie(salId, mois, annee){
         </div>
       </div>
     </div>
+
     <div style="background:var(--text);color:#fff;border-radius:var(--radius);padding:14px 16px;margin-top:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-weight:500;font-size:13px">NET À PAYER</span>
@@ -3211,6 +3263,12 @@ async function openModifierPaie(salId, mois, annee){
 function getAvances(){
   try{return JSON.parse(document.getElementById('pm-avances-data').value.replace(/&quot;/g,'"'));}catch(e){return[];}
 }
+function getHsup(){
+  try{return JSON.parse(document.getElementById('pm-hsup-data').value.replace(/&quot;/g,'"'));}catch(e){return[];}
+}
+function getPrimes(){
+  try{return JSON.parse(document.getElementById('pm-primes-data').value.replace(/&quot;/g,'"'));}catch(e){return[];}
+}
 
 function addAvance(base){
   const montant=Number(document.getElementById('pm-avance-montant').value);
@@ -3231,20 +3289,76 @@ function removeAvance(index,base){
   refreshAvancesUI(avances,base);
 }
 
+function addHsup(base){
+  const montant=Number(document.getElementById('pm-hsup-montant').value);
+  const date=document.getElementById('pm-hsup-date').value;
+  const label=document.getElementById('pm-hsup-label').value.trim();
+  if(!montant){toast('Montant invalide');return;}
+  if(!date){toast('Date requise');return;}
+  const list=getHsup();
+  list.push({montant,date,label});
+  document.getElementById('pm-hsup-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
+  document.getElementById('pm-hsup-montant').value='';
+  document.getElementById('pm-hsup-label').value='';
+  refreshHsupUI(list,base);
+}
+
+function removeHsup(index,base){
+  const list=getHsup();
+  list.splice(index,1);
+  document.getElementById('pm-hsup-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
+  refreshHsupUI(list,base);
+}
+
+function addPrime(base){
+  const montant=Number(document.getElementById('pm-prime-montant').value);
+  const date=document.getElementById('pm-prime-date').value;
+  const label=document.getElementById('pm-prime-label').value.trim();
+  if(!montant){toast('Montant invalide');return;}
+  if(!date){toast('Date requise');return;}
+  const list=getPrimes();
+  list.push({montant,date,label});
+  document.getElementById('pm-primes-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
+  document.getElementById('pm-prime-montant').value='';
+  document.getElementById('pm-prime-label').value='';
+  refreshPrimesUI(list,base);
+}
+
+function removePrime(index,base){
+  const list=getPrimes();
+  list.splice(index,1);
+  document.getElementById('pm-primes-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
+  refreshPrimesUI(list,base);
+}
+
+function renderListInline(list, removeFn, emptyLabel){
+  if(!list.length) return `<div style="font-size:12px;color:var(--muted);padding:8px 0">${emptyLabel}</div>`;
+  return list.map((a,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
+      ${a.label?`<span style="font-size:12px;color:var(--muted);flex:1;margin:0 8px;text-align:center">${a.label}</span>`:'<span style="flex:1"></span>'}
+      <span style="font-weight:500;color:${Number(a.montant)<0?'#EF4444':'inherit'}">${Number(a.montant)>=0?'+':''}${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
+      <button onclick="${removeFn}(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px;margin-left:6px">×</button>
+    </div>`).join('');
+}
+
 function refreshAvancesUI(avances,base){
   const total=avances.reduce((s,a)=>s+Number(a.montant),0);
   document.getElementById('pm-total-avances').textContent=total.toLocaleString('fr-FR')+' MAD';
-  if(!avances.length){
-    document.getElementById('pm-avances-list').innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucune avance enregistrée</div>';
-  } else {
-    document.getElementById('pm-avances-list').innerHTML=avances.map((a,i)=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
-        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
-        <span style="font-weight:500">${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
-        <button onclick="removeAvance(${i},${base})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px">×</button>
-      </div>`).join('');
-  }
+  document.getElementById('pm-avances-list').innerHTML=renderListInline(avances,'removeAvance','Aucune avance enregistrée').replace(/removeAvance\((\d+)\)/g,(m,i)=>`removeAvance(${i},${base})`);
   calcNetModif(base);
+}
+
+function refreshHsupUI(list,base){
+  const total=list.reduce((s,a)=>s+Number(a.montant),0);
+  document.getElementById('pm-total-hsup').textContent=total.toLocaleString('fr-FR')+' MAD';
+  document.getElementById('pm-hsup-list').innerHTML=renderListInline(list,'removeHsup','Aucune heure sup enregistrée').replace(/removeHsup\((\d+)\)/g,(m,i)=>`removeHsup(${i},${base})`);
+}
+
+function refreshPrimesUI(list,base){
+  const total=list.reduce((s,a)=>s+Number(a.montant),0);
+  document.getElementById('pm-total-primes').textContent=total.toLocaleString('fr-FR')+' MAD';
+  document.getElementById('pm-primes-list').innerHTML=renderListInline(list,'removePrime','Aucune prime/déduction enregistrée').replace(/removePrime\((\d+)\)/g,(m,i)=>`removePrime(${i},${base})`);
 }
 
 function calcNetModif(base){
@@ -3259,21 +3373,21 @@ function calcNetModif(base){
 }
 
 async function savePaieModif(salId,mois,annee,base){
-  const deducAbs=Number(document.getElementById('pm-abs-mad').value)||0;
-  const deducRet=Number(document.getElementById('pm-ret-mad').value)||0;
-  const hSupMontant=Number(document.getElementById('pm-hsup-mad').value)||0;
-  const autres=Number(document.getElementById('pm-autres').value)||0;
+  const hsupListe=getHsup();
+  const primesListe=getPrimes();
   const avances=getAvances();
+  const hSupMontant=hsupListe.reduce((s,a)=>s+Number(a.montant),0);
+  const autres=primesListe.reduce((s,a)=>s+Number(a.montant),0);
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
   const net=base;
   const reste=Math.max(0,net-totalAvances);
   const{error}=await sb.from('paie').upsert({
     salarie_id:salId,mois,annee,
     salaire_base:base,
-    deduction_absences:deducAbs,
-    deduction_retards:deducRet,
     heures_sup_montant:hSupMontant,
+    heures_sup_liste:hsupListe,
     autres_primes:autres,
+    primes_liste:primesListe,
     avances:avances,
     total_avances:totalAvances,
     reste_a_donner:reste,
