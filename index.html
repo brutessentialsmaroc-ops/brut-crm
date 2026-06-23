@@ -418,6 +418,7 @@
         <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:nowrap;overflow-x:auto">
           <button class="rh-tab active" id="dtab-liste" onclick="showDevisTab('liste',this)" style="white-space:nowrap">◧ Devis</button>
           <button class="rh-tab" id="dtab-afaire" onclick="showDevisTab('afaire',this)" style="white-space:nowrap">📋 Devis à faire</button>
+          <button class="rh-tab" id="dtab-proforma" onclick="showDevisTab('proforma',this)" style="white-space:nowrap">🧾 Pro forma</button>
         </div>
         <div id="dtab-content-liste"><div id="devis-list"></div></div>
         <div id="dtab-content-afaire" class="hidden">
@@ -426,15 +427,28 @@
           </div>
           <div id="daf-list"></div>
         </div>
+        <div id="dtab-content-proforma" class="hidden">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button class="btn btn-primary btn-sm" onclick="openDevisBuilder(null,true)">+ Nouveau devis pro forma</button>
+          </div>
+          <div id="devis-proforma-list"></div>
+        </div>
       </div>
       <!-- FACTURES -->
       <div id="page-factures" class="hidden">
-        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)">
-          <button class="rh-tab active" id="ftab-liste" onclick="showFactureTab('liste',this)">◈ Factures</button>
-          <button class="rh-tab" id="ftab-paiements" onclick="showFactureTab('paiements',this)">💳 Suivi des paiements</button>
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:nowrap;overflow-x:auto">
+          <button class="rh-tab active" id="ftab-liste" onclick="showFactureTab('liste',this)" style="white-space:nowrap">◈ Factures</button>
+          <button class="rh-tab" id="ftab-paiements" onclick="showFactureTab('paiements',this)" style="white-space:nowrap">💳 Suivi des paiements</button>
+          <button class="rh-tab" id="ftab-proforma" onclick="showFactureTab('proforma',this)" style="white-space:nowrap">🧾 Pro forma</button>
         </div>
         <div id="ftab-content-liste"><div id="factures-list"></div></div>
         <div id="ftab-content-paiements" class="hidden"><div id="paiements-list"></div></div>
+        <div id="ftab-content-proforma" class="hidden">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button class="btn btn-primary btn-sm" onclick="openFactureProformaBuilder(null)">+ Nouvelle facture pro forma</button>
+          </div>
+          <div id="facture-proforma-list"></div>
+        </div>
       </div>
       <!-- SUIVI PROJETS -->
       <div id="page-suivi" class="hidden">
@@ -519,10 +533,10 @@
           <div id="org-canvas" style="position:relative;min-height:600px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:auto;padding:20px"></div>
         </div>
       </div>
-      <!-- DEVIS BUILDER -->
+      <!-- DEVIS / FACTURE PROFORMA BUILDER -->
       <div id="page-devis-builder" class="hidden">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-          <button class="btn btn-sm" onclick="showPage('devis', document.querySelector('.nav-item:nth-child(5)'))">← Retour</button>
+          <button class="btn btn-sm" onclick="returnFromBuilder()">← Retour</button>
           <span id="builder-ref" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)"></span>
         </div>
         <!-- INFO DEVIS -->
@@ -535,12 +549,12 @@
           </div>
         </div>
             <div class="form-group" style="margin:0"><label>Nom du projet</label><input type="text" id="builder-projet" placeholder="Appartement Agadir…"></div>
-            <div class="form-group" style="margin:0"><label>Statut</label>
+            <div class="form-group" style="margin:0" id="builder-statut-wrap"><label>Statut</label>
               <select id="builder-statut"><option>En attente</option><option>Accepté</option><option>Refusé</option></select>
             </div>
           </div>
           <div style="margin-top:12px;display:flex;gap:12px">
-            <button class="btn btn-primary" onclick="saveDevisBuilder()">Enregistrer</button>
+            <button class="btn btn-primary" id="builder-save-btn" onclick="saveDevisBuilder()">Enregistrer</button>
             <button class="btn" onclick="printDevis()" style="gap:6px">🖨 Imprimer / PDF</button>
           </div>
         </div>
@@ -1163,8 +1177,39 @@ function showDevisTab(tab,btn){
   btn.classList.add('active');
   document.getElementById('dtab-content-liste').classList.toggle('hidden',tab!=='liste');
   document.getElementById('dtab-content-afaire').classList.toggle('hidden',tab!=='afaire');
+  document.getElementById('dtab-content-proforma').classList.toggle('hidden',tab!=='proforma');
   if(tab==='afaire') renderDevisAFaire();
+  else if(tab==='proforma') loadDevisProformaList();
 }
+
+async function loadDevisProformaList(){
+  const{data}=await sb.from('devis').select('*,clients(nom),devis_sections(id,devis_articles(quantite,prix_unitaire))').eq('type','proforma').order('created_at',{ascending:false});
+  const el=document.getElementById('devis-proforma-list');
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis pro forma. Cliquez sur + Nouveau devis pro forma pour commencer.</div>';return}
+  el.innerHTML=(data||[]).map(d=>{
+    const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+    const remise=Number(d.remise||0);
+    const htNet=Math.round(ht*(1-remise/100));
+    const ttc=Math.round(htNet*1.2);
+    return`<div class="devis-card">
+      <div class="devis-card-left" onclick="openDevisBuilder('${d.id}',true)" style="cursor:pointer">
+        <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
+        <div class="devis-card-title">${d.clients?.nom||'—'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
+        <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)${remise>0?` · Remise ${remise}%`:''}</div>
+      </div>
+      <div class="devis-card-right">
+        <div>
+          <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
+          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${htNet.toLocaleString('fr-FR')} HT</div>
+        </div>
+        <span class="badge ${badgeClass(d.statut)}">${d.statut}</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();printDevisById('${d.id}')">📄 PDF</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteDevisProforma('${d.id}')">Suppr.</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function deleteDevisProforma(id){if(!confirm('Supprimer ce devis pro forma ?'))return;await sb.from('devis').delete().eq('id',id);toast('Supprimé');loadDevisProformaList();}
 
 let devisAFaireList=JSON.parse(localStorage.getItem('daf_list')||'[]');
 function saveDevisAFaire(){localStorage.setItem('daf_list',JSON.stringify(devisAFaireList));}
@@ -1359,9 +1404,81 @@ function printDevisAFaire(clientId){
 }
 
 // ─── DEVIS BUILDER ────────────────────────────────────────────────────────────
-async function openDevisBuilder(devisId){
-  currentDevisId=devisId;
+let currentDevisIsProforma=false;
+let currentBuilderTarget='devis'; // 'devis' or 'facture'
+
+function returnFromBuilder(){
+  if(currentBuilderTarget==='facture'){
+    const facturNav=document.querySelector('.nav-item[onclick*="factures"]');
+    showPage('factures', facturNav);
+    const btn=document.getElementById('ftab-proforma');
+    if(btn) showFactureTab('proforma',btn);
+  } else {
+    showPage('devis', document.querySelector('.nav-item:nth-child(5)'));
+    if(currentDevisIsProforma){
+      const btn=document.getElementById('dtab-proforma');
+      if(btn) showDevisTab('proforma',btn);
+    }
+  }
+}
+
+async function openFactureProformaBuilder(factureId){
+  currentBuilderTarget='facture';
+  currentDevisIsProforma=true;
+  currentDevisId=factureId;
   sectionsData=[];
+  const[{data:clients},{data:prospects}]=await Promise.all([
+    sb.from('clients').select('id,nom').order('nom'),
+    sb.from('prospects').select('id,nom').order('nom')
+  ]);
+  const clientOpts=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  const prospectOpts=(prospects||[]).map(p=>`<option value="prospect_${p.id}">🔍 ${p.nom} (prospect)</option>`).join('');
+  document.getElementById('builder-client').innerHTML=
+    '<option value="">— Sélectionnez un client —</option>'+
+    '<option value="__new__">+ Nouveau client…</option>'+
+    (clientOpts?`<optgroup label="Clients">${clientOpts}</optgroup>`:'')+
+    (prospectOpts?`<optgroup label="Prospects">${prospectOpts}</optgroup>`:'');
+
+  // Statut field is not relevant for factures, hide it
+  const statutWrap=document.getElementById('builder-statut-wrap');
+  if(statutWrap) statutWrap.style.display='none';
+
+  if(factureId){
+    const{data:f}=await sb.from('factures').select('*').eq('id',factureId).single();
+    if(f){
+      document.getElementById('builder-client').value=f.client_id||'';
+      document.getElementById('builder-projet').value=f.projet_nom||'';
+      document.getElementById('builder-ref').textContent=f.reference||'';
+      if(document.getElementById('builder-remise')){
+        if(f.remise_mad&&f.remise_mad>0){
+          document.getElementById('builder-remise').value=f.remise_mad;
+          setRemiseType('mad');
+        } else {
+          const safePct=Math.min(Math.max(Number(f.remise||0),0),100);
+          document.getElementById('builder-remise').value=safePct;
+          setRemiseType('pct');
+        }
+      }
+    }
+    const{data:sections}=await sb.from('facture_proforma_sections').select('*,facture_proforma_articles(*)').eq('facture_id',factureId).order('ordre');
+    sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.facture_proforma_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,sous_titre:a.sous_titre||'',quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),prix_ttc:Math.round(Number(a.prix_unitaire)*1.2),remise:Number(a.remise||0)}))}));
+  } else {
+    document.getElementById('builder-ref').textContent='Nouvelle facture pro forma';
+    document.getElementById('builder-projet').value='';
+    sectionsData=[{id:null,nom:'',sous_titre:'',ordre:0,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]}];
+  }
+  renderSections();
+  showPage('devis-builder',null);
+}
+
+async function openDevisBuilder(devisId, isProforma=false){
+  currentBuilderTarget='devis';
+  currentDevisId=devisId;
+  currentDevisIsProforma=isProforma;
+  sectionsData=[];
+  // Restore statut field visibility (may have been hidden by facture proforma builder)
+  const statutWrap=document.getElementById('builder-statut-wrap');
+  if(statutWrap) statutWrap.style.display='';
   // Load clients + prospects
   const[{data:clients},{data:prospects}]=await Promise.all([
     sb.from('clients').select('id,nom').order('nom'),
@@ -1374,6 +1491,8 @@ async function openDevisBuilder(devisId){
     '<option value="__new__">+ Nouveau client…</option>'+
     (clientOpts?`<optgroup label="Clients">${clientOpts}</optgroup>`:'')+
     (prospectOpts?`<optgroup label="Prospects">${prospectOpts}</optgroup>`:'');
+
+  const titleEl=null; // builder-ref already shows the contextual title
 
   if(devisId){
     const{data:d}=await sb.from('devis').select('*').eq('id',devisId).single();
@@ -1397,7 +1516,7 @@ async function openDevisBuilder(devisId){
     const{data:sections}=await sb.from('devis_sections').select('*,devis_articles(*)').eq('devis_id',devisId).order('ordre');
     sectionsData=(sections||[]).map(s=>({id:s.id,nom:s.nom,sous_titre:s.sous_titre||'',ordre:s.ordre,articles:(s.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre).map(a=>({id:a.id,description:a.description,sous_titre:a.sous_titre||'',quantite:Number(a.quantite),prix_unitaire:Number(a.prix_unitaire),prix_ttc:Math.round(Number(a.prix_unitaire)*1.2),remise:Number(a.remise||0)}))}));
   } else {
-    document.getElementById('builder-ref').textContent='Nouveau devis';
+    document.getElementById('builder-ref').textContent = isProforma ? 'Nouveau devis pro forma' : 'Nouveau devis';
     document.getElementById('builder-projet').value='';
     document.getElementById('builder-statut').value='En attente';
     sectionsData=[{id:null,nom:'',sous_titre:'',ordre:0,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]}];
@@ -1594,6 +1713,7 @@ function updateTotals(){
 }
 
 async function saveDevisBuilder(){
+  if(currentBuilderTarget==='facture'){ return saveFactureProformaBuilder(); }
   let clientId=document.getElementById('builder-client').value;
   if(!clientId||clientId==='__new__'){toast('Sélectionnez un client');return;}
 
@@ -1616,10 +1736,11 @@ async function saveDevisBuilder(){
 
   // 1. Créer ou mettre à jour le devis
   if(!devisId){
-    const ref='DEV-'+Date.now().toString().slice(-6);
+    const ref=(currentDevisIsProforma?'DPF-':'DEV-')+Date.now().toString().slice(-6);
     const{data,error}=await sb.from('devis').insert({
       reference:ref, client_id:clientId, projet_nom:projetNom,
       statut, date_envoi:new Date().toISOString().split('T')[0],
+      type:currentDevisIsProforma?'proforma':null,
       remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
       remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
     }).select().single();
@@ -1677,6 +1798,89 @@ async function saveDevisBuilder(){
 
   toast('Devis enregistré ✓');
   return devisId;
+}
+
+async function saveFactureProformaBuilder(){
+  let clientId=document.getElementById('builder-client').value;
+  if(!clientId||clientId==='__new__'){toast('Sélectionnez un client');return;}
+
+  if(clientId.startsWith('prospect_')){
+    const prospectId=clientId.replace('prospect_','');
+    const{data:prospect}=await sb.from('prospects').select('nom,telephone,email').eq('id',prospectId).single();
+    if(!prospect){toast('Prospect introuvable');return;}
+    const{data:newClient,error}=await sb.from('clients').insert({nom:prospect.nom,telephone:prospect.telephone||'',email:prospect.email||'',statut:'Actif'}).select().single();
+    if(error){toast('Erreur: '+error.message);return;}
+    clientId=newClient.id;
+    document.getElementById('builder-client').value=clientId;
+    toast('Client créé ✓');
+  }
+
+  const projetNom=document.getElementById('builder-projet').value.trim();
+  let factureId=currentDevisId;
+
+  // 1. Créer ou mettre à jour la facture pro forma
+  if(!factureId){
+    const ref='FPF-'+Date.now().toString().slice(-6);
+    const{data,error}=await sb.from('factures').insert({
+      reference:ref, client_id:clientId, projet_nom:projetNom,
+      type:'proforma', statut:'Pro forma',
+      date_emission:new Date().toISOString().split('T')[0],
+      remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
+      remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
+    }).select().single();
+    if(error){toast('Erreur création: '+error.message);return;}
+    factureId=data.id;
+    currentDevisId=factureId;
+    document.getElementById('builder-ref').textContent=ref;
+  } else {
+    const{error}=await sb.from('factures').update({
+      client_id:clientId, projet_nom:projetNom,
+      remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
+      remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
+    }).eq('id',factureId);
+    if(error){toast('Erreur mise à jour: '+error.message);return;}
+  }
+
+  // 2. Garde-fou anti-perte de données
+  const{data:existingSections}=await sb.from('facture_proforma_sections').select('id').eq('facture_id',factureId);
+  const existingCount=(existingSections||[]).length;
+  const newCount=sectionsData.length;
+  if(existingCount>0 && newCount < existingCount){
+    const ok=confirm(`⚠️ ATTENTION : cette facture pro forma a actuellement ${existingCount} section(s) en base, mais vous n'en avez que ${newCount} chargée(s) à l'écran.\n\nContinuer va SUPPRIMER DÉFINITIVEMENT ${existingCount-newCount} section(s) et leurs articles.\n\nÊtes-vous certain de vouloir continuer ?`);
+    if(!ok){ toast('Sauvegarde annulée — aucune donnée supprimée'); return; }
+  }
+
+  // 3. Supprimer toutes les sections existantes (cascade supprime les articles)
+  await sb.from('facture_proforma_sections').delete().eq('facture_id',factureId);
+
+  // 4. Réinsérer sections + articles proprement
+  for(let si=0;si<sectionsData.length;si++){
+    const sec=sectionsData[si];
+    const{data:secData,error:secErr}=await sb.from('facture_proforma_sections').insert({
+      facture_id:factureId, nom:sec.nom||'', sous_titre:sec.sous_titre||'', ordre:si
+    }).select().single();
+    if(secErr){toast('Erreur section: '+secErr.message);return;}
+    const secId=secData.id;
+    sectionsData[si].id=secId;
+
+    for(let ai=0;ai<sec.articles.length;ai++){
+      const art=sec.articles[ai];
+      const{data:artData,error:artErr}=await sb.from('facture_proforma_articles').insert({
+        section_id:secId,
+        description:art.description||'',
+        sous_titre:art.sous_titre||'',
+        quantite:Number(art.quantite)||0,
+        prix_unitaire:Number(art.prix_unitaire)||0,
+        remise:Number(art.remise||0),
+        ordre:ai
+      }).select().single();
+      if(artErr){toast('Erreur article: '+artErr.message);return;}
+      sectionsData[si].articles[ai].id=artData.id;
+    }
+  }
+
+  toast('Facture pro forma enregistrée ✓');
+  return factureId;
 }
 
 // ─── PRINT / PDF ──────────────────────────────────────────────────────────────
@@ -1757,7 +1961,7 @@ async function printDevis(){
           </div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:10px;font-family:monospace;color:#C2703D;letter-spacing:1px;font-weight:600">DEVIS</div>
+          <div style="font-size:10px;font-family:monospace;color:#C2703D;letter-spacing:1px;font-weight:600">${currentBuilderTarget==='facture'?'FACTURE PRO FORMA':(currentDevisIsProforma?'DEVIS PRO FORMA':'DEVIS')}</div>
           <div style="font-size:13px;font-weight:600;font-family:monospace;margin-top:1px">${ref}</div>
           <div style="font-size:10px;color:#888;margin-top:2px">${date}</div>
         </div>
@@ -1869,7 +2073,7 @@ async function printDevisById(devisId){
           </div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:10px;font-family:monospace;color:#C2703D;letter-spacing:1px;font-weight:600">DEVIS</div>
+          <div style="font-size:10px;font-family:monospace;color:#C2703D;letter-spacing:1px;font-weight:600">${d.type==='proforma'?'DEVIS PRO FORMA':'DEVIS'}</div>
           <div style="font-size:13px;font-weight:600;font-family:monospace;margin-top:1px">${ref}</div>
           <div style="font-size:10px;color:#888;margin-top:2px">${date}</div>
         </div>
@@ -1898,6 +2102,104 @@ async function printDevisById(devisId){
         <div style="margin-top:10px;padding:8px 12px;background:#FBF1E6;border-radius:3px;font-size:10.5px;color:#5C3D24;line-height:1.5;border-left:3px solid #C2703D">
           Pour valider la commande, merci d'effectuer un paiement de <strong>50% du montant du devis</strong> soit <strong>${Math.round(ttc/2).toLocaleString('fr-FR')} MAD TTC</strong>.
         </div>
+        <div style="margin-top:8px;padding:8px 12px;background:#f5f3ee;border-radius:3px;font-size:10px;color:#444;line-height:1.7"><div style="font-weight:700;font-size:10.5px;letter-spacing:0.5px;margin-bottom:2px">CERAMICS DESIGN</div><div>Compte courant : <span style="font-family:monospace;font-weight:600">011450000043210000068148</span></div><div>SWIFT : <span style="font-family:monospace;font-weight:600">BMCEMAMC</span></div><div>IBAN : <span style="font-family:monospace;font-weight:600">MA64 011450000043210000068148</span></div></div>
+      </div>
+      <div style="margin-top:14px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center;line-height:1.6">
+        CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96<br>
+        Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
+      </div>
+    </div>`;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+async function printFactureProformaById(factureId){
+  toast('Préparation du PDF…');
+  const{data:f}=await sb.from('factures').select('*,clients(*),facture_proforma_sections(nom,sous_titre,ordre,facture_proforma_articles(*))').eq('id',factureId).single();
+  if(!f){toast('Facture pro forma introuvable');return;}
+  const client=f.clients;
+  const ref=f.reference||'—';
+  const projet=f.projet_nom||'Projet';
+  const date=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
+  const sections=(f.facture_proforma_sections||[]).sort((a,b)=>a.ordre-b.ordre);
+  const htBrut=Math.round(sections.reduce((s,sec)=>s+(sec.facture_proforma_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0));
+  const remisePct=Math.min(Math.max(Number(f.remise||0),0),100);
+  const remiseMad=Number(f.remise_mad||0);
+  const ttcBrut=Math.round(htBrut*1.2);
+  let remiseTTC=0;
+  if(remiseMad>0) remiseTTC=Math.min(remiseMad,ttcBrut);
+  else if(remisePct>0) remiseTTC=Math.round(ttcBrut*(remisePct/100));
+  const ttc=Math.round(ttcBrut-remiseTTC);
+  const ht=Math.round(ttc/1.2);
+  const tva=Math.round(ht*0.2);
+  const sectionsHTML=sections.map(sec=>{
+    const arts=(sec.facture_proforma_articles||[]).sort((a,b)=>a.ordre-b.ordre);
+    return`<div style="margin-bottom:14px;page-break-inside:avoid">
+      <div style="background:#FBF1E6;padding:6px 12px;border-radius:3px 3px 0 0;border-left:3px solid #C2703D">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#8A5A36;font-family:monospace">${sec.nom||'Section'}</div>
+        ${sec.sous_titre?`<div style="font-size:11px;color:#aaa;margin-top:1px">${sec.sous_titre}</div>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="background:#FBF1E6">
+          <th style="padding:5px 12px;text-align:left;font-size:9px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc">ARTICLE</th>
+          <th style="padding:5px 12px;text-align:center;font-size:9px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:50px">QTÉ</th>
+          <th style="padding:5px 12px;text-align:right;font-size:9px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:110px">P.U. HT (MAD)</th>
+          <th style="padding:5px 12px;text-align:right;font-size:9px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:monospace;border-bottom:1px solid #e8e4dc;width:110px">TOTAL HT (MAD)</th>
+        </tr></thead>
+        <tbody>${arts.map(a=>`<tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #f0ece4">
+            <div style="font-weight:500">${a.description||'—'}</div>
+            ${a.sous_titre?`<div style="font-size:10px;color:#aaa;margin-top:1px">${a.sous_titre}</div>`:''}
+          </td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f0ece4;text-align:center;font-family:monospace">${a.quantite||1}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace">${Math.round(Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-weight:500">${Math.round(Number(a.quantite||1)*Number(a.prix_unitaire||0)).toLocaleString('fr-FR')}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+      body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @page{margin:13mm 16mm}
+    </style>
+    <div style="position:relative">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1a1a18">
+        <div style="display:flex;align-items:center;gap:14px">
+          <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:74px;height:74px;flex-shrink:0">
+          <div>
+            <div style="font-size:10.5px;color:#555">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div>
+            <div style="font-size:10.5px;color:#555">Tél : +212 6 60 10 78 96</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;font-family:monospace;color:#C2703D;letter-spacing:1px;font-weight:600">FACTURE PRO FORMA</div>
+          <div style="font-size:13px;font-weight:600;font-family:monospace;margin-top:1px">${ref}</div>
+          <div style="font-size:10px;color:#888;margin-top:2px">${date}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px">
+        <div>
+          <div style="font-size:9px;font-weight:600;letter-spacing:2px;color:#C2703D;font-family:monospace;margin-bottom:3px">CLIENT</div>
+          <div style="font-size:13px;font-weight:600">${client?.nom||'—'}</div>
+          ${client?.ville?`<div style="font-size:11px;color:#888">${client.ville}</div>`:''}
+          ${client?.telephone?`<div style="font-size:11px;color:#888">${client.telephone}</div>`:''}
+          ${projet?`<div style="font-size:11px;color:#555;margin-top:2px;font-style:italic">Projet : ${projet}</div>`:''}
+        </div>
+        <img src="data:image/png;base64,${BRUT_LOGO_SIGNATURE}" style="height:32px;opacity:0.85">
+      </div>
+      ${sectionsHTML}
+      <div style="margin-top:14px;page-break-inside:avoid">
+        <table style="width:100%;border-collapse:collapse;max-width:340px;margin-left:auto;font-size:12px">
+          <tr><td style="padding:6px 0 4px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:6px 0 4px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${htBrut.toLocaleString('fr-FR')} MAD</td></tr>
+          ${remiseTTC>0?`<tr><td style="padding:3px 0;color:#C2703D">Remise${remiseMad>0?' ('+remiseMad.toLocaleString('fr-FR')+' MAD)':' ('+remisePct+'%)'}</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#C2703D">- ${remiseTTC.toLocaleString('fr-FR')} MAD</td></tr>`:''}
+          <tr><td style="padding:3px 0;color:#888">TVA 20%</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
+          <tr style="background:#1a1a18;color:#fff">
+            <td style="padding:9px 12px;font-weight:700;font-size:13px;border-radius:3px 0 0 3px">TOTAL TTC</td>
+            <td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;font-size:13px;border-radius:0 3px 3px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
+          </tr>
+        </table>
         <div style="margin-top:8px;padding:8px 12px;background:#f5f3ee;border-radius:3px;font-size:10px;color:#444;line-height:1.7"><div style="font-weight:700;font-size:10.5px;letter-spacing:0.5px;margin-bottom:2px">CERAMICS DESIGN</div><div>Compte courant : <span style="font-family:monospace;font-weight:600">011450000043210000068148</span></div><div>SWIFT : <span style="font-family:monospace;font-weight:600">BMCEMAMC</span></div><div>IBAN : <span style="font-family:monospace;font-weight:600">MA64 011450000043210000068148</span></div></div>
       </div>
       <div style="margin-top:14px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center;line-height:1.6">
@@ -1962,13 +2264,43 @@ async function convertirFacture(devisId){
 }
 
 function showFactureTab(tab, el){
-  ['liste','paiements'].forEach(t=>{
+  ['liste','paiements','proforma'].forEach(t=>{
     document.getElementById('ftab-content-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('ftab-'+t).classList.toggle('active', t===tab);
   });
   if(tab==='paiements') loadPaiements();
+  else if(tab==='proforma') loadFactureProformaList();
   else loadFactures();
 }
+
+async function loadFactureProformaList(){
+  const{data}=await sb.from('factures').select('*,clients(nom),facture_proforma_sections(id,facture_proforma_articles(quantite,prix_unitaire))').eq('type','proforma').order('created_at',{ascending:false});
+  const el=document.getElementById('facture-proforma-list');
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune facture pro forma. Cliquez sur + Nouvelle facture pro forma pour commencer.</div>';return}
+  el.innerHTML=(data||[]).map(f=>{
+    const ht=(f.facture_proforma_sections||[]).reduce((s,sec)=>s+(sec.facture_proforma_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+    const remise=Number(f.remise||0);
+    const htNet=Math.round(ht*(1-remise/100));
+    const ttc=Math.round(htNet*1.2);
+    return`<div class="devis-card">
+      <div class="devis-card-left" onclick="openFactureProformaBuilder('${f.id}')" style="cursor:pointer">
+        <div class="devis-card-ref">${f.reference||'—'} · ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
+        <div class="devis-card-title">${f.clients?.nom||'—'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
+        <div class="devis-card-sub">${(f.facture_proforma_sections||[]).length} section(s)${remise>0?` · Remise ${remise}%`:''}</div>
+      </div>
+      <div class="devis-card-right">
+        <div>
+          <div class="devis-card-amount">${ttc.toLocaleString('fr-FR')} MAD TTC</div>
+          <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${htNet.toLocaleString('fr-FR')} HT</div>
+        </div>
+        <span class="badge badge-amber">Pro forma</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();printFactureProformaById('${f.id}')">📄 PDF</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteFactureProforma('${f.id}')">Suppr.</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function deleteFactureProforma(id){if(!confirm('Supprimer cette facture pro forma ?'))return;await sb.from('factures').delete().eq('id',id);toast('Supprimé');loadFactureProformaList();}
 
 async function loadPaiements(){
   const el=document.getElementById('paiements-list');
