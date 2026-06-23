@@ -766,7 +766,7 @@ async function loadDashboard(){
   const[r1,r2,r3,r5,r6,r7,r8]=await Promise.all([
     sb.from('clients').select('*'),
     sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
-    sb.from('devis').select('*').eq('statut','En attente'),
+    sb.from('devis').select('*').eq('statut','En attente').is('type',null),
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
     sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard'),
     sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true}),
@@ -917,7 +917,7 @@ async function loadCommandes(){
 async function openCommandeModal(data={}){
   const[{data:clients},{data:factures}]=await Promise.all([
     sb.from('clients').select('id,nom').order('nom'),
-    sb.from('factures').select('id,reference,projet_nom,clients(nom)').order('created_at',{ascending:false})
+    sb.from('factures').select('id,reference,projet_nom,clients(nom)').is('type',null).order('created_at',{ascending:false})
   ]);
   document.getElementById('commande-client').innerHTML=(clients||[]).map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
   if(data.client_id)document.getElementById('commande-client').value=data.client_id;
@@ -1142,7 +1142,7 @@ async function saveTicket(){
 
 // ─── DEVIS LIST ───────────────────────────────────────────────────────────────
 async function loadDevisList(){
-  const{data}=await sb.from('devis').select('*,clients(nom),devis_sections(id,devis_articles(quantite,prix_unitaire))').order('created_at',{ascending:false});
+  const{data}=await sb.from('devis').select('*,clients(nom),devis_sections(id,devis_articles(quantite,prix_unitaire))').is('type',null).order('created_at',{ascending:false});
   const el=document.getElementById('devis-list');
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis. Cliquez sur + Nouveau pour commencer.</div>';return}
   el.innerHTML=(data||[]).map(d=>{
@@ -2307,6 +2307,7 @@ async function loadPaiements(){
   el.innerHTML='<div class="loading">Chargement…</div>';
   const{data:factures}=await sb.from('factures')
     .select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))')
+    .is('type',null)
     .neq('statut','Payée')
     .order('created_at',{ascending:false});
   if(!(factures||[]).length){
@@ -2458,7 +2459,7 @@ async function savePaiementCard(factureId, ttc){
 }
 
 async function loadFactures(){
-  const{data,error}=await sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').order('created_at',{ascending:false});
+  const{data,error}=await sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null).order('created_at',{ascending:false});
   const el=document.getElementById('factures-list');
   if(error){el.innerHTML=`<div class="empty">Table factures manquante — exécutez le SQL factures dans Supabase.</div>`;return;}
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune facture. Convertissez un devis accepté en facture.</div>';return;}
@@ -6418,7 +6419,7 @@ async function loadBusinessObjectifs(){
   }
 
   const [r1,r2]=await Promise.all([
-    sb.from('factures').select('*,devis(devis_sections(devis_articles(quantite,prix_unitaire)))').gte('date_emission','2026-01-01'),
+    sb.from('factures').select('*,devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null).gte('date_emission','2026-01-01'),
     sb.from('objectifs_ca').select('*').in('annee',[2026,2027])
   ]);
   const factures=r1.data||[];
@@ -6591,8 +6592,8 @@ async function loadBusiness(){
   const anneeCourante=now.getFullYear();
 
   const[{data:factures},{data:devis}]=await Promise.all([
-    sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))'),
-    sb.from('devis').select('*,clients(nom),devis_sections(devis_articles(quantite,prix_unitaire))')
+    sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null),
+    sb.from('devis').select('*,clients(nom),devis_sections(devis_articles(quantite,prix_unitaire))').is('type',null)
   ]);
 
   function calcTTC(item, sections){
