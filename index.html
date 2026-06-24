@@ -6845,7 +6845,7 @@ async function loadBusiness(){
   // Fusionner : pour les pro forma, on reconstitue une structure devis_sections compatible avec calcTTC
   const facturesProformaNormalisees=(facturesProforma||[]).map(f=>({
     ...f,
-    devis:{devis_sections:f.facture_proforma_sections}
+    devis:{devis_sections:(f.facture_proforma_sections||[]).map(sec=>({devis_articles:sec.facture_proforma_articles}))}
   }));
   const facturesAll=[...(facturesNormales||[]),...facturesProformaNormalisees];
 
@@ -6860,7 +6860,8 @@ async function loadBusiness(){
 
   function calcTTC(item, sections){
     const ht=(sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-    return Math.round(ht*(1-Number(item.remise||0)/100)*1.2);
+    const sansTVA=item.type==='proforma';
+    return Math.round(ht*(1-Number(item.remise||0)/100)*(sansTVA?1:1.2));
   }
 
   // 4 métriques CA (filtrées sur le mois sélectionné)
