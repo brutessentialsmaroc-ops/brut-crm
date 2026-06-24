@@ -2018,13 +2018,14 @@ async function printDevis(){
   }).join('');
 
   const remiseVal=Math.abs(Number(document.getElementById('builder-remise')?.value||0));
-  const ttcBrut=Math.round(ht*1.2);
+  const sansTVA=currentDevisIsProforma;
+  const ttcBrut=sansTVA?Math.round(ht):Math.round(ht*1.2);
   let remiseMnt=0;
   if(remiseType==='mad') remiseMnt=Math.min(remiseVal, ttcBrut);
   else remiseMnt=Math.round(ttcBrut*(Math.min(remiseVal,100)/100));
   const ttc=Math.max(0, ttcBrut-remiseMnt);
-  const htNet=Math.round(ttc/1.2);
-  const tva=Math.round(htNet*0.2);
+  const htNet=sansTVA?ttc:Math.round(ttc/1.2);
+  const tva=sansTVA?0:Math.round(htNet*0.2);
   const htRound=Math.round(ht);
 
   document.getElementById('pdf-preview').innerHTML=`
@@ -2068,7 +2069,7 @@ async function printDevis(){
         <table style="width:100%;border-collapse:collapse;max-width:340px;margin-left:auto;font-size:12px">
           <tr><td style="padding:6px 0 4px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:6px 0 4px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${htRound.toLocaleString('fr-FR')} MAD</td></tr>
           ${remiseMnt>0?`<tr><td style="padding:3px 0;color:#C2703D">Remise</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#C2703D">- ${remiseMnt.toLocaleString('fr-FR')} MAD</td></tr>`:''}
-          <tr><td style="padding:3px 0;color:#888">TVA 20%</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
+          ${sansTVA?'':`<tr><td style="padding:3px 0;color:#888">TVA 20%</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>`}
           <tr style="background:#1a1a18;color:#fff">
             <td style="padding:9px 12px;font-weight:700;font-size:13px;border-radius:3px 0 0 3px">TOTAL TTC</td>
             <td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;font-size:13px;border-radius:0 3px 3px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
@@ -2106,13 +2107,14 @@ async function printDevisById(devisId){
   const htBrut=Math.round(sections.reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0));
   const remisePct=Math.min(Math.max(Number(d.remise||0),0),100);
   const remiseMad=Number(d.remise_mad||0);
-  const ttcBrut=Math.round(htBrut*1.2);
+  const sansTVA=d.type==='proforma';
+  const ttcBrut=sansTVA?htBrut:Math.round(htBrut*1.2);
   let remiseTTC=0;
   if(remiseMad>0) remiseTTC=Math.min(remiseMad,ttcBrut);
   else if(remisePct>0) remiseTTC=Math.round(ttcBrut*(remisePct/100));
   const ttc=Math.round(ttcBrut-remiseTTC);
-  const ht=Math.round(ttc/1.2);
-  const tva=Math.round(ht*0.2);
+  const ht=sansTVA?ttc:Math.round(ttc/1.2);
+  const tva=sansTVA?0:Math.round(ht*0.2);
   const sectionsHTML=sections.map(sec=>{
     const arts=(sec.devis_articles||[]).sort((a,b)=>a.ordre-b.ordre);
     return`<div style="margin-bottom:14px;page-break-inside:avoid">
@@ -2176,7 +2178,7 @@ async function printDevisById(devisId){
         <table style="width:100%;border-collapse:collapse;max-width:340px;margin-left:auto;font-size:12px">
           <tr><td style="padding:6px 0 4px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:6px 0 4px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${htBrut.toLocaleString('fr-FR')} MAD</td></tr>
           ${remiseTTC>0?`<tr><td style="padding:3px 0;color:#C2703D">Remise${remiseMad>0?' ('+remiseMad.toLocaleString('fr-FR')+' MAD)':' ('+remisePct+'%)'}</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#C2703D">- ${remiseTTC.toLocaleString('fr-FR')} MAD</td></tr>`:''}
-          <tr><td style="padding:3px 0;color:#888">TVA 20%</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
+          ${sansTVA?'':`<tr><td style="padding:3px 0;color:#888">TVA 20%</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>`}
           <tr style="background:#1a1a18;color:#fff">
             <td style="padding:9px 12px;font-weight:700;font-size:13px;border-radius:3px 0 0 3px">TOTAL TTC</td>
             <td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;font-size:13px;border-radius:0 3px 3px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
@@ -2207,13 +2209,11 @@ async function printFactureProformaById(factureId){
   const htBrut=Math.round(sections.reduce((s,sec)=>s+(sec.facture_proforma_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0)*(1-Number(a.remise||0)/100),0),0));
   const remisePct=Math.min(Math.max(Number(f.remise||0),0),100);
   const remiseMad=Number(f.remise_mad||0);
-  const ttcBrut=Math.round(htBrut*1.2);
+  const ttcBrut=htBrut; // pas de TVA sur les pro forma
   let remiseTTC=0;
   if(remiseMad>0) remiseTTC=Math.min(remiseMad,ttcBrut);
   else if(remisePct>0) remiseTTC=Math.round(ttcBrut*(remisePct/100));
   const ttc=Math.round(ttcBrut-remiseTTC);
-  const ht=Math.round(ttc/1.2);
-  const tva=Math.round(ht*0.2);
   const sectionsHTML=sections.map(sec=>{
     const arts=(sec.facture_proforma_articles||[]).sort((a,b)=>a.ordre-b.ordre);
     return`<div style="margin-bottom:14px;page-break-inside:avoid">
@@ -2276,7 +2276,6 @@ async function printFactureProformaById(factureId){
         <table style="width:100%;border-collapse:collapse;max-width:340px;margin-left:auto;font-size:12px">
           <tr><td style="padding:6px 0 4px;font-weight:600;border-top:1px solid #e8e4dc">Total HT</td><td style="padding:6px 0 4px;text-align:right;font-family:monospace;font-weight:600;border-top:1px solid #e8e4dc">${htBrut.toLocaleString('fr-FR')} MAD</td></tr>
           ${remiseTTC>0?`<tr><td style="padding:3px 0;color:#C2703D">Remise${remiseMad>0?' ('+remiseMad.toLocaleString('fr-FR')+' MAD)':' ('+remisePct+'%)'}</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#C2703D">- ${remiseTTC.toLocaleString('fr-FR')} MAD</td></tr>`:''}
-          <tr><td style="padding:3px 0;color:#888">TVA 20%</td><td style="padding:3px 0;text-align:right;font-family:monospace;color:#888">${tva.toLocaleString('fr-FR')} MAD</td></tr>
           <tr style="background:#1a1a18;color:#fff">
             <td style="padding:9px 12px;font-weight:700;font-size:13px;border-radius:3px 0 0 3px">TOTAL TTC</td>
             <td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;font-size:13px;border-radius:0 3px 3px 0">${ttc.toLocaleString('fr-FR')} MAD</td>
@@ -6691,10 +6690,17 @@ async function loadBusiness(){
   const moisCourant=now.getMonth()+1;
   const anneeCourante=now.getFullYear();
 
-  const[{data:facturesAll},{data:devisAll}]=await Promise.all([
+  const[{data:facturesNormales},{data:facturesProforma},{data:devisAll}]=await Promise.all([
     sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null),
+    sb.from('factures').select('*,clients(nom),facture_proforma_sections(facture_proforma_articles(quantite,prix_unitaire))').eq('type','proforma'),
     sb.from('devis').select('*,clients(nom),devis_sections(devis_articles(quantite,prix_unitaire))').is('type',null)
   ]);
+  // Fusionner : pour les pro forma, on reconstitue une structure devis_sections compatible avec calcTTC
+  const facturesProformaNormalisees=(facturesProforma||[]).map(f=>({
+    ...f,
+    devis:{devis_sections:f.facture_proforma_sections}
+  }));
+  const facturesAll=[...(facturesNormales||[]),...facturesProformaNormalisees];
 
   // Filtre mois en cours : on ne garde que les devis/factures émis pendant currentDashboardMois/Annee
   const moisStr=String(currentDashboardMois).padStart(2,'0');
@@ -6766,7 +6772,7 @@ async function loadBusiness(){
             const isPaid=f.statut==='Payée';
             return`<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:10px 0">
-                <div style="font-weight:600">${f.clients?.nom||'—'}${f.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+f.projet_nom+'</span>':''}</div>
+                <div style="font-weight:600">${f.clients?.nom||'—'}${f.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+f.projet_nom+'</span>':''}${f.type==='proforma'?' <span class="badge" style="background:#EEF2FF;color:#6366F1;font-size:9px;vertical-align:middle">PRO FORMA</span>':''}</div>
                 <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${f.reference}</div>
               </td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
@@ -6774,7 +6780,7 @@ async function loadBusiness(){
                 ${acompte>0?`<span style="color:#F59E0B;font-weight:600;font-family:'DM Mono',monospace">${acompte.toLocaleString('fr-FR')} MAD</span> <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`:'<span style="color:var(--muted)">—</span>'}
               </td>
               <td style="padding:10px 8px;text-align:center"><span class="badge ${isPaid?'badge-green':'badge-amber'}">${f.statut||'Non payée'}</span></td>
-              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printFacture,'${f.id}')">📄 PDF</button></td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(${f.type==='proforma'?'printFactureProformaById':'printFacture'},'${f.id}')">📄 PDF</button></td>
             </tr>`;
           }).join('')}
         </tbody>
