@@ -457,6 +457,7 @@
           <button class="rh-tab active" id="ftab-liste" onclick="showFactureTab('liste',this)" style="white-space:nowrap">◈ Factures</button>
           <button class="rh-tab" id="ftab-paiements" onclick="showFactureTab('paiements',this)" style="white-space:nowrap">💳 Suivi des paiements</button>
           <button class="rh-tab" id="ftab-proforma" onclick="showFactureTab('proforma',this)" style="white-space:nowrap">🧾 Pro forma</button>
+          <button class="rh-tab" id="ftab-avoirs" onclick="showFactureTab('avoirs',this)" style="white-space:nowrap">↩️ Avoirs</button>
         </div>
         <div id="ftab-content-liste">
           <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
@@ -472,6 +473,12 @@
             <button class="btn btn-primary btn-sm" onclick="openFactureProformaBuilder(null)">+ Nouvelle facture pro forma</button>
           </div>
           <div id="facture-proforma-list"></div>
+        </div>
+        <div id="ftab-content-avoirs" class="hidden">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <button class="btn btn-primary btn-sm" onclick="openAvoirModal(null)">+ Nouvel avoir</button>
+          </div>
+          <div id="avoirs-list"></div>
         </div>
       </div>
       <!-- SUIVI PROJETS -->
@@ -2344,12 +2351,13 @@ async function convertirFacture(devisId){
 }
 
 function showFactureTab(tab, el){
-  ['liste','paiements','proforma'].forEach(t=>{
+  ['liste','paiements','proforma','avoirs'].forEach(t=>{
     document.getElementById('ftab-content-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('ftab-'+t).classList.toggle('active', t===tab);
   });
   if(tab==='paiements') loadPaiements();
   else if(tab==='proforma') loadFactureProformaList();
+  else if(tab==='avoirs') loadAvoirsList();
   else loadFactures();
 }
 
@@ -2381,6 +2389,145 @@ async function loadFactureProformaList(){
   }).join('');
 }
 async function deleteFactureProforma(id){if(!confirm('Supprimer cette facture pro forma ?'))return;await sb.from('factures').delete().eq('id',id);toast('Supprimé');loadFactureProformaList();}
+
+// ─── AVOIRS ───────────────────────────────────────────────────────────────────
+async function loadAvoirsList(){
+  const{data,error}=await sb.from('avoirs').select('*,clients(nom)').order('created_at',{ascending:false});
+  const el=document.getElementById('avoirs-list');
+  if(error){el.innerHTML='<div class="empty">Table avoirs manquante — exécutez le SQL avoirs dans Supabase.</div>';return;}
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun avoir. Cliquez sur + Nouvel avoir pour commencer.</div>';return;}
+  el.innerHTML=(data||[]).map(a=>`
+    <div class="devis-card">
+      <div class="devis-card-left" onclick="openAvoirModal('${a.id}')" style="cursor:pointer">
+        <div class="devis-card-ref">${a.reference||'—'} · ${a.date_avoir?new Date(a.date_avoir).toLocaleDateString('fr-FR'):'—'}</div>
+        <div class="devis-card-title">${a.clients?.nom||'—'}</div>
+        <div class="devis-card-sub">${a.motif||'—'}</div>
+      </div>
+      <div class="devis-card-right">
+        <div class="devis-card-amount" style="color:#EF4444">- ${Math.abs(Number(a.montant||0)).toLocaleString('fr-FR')} MAD</div>
+        <button class="btn btn-sm" onclick="event.stopPropagation();previewDoc(printAvoirById,'${a.id}')">📄 PDF</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteAvoir('${a.id}')">Suppr.</button>
+      </div>
+    </div>`).join('');
+}
+
+async function openAvoirModal(avoirId){
+  let a=null;
+  if(avoirId){
+    const{data}=await sb.from('avoirs').select('*').eq('id',avoirId).single();
+    a=data;
+  }
+  const[{data:clients},{data:prospects}]=await Promise.all([
+    sb.from('clients').select('id,nom').order('nom'),
+    sb.from('prospects').select('id,nom').order('nom')
+  ]);
+  const clientOpts=(clients||[]).map(c=>`<option value="${c.id}" ${a?.client_id===c.id?'selected':''}>${c.nom}</option>`).join('');
+  const todayStr=new Date().toISOString().split('T')[0];
+  const html=`<div class="modal" style="max-width:520px">
+    <div class="modal-title">${avoirId?'Modifier avoir':'Nouvel avoir'}</div>
+    <div class="form-group"><label>Client</label>
+      <select id="avoir-client"><option value="">— Sélectionnez un client —</option>${clientOpts}</select>
+    </div>
+    <div class="form-group"><label>Montant (MAD)</label>
+      <input type="number" id="avoir-montant" min="0" step="1" placeholder="Ex: 2000" value="${a?Math.abs(Number(a.montant)):''}">
+    </div>
+    <div class="form-group"><label>Date</label>
+      <input type="date" id="avoir-date" value="${a?.date_avoir||todayStr}">
+    </div>
+    <div class="form-group"><label>Motif</label>
+      <textarea id="avoir-motif" rows="3" placeholder="Ex: Retour marchandise, erreur de facturation...">${a?.motif||''}</textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveAvoir(${avoirId?`'${avoirId}'`:'null'})">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveAvoir(avoirId){
+  const clientId=document.getElementById('avoir-client').value;
+  const montant=Math.abs(Number(document.getElementById('avoir-montant').value||0));
+  const date=document.getElementById('avoir-date').value;
+  const motif=document.getElementById('avoir-motif').value.trim();
+  if(!clientId){toast('Sélectionnez un client');return;}
+  if(!montant||montant<=0){toast('Montant invalide');return;}
+  if(!date){toast('Date requise');return;}
+
+  if(avoirId){
+    const{error}=await sb.from('avoirs').update({client_id:clientId,montant:-montant,date_avoir:date,motif}).eq('id',avoirId);
+    if(error){toast('Erreur: '+error.message);return;}
+  } else {
+    const ref='AV-'+Date.now().toString().slice(-6);
+    const{error}=await sb.from('avoirs').insert({reference:ref,client_id:clientId,montant:-montant,date_avoir:date,motif});
+    if(error){toast('Erreur: '+error.message);return;}
+  }
+  closeModal('rh-modal');
+  toast('Avoir enregistré ✓');
+  loadAvoirsList();
+}
+
+async function deleteAvoir(id){
+  if(!confirm('Supprimer cet avoir ?'))return;
+  await sb.from('avoirs').delete().eq('id',id);
+  toast('Supprimé');
+  loadAvoirsList();
+}
+
+async function printAvoirById(avoirId){
+  toast('Préparation du PDF…');
+  const{data:a}=await sb.from('avoirs').select('*,clients(*)').eq('id',avoirId).single();
+  if(!a){toast('Avoir introuvable');return;}
+  const client=a.clients;
+  const date=a.date_avoir?new Date(a.date_avoir).toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'}):'—';
+  const montant=Math.abs(Number(a.montant||0));
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+      body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @page{margin:13mm 16mm}
+    </style>
+    <div style="position:relative">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1a1a18">
+        <div style="display:flex;align-items:center;gap:14px">
+          <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:74px;height:74px;flex-shrink:0">
+          <div>
+            <div style="font-size:10.5px;color:#555">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div>
+            <div style="font-size:10.5px;color:#555">Tél : +212 6 60 10 78 96</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;font-family:monospace;color:#EF4444;letter-spacing:1px;font-weight:600">AVOIR</div>
+          <div style="font-size:13px;font-weight:600;font-family:monospace;margin-top:1px">${a.reference}</div>
+          <div style="font-size:10px;color:#888;margin-top:2px">${date}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:20px">
+        <div style="font-size:9px;font-weight:600;letter-spacing:2px;color:#EF4444;font-family:monospace;margin-bottom:3px">CLIENT</div>
+        <div style="font-size:14px;font-weight:600">${client?.nom||'—'}</div>
+        ${client?.ville?`<div style="font-size:11px;color:#888">${client.ville}</div>`:''}
+        ${client?.telephone?`<div style="font-size:11px;color:#888">${client.telephone}</div>`:''}
+      </div>
+      <div style="background:#FEF2F2;border-left:3px solid #EF4444;border-radius:3px;padding:12px 16px;margin-bottom:20px">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:#991B1B;font-family:monospace;margin-bottom:6px">MOTIF</div>
+        <div style="font-size:13px;color:#444;line-height:1.6">${a.motif||'—'}</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+        <table style="border-collapse:collapse;min-width:300px">
+          <tr style="background:#1a1a18;color:#fff">
+            <td style="padding:14px 18px;font-weight:600;font-size:15px;border-radius:4px 0 0 4px">MONTANT DE L'AVOIR</td>
+            <td style="padding:14px 18px;text-align:right;font-family:monospace;font-weight:600;font-size:15px;border-radius:0 4px 4px 0;color:#FCA5A5">- ${montant.toLocaleString('fr-FR')} MAD</td>
+          </tr>
+        </table>
+      </div>
+      <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center;line-height:1.6">
+        CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96<br>
+        Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
+      </div>
+    </div>`;
+  finalizeDocOutput();
+}
+
 
 async function loadPaiements(){
   const el=document.getElementById('paiements-list');
