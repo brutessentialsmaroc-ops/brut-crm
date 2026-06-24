@@ -6628,6 +6628,16 @@ async function saveObjectif(annee, mois, montant){
   toast('Objectif enregistré ✓');
 }
 
+let currentDashboardMois=new Date().getMonth()+1;
+let currentDashboardAnnee=new Date().getFullYear();
+
+function navDashboardMois(dir){
+  currentDashboardMois+=dir;
+  if(currentDashboardMois>12){currentDashboardMois=1;currentDashboardAnnee++;}
+  if(currentDashboardMois<1){currentDashboardMois=12;currentDashboardAnnee--;}
+  loadBusiness();
+}
+
 async function loadBusiness(){
   const el=document.getElementById('business-content');
   el.innerHTML='<div class="loading">Chargement…</div>';
@@ -6636,17 +6646,26 @@ async function loadBusiness(){
   const moisCourant=now.getMonth()+1;
   const anneeCourante=now.getFullYear();
 
-  const[{data:factures},{data:devis}]=await Promise.all([
+  const[{data:facturesAll},{data:devisAll}]=await Promise.all([
     sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null),
     sb.from('devis').select('*,clients(nom),devis_sections(devis_articles(quantite,prix_unitaire))').is('type',null)
   ]);
+
+  // Filtre mois en cours : on ne garde que les devis/factures émis pendant currentDashboardMois/Annee
+  const moisStr=String(currentDashboardMois).padStart(2,'0');
+  const prefixMois=`${currentDashboardAnnee}-${moisStr}`;
+  const devis=(devisAll||[]).filter(d=>d.date_envoi?.startsWith(prefixMois));
+  const factures=(facturesAll||[]).filter(f=>f.date_emission?.startsWith(prefixMois));
+
+  const moisNomsLong=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const moisLabel=`${moisNomsLong[currentDashboardMois-1]} ${currentDashboardAnnee}`;
 
   function calcTTC(item, sections){
     const ht=(sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     return Math.round(ht*(1-Number(item.remise||0)/100)*1.2);
   }
 
-  // 4 métriques CA
+  // 4 métriques CA (filtrées sur le mois sélectionné)
   const caDevisAttente=Math.round((devis||[]).filter(d=>d.statut==='En attente').reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
   const caDevisAccepte=Math.round((devis||[]).filter(d=>d.statut==='Accepté').reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
   const acomptesVerses=Math.round((factures||[]).reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0));
@@ -6668,6 +6687,13 @@ async function loadBusiness(){
       <button class="btn btn-sm" onclick="businessUnlocked=false;showPage('dashboard',document.querySelector('.nav-item'))" style="color:var(--muted)">🔒 Verrouiller</button>
     </div>
 
+    <!-- SÉLECTEUR DE MOIS -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+      <button class="btn btn-sm" onclick="navDashboardMois(-1)">←</button>
+      <div style="font-size:15px;font-weight:600;min-width:160px;text-align:center">${moisLabel}</div>
+      <button class="btn btn-sm" onclick="navDashboardMois(1)">→</button>
+    </div>
+
     <!-- 4 STATS CA -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
       ${statCard('Devis en attente',caDevisAttente.toLocaleString('fr-FR')+' MAD','CA potentiel à confirmer','#6B7280')}
@@ -6678,7 +6704,7 @@ async function loadBusiness(){
 
     <!-- DÉTAIL DEVIS ACCEPTÉS -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis acceptés — CA confirmé</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis acceptés — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
           <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
@@ -6687,7 +6713,7 @@ async function loadBusiness(){
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
-          ${(devis||[]).filter(d=>d.statut==='Accepté').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
+          ${!(devis||[]).filter(d=>d.statut==='Accepté').length?'<tr><td colspan="4" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis accepté ce mois-ci</td></tr>':(devis||[]).filter(d=>d.statut==='Accepté').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
             const ttc=calcTTC(d,d.devis_sections);
             // Chercher la facture liée
             const fac=(factures||[]).find(f=>f.devis_id===d.id);
@@ -6711,7 +6737,7 @@ async function loadBusiness(){
 
     <!-- DÉTAIL DEVIS EN ATTENTE -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis en attente — CA potentiel</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis en attente — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
           <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
@@ -6719,7 +6745,7 @@ async function loadBusiness(){
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
-          ${(devis||[]).filter(d=>d.statut==='En attente').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
+          ${!(devis||[]).filter(d=>d.statut==='En attente').length?'<tr><td colspan="3" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis en attente ce mois-ci</td></tr>':(devis||[]).filter(d=>d.statut==='En attente').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
             const ttc=calcTTC(d,d.devis_sections);
             return`<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:10px 0">
@@ -6736,7 +6762,7 @@ async function loadBusiness(){
 
     <!-- DÉTAIL FACTURES -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Factures</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Factures — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
           <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
@@ -6746,7 +6772,7 @@ async function loadBusiness(){
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
-          ${(factures||[]).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(f=>{
+          ${!(factures||[]).length?'<tr><td colspan="5" style="padding:20px 0;text-align:center;color:var(--muted)">Aucune facture ce mois-ci</td></tr>':(factures||[]).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(f=>{
             const ttc=calcTTC(f,f.devis?.devis_sections);
             const acompte=Math.round(Number(f.acompte1||0)+Number(f.acompte2||0));
             const pct=ttc>0?Math.round(acompte/ttc*100):0;
