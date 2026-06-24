@@ -430,7 +430,14 @@
           <button class="rh-tab" id="dtab-afaire" onclick="showDevisTab('afaire',this)" style="white-space:nowrap">📋 Devis à faire</button>
           <button class="rh-tab" id="dtab-proforma" onclick="showDevisTab('proforma',this)" style="white-space:nowrap">🧾 Pro forma</button>
         </div>
-        <div id="dtab-content-liste"><div id="devis-list"></div></div>
+        <div id="dtab-content-liste">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+            <button class="btn btn-sm" onclick="navDevisListMois(-1)">←</button>
+            <div id="devis-mois-label" style="font-size:15px;font-weight:600;min-width:160px;text-align:center"></div>
+            <button class="btn btn-sm" onclick="navDevisListMois(1)">→</button>
+          </div>
+          <div id="devis-list"></div>
+        </div>
         <div id="dtab-content-afaire" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <button class="btn btn-primary btn-sm" onclick="openAddDafModal()">+ Nouveau client</button>
@@ -451,7 +458,14 @@
           <button class="rh-tab" id="ftab-paiements" onclick="showFactureTab('paiements',this)" style="white-space:nowrap">💳 Suivi des paiements</button>
           <button class="rh-tab" id="ftab-proforma" onclick="showFactureTab('proforma',this)" style="white-space:nowrap">🧾 Pro forma</button>
         </div>
-        <div id="ftab-content-liste"><div id="factures-list"></div></div>
+        <div id="ftab-content-liste">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+            <button class="btn btn-sm" onclick="navFacturesMois(-1)">←</button>
+            <div id="factures-mois-label" style="font-size:15px;font-weight:600;min-width:160px;text-align:center"></div>
+            <button class="btn btn-sm" onclick="navFacturesMois(1)">→</button>
+          </div>
+          <div id="factures-list"></div>
+        </div>
         <div id="ftab-content-paiements" class="hidden"><div id="paiements-list"></div></div>
         <div id="ftab-content-proforma" class="hidden">
           <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
@@ -1161,11 +1175,26 @@ async function saveTicket(){
 }
 
 // ─── DEVIS LIST ───────────────────────────────────────────────────────────────
+let currentDevisListMois=new Date().getMonth()+1;
+let currentDevisListAnnee=new Date().getFullYear();
+
+function navDevisListMois(dir){
+  currentDevisListMois+=dir;
+  if(currentDevisListMois>12){currentDevisListMois=1;currentDevisListAnnee++;}
+  if(currentDevisListMois<1){currentDevisListMois=12;currentDevisListAnnee--;}
+  loadDevisList();
+}
+
 async function loadDevisList(){
+  const labelEl=document.getElementById('devis-mois-label');
+  if(labelEl) labelEl.textContent=`${MOIS_NOMS_LONG[currentDevisListMois-1]} ${currentDevisListAnnee}`;
   const{data}=await sb.from('devis').select('*,clients(nom),devis_sections(id,devis_articles(quantite,prix_unitaire))').is('type',null).order('created_at',{ascending:false});
   const el=document.getElementById('devis-list');
-  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucun devis. Cliquez sur + Nouveau pour commencer.</div>';return}
-  el.innerHTML=(data||[]).map(d=>{
+  const moisStr=String(currentDevisListMois).padStart(2,'0');
+  const prefixMois=`${currentDevisListAnnee}-${moisStr}`;
+  const filtered=(data||[]).filter(d=>d.date_envoi?.startsWith(prefixMois));
+  if(!filtered.length){el.innerHTML='<div class="empty">Aucun devis ce mois-ci.</div>';return}
+  el.innerHTML=filtered.map(d=>{
     const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const remise=Number(d.remise||0);
     const htNet=Math.round(ht*(1-remise/100));
@@ -2510,12 +2539,28 @@ async function savePaiementCard(factureId, ttc){
   }
 }
 
+let currentFacturesMois=new Date().getMonth()+1;
+let currentFacturesAnnee=new Date().getFullYear();
+const MOIS_NOMS_LONG=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+function navFacturesMois(dir){
+  currentFacturesMois+=dir;
+  if(currentFacturesMois>12){currentFacturesMois=1;currentFacturesAnnee++;}
+  if(currentFacturesMois<1){currentFacturesMois=12;currentFacturesAnnee--;}
+  loadFactures();
+}
+
 async function loadFactures(){
+  const labelEl=document.getElementById('factures-mois-label');
+  if(labelEl) labelEl.textContent=`${MOIS_NOMS_LONG[currentFacturesMois-1]} ${currentFacturesAnnee}`;
   const{data,error}=await sb.from('factures').select('*,clients(nom),devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null).order('created_at',{ascending:false});
   const el=document.getElementById('factures-list');
   if(error){el.innerHTML=`<div class="empty">Table factures manquante — exécutez le SQL factures dans Supabase.</div>`;return;}
-  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune facture. Convertissez un devis accepté en facture.</div>';return;}
-  el.innerHTML=(data||[]).map(f=>{
+  const moisStr=String(currentFacturesMois).padStart(2,'0');
+  const prefixMois=`${currentFacturesAnnee}-${moisStr}`;
+  const filtered=(data||[]).filter(f=>f.date_emission?.startsWith(prefixMois));
+  if(!filtered.length){el.innerHTML='<div class="empty">Aucune facture ce mois-ci.</div>';return;}
+  el.innerHTML=filtered.map(f=>{
     const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const remise=Number(f.remise||0);
     const htNet=ht*(1-remise/100);
@@ -6464,29 +6509,29 @@ async function loadBusinessObjectifs(){
   }
 
   const [r1,r2]=await Promise.all([
-    sb.from('factures').select('*,devis(devis_sections(devis_articles(quantite,prix_unitaire)))').is('type',null).gte('date_emission','2026-01-01'),
+    sb.from('devis').select('*,devis_sections(devis_articles(quantite,prix_unitaire))').is('type',null).eq('statut','Accepté').gte('date_envoi','2026-01-01'),
     sb.from('objectifs_ca').select('*').in('annee',[2026,2027])
   ]);
-  const factures=r1.data||[];
+  const devisAcceptes=r1.data||[];
   const objectifs=r2.data||[];
 
   const objMap={};
   objectifs.forEach(o=>objMap[`${o.annee}-${o.mois===null?'annuel':o.mois}`]=o);
 
-  function calcTTCFac(f){
-    const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-    return Math.round(ht*(1-Number(f.remise||0)/100)*1.2*100)/100;
+  function calcTTCDevis(d){
+    const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
+    return Math.round(ht*(1-Number(d.remise||0)/100)*1.2*100)/100;
   }
 
   function facturePourMois(mois,annee){
     const m=String(mois).padStart(2,'0');
-    return factures.filter(f=>f.date_emission?.startsWith(`${annee}-${m}`))
-      .reduce((s,f)=>s+calcTTCFac(f),0);
+    return devisAcceptes.filter(d=>d.date_envoi?.startsWith(`${annee}-${m}`))
+      .reduce((s,d)=>s+calcTTCDevis(d),0);
   }
 
   const objAnnuel=Number(objMap[`2026-annuel`]?.montant||0);
-  const factureAnnee=factures.filter(f=>f.date_emission?.startsWith('2026'))
-    .reduce((s,f)=>s+calcTTCFac(f),0);
+  const factureAnnee=devisAcceptes.filter(d=>d.date_envoi?.startsWith('2026'))
+    .reduce((s,d)=>s+calcTTCDevis(d),0);
   const pctAnnee=objAnnuel>0?Math.min(100,Math.round(factureAnnee/objAnnuel*100)):0;
   const resteAnnee=Math.max(0,objAnnuel-factureAnnee);
   const barColorAnnee=pctAnnee>=100?'#10B981':pctAnnee>=50?'#F59E0B':'#EF4444';
