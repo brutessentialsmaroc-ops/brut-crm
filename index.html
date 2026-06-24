@@ -6702,33 +6702,34 @@ async function loadBusiness(){
       ${statCard('Factures validées',facturesSoldees.toLocaleString('fr-FR')+' MAD','entièrement payées','#10B981','#F0FDF4','#6EE7B7')}
     </div>
 
-    <!-- DÉTAIL DEVIS ACCEPTÉS -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis acceptés — ${moisLabel}</div>
+    <!-- DÉTAIL FACTURES -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Factures — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
           <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">MONTANT TTC</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">ACOMPTE</th>
+          <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600">STATUT</th>
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
-          ${!(devis||[]).filter(d=>d.statut==='Accepté').length?'<tr><td colspan="4" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis accepté ce mois-ci</td></tr>':(devis||[]).filter(d=>d.statut==='Accepté').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
-            const ttc=calcTTC(d,d.devis_sections);
-            // Chercher la facture liée
-            const fac=(factures||[]).find(f=>f.devis_id===d.id);
-            const acompte=fac?Math.round(Number(fac.acompte1||0)+Number(fac.acompte2||0)):0;
+          ${!(factures||[]).length?'<tr><td colspan="5" style="padding:20px 0;text-align:center;color:var(--muted)">Aucune facture ce mois-ci</td></tr>':(factures||[]).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(f=>{
+            const ttc=calcTTC(f,f.devis?.devis_sections);
+            const acompte=Math.round(Number(f.acompte1||0)+Number(f.acompte2||0));
             const pct=ttc>0?Math.round(acompte/ttc*100):0;
+            const isPaid=f.statut==='Payée';
             return`<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:10px 0">
-                <div style="font-weight:600">${d.clients?.nom||'—'}${d.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+d.projet_nom+'</span>':''}</div>
-                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${d.reference}</div>
+                <div style="font-weight:600">${f.clients?.nom||'—'}${f.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+f.projet_nom+'</span>':''}</div>
+                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${f.reference}</div>
               </td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
               <td style="padding:10px 8px;text-align:right">
                 ${acompte>0?`<span style="color:#F59E0B;font-weight:600;font-family:'DM Mono',monospace">${acompte.toLocaleString('fr-FR')} MAD</span> <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`:'<span style="color:var(--muted)">—</span>'}
               </td>
-              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printDevisById,'${d.id}')">📄 PDF</button></td>
+              <td style="padding:10px 8px;text-align:center"><span class="badge ${isPaid?'badge-green':'badge-amber'}">${f.statut||'Non payée'}</span></td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printFacture,'${f.id}')">📄 PDF</button></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -6760,34 +6761,33 @@ async function loadBusiness(){
       </table>
     </div>
 
-    <!-- DÉTAIL FACTURES -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Factures — ${moisLabel}</div>
+    <!-- DÉTAIL DEVIS ACCEPTÉS -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis acceptés — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
           <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">MONTANT TTC</th>
           <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">ACOMPTE</th>
-          <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600">STATUT</th>
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
-          ${!(factures||[]).length?'<tr><td colspan="5" style="padding:20px 0;text-align:center;color:var(--muted)">Aucune facture ce mois-ci</td></tr>':(factures||[]).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(f=>{
-            const ttc=calcTTC(f,f.devis?.devis_sections);
-            const acompte=Math.round(Number(f.acompte1||0)+Number(f.acompte2||0));
+          ${!(devis||[]).filter(d=>d.statut==='Accepté').length?'<tr><td colspan="4" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis accepté ce mois-ci</td></tr>':(devis||[]).filter(d=>d.statut==='Accepté').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
+            const ttc=calcTTC(d,d.devis_sections);
+            // Chercher la facture liée
+            const fac=(factures||[]).find(f=>f.devis_id===d.id);
+            const acompte=fac?Math.round(Number(fac.acompte1||0)+Number(fac.acompte2||0)):0;
             const pct=ttc>0?Math.round(acompte/ttc*100):0;
-            const isPaid=f.statut==='Payée';
             return`<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:10px 0">
-                <div style="font-weight:600">${f.clients?.nom||'—'}${f.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+f.projet_nom+'</span>':''}</div>
-                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${f.reference}</div>
+                <div style="font-weight:600">${d.clients?.nom||'—'}${d.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+d.projet_nom+'</span>':''}</div>
+                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${d.reference}</div>
               </td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
               <td style="padding:10px 8px;text-align:right">
                 ${acompte>0?`<span style="color:#F59E0B;font-weight:600;font-family:'DM Mono',monospace">${acompte.toLocaleString('fr-FR')} MAD</span> <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`:'<span style="color:var(--muted)">—</span>'}
               </td>
-              <td style="padding:10px 8px;text-align:center"><span class="badge ${isPaid?'badge-green':'badge-amber'}">${f.statut||'Non payée'}</span></td>
-              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printFacture,'${f.id}')">📄 PDF</button></td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printDevisById,'${d.id}')">📄 PDF</button></td>
             </tr>`;
           }).join('')}
         </tbody>
