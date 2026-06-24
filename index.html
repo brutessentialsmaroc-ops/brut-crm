@@ -2898,13 +2898,16 @@ async function printFacture(id){
             </tr>`).join('')}
             <tr style="border-top:1px solid #e8d4bc">
               <td style="padding:4px 0;font-weight:600;color:#5C3D24" colspan="2">Total versé</td>
-              <td style="padding:4px 0;text-align:right;font-family:monospace;font-weight:700">${totalVerse.toLocaleString('fr-FR')} MAD</td>
+              <td style="padding:4px 0;text-align:right;font-family:monospace;font-weight:700">${paiements.reduce((s,p)=>s+Number(p.montant||0),0).toLocaleString('fr-FR')} MAD</td>
             </tr>
             <tr>
-              <td style="padding:2px 0;font-weight:600;color:${resteAPayer<0?'#EF4444':'#1a1a18'}" colspan="2">${resteAPayer<0?'Trop-perçu':'Reste à payer'}</td>
-              <td style="padding:2px 0;text-align:right;font-family:monospace;font-weight:700;color:${resteAPayer<0?'#EF4444':'#1a1a18'}">${Math.abs(resteAPayer).toLocaleString('fr-FR')} MAD</td>
+              <td style="padding:2px 0;font-weight:600;color:${f.statut==='Payée'?'#10B981':resteAPayer<0?'#EF4444':'#1a1a18'}" colspan="2">${f.statut==='Payée'?'Solde':resteAPayer<0?'Trop-perçu':'Reste à payer'}</td>
+              <td style="padding:2px 0;text-align:right;font-family:monospace;font-weight:700;color:${f.statut==='Payée'?'#10B981':resteAPayer<0?'#EF4444':'#1a1a18'}">${f.statut==='Payée'?'✓ Réglé':Math.abs(resteAPayer).toLocaleString('fr-FR')+' MAD'}</td>
             </tr>
           </table>
+        </div>`:f.statut==='Payée'?`
+        <div style="margin-top:10px;padding:10px 12px;background:#F0FDF4;border-radius:3px;border-left:3px solid #10B981">
+          <div style="font-weight:700;font-size:11px;color:#10B981">✓ Facture intégralement réglée</div>
         </div>`:''}
         <!-- COORDONNÉES BANCAIRES -->
         <div style="margin-top:12px;padding:8px 12px;background:#f5f3ee;border-radius:3px;font-size:10px;color:#444;line-height:1.7">
