@@ -1153,7 +1153,7 @@ async function loadDevisList(){
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="openDevisBuilder('${d.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
-        <div class="devis-card-title">${d.clients?.nom||'—'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
+        <div class="devis-card-title">${d.clients?.nom||'<span style="color:var(--muted);font-style:italic">Client supprimé</span>'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
         <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)${remise>0?` · Remise ${remise}%`:''}</div>
       </div>
       <div class="devis-card-right">
@@ -1194,7 +1194,7 @@ async function loadDevisProformaList(){
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="openDevisBuilder('${d.id}',true)" style="cursor:pointer">
         <div class="devis-card-ref">${d.reference||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
-        <div class="devis-card-title">${d.clients?.nom||'—'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
+        <div class="devis-card-title">${d.clients?.nom||'<span style="color:var(--muted);font-style:italic">Client supprimé</span>'} ${d.projet_nom?'— '+d.projet_nom:''}</div>
         <div class="devis-card-sub">${(d.devis_sections||[]).length} section(s)${remise>0?` · Remise ${remise}%`:''}</div>
       </div>
       <div class="devis-card-right">
@@ -2285,7 +2285,7 @@ async function loadFactureProformaList(){
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="openFactureProformaBuilder('${f.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${f.reference||'—'} · ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
-        <div class="devis-card-title">${f.clients?.nom||'—'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
+        <div class="devis-card-title">${f.clients?.nom||'<span style="color:var(--muted);font-style:italic">Client supprimé</span>'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
         <div class="devis-card-sub">${(f.facture_proforma_sections||[]).length} section(s)${remise>0?` · Remise ${remise}%`:''}</div>
       </div>
       <div class="devis-card-right">
@@ -2487,7 +2487,7 @@ async function loadFactures(){
     return`<div class="devis-card">
       <div class="devis-card-left" onclick="printFacture('${f.id}')" style="cursor:pointer">
         <div class="devis-card-ref">${f.reference} · Émise le ${f.date_emission?new Date(f.date_emission).toLocaleDateString('fr-FR'):'—'}</div>
-        <div class="devis-card-title">${f.clients?.nom||'—'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
+        <div class="devis-card-title">${f.clients?.nom||'<span style="color:var(--muted);font-style:italic">Client supprimé</span>'} ${f.projet_nom?'— '+f.projet_nom:''}</div>
         <div class="devis-card-sub">Échéance : ${f.date_echeance?new Date(f.date_echeance).toLocaleDateString('fr-FR'):'—'}</div>
       </div>
       <div class="devis-card-right">
