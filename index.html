@@ -201,6 +201,16 @@
   }
   #pdf-preview { display: none; }
 
+  /* PDF PREVIEW MODAL (on-screen) */
+  #pdf-preview-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(20,18,15,0.65);z-index:500;display:none;align-items:center;justify-content:center;padding:30px}
+  #pdf-preview-modal.show{display:flex}
+  #pdf-preview-modal-inner{background:#fff;width:100%;max-width:850px;max-height:90vh;border-radius:8px;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative}
+  #pdf-preview-modal-doc{padding:30px 40px}
+  #pdf-preview-modal-bar{position:sticky;top:0;background:#fff;display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-bottom:1px solid var(--border);z-index:2}
+  @media print {
+    #pdf-preview-modal { display: none !important; }
+  }
+
   /* DEVIS LIST CARD */
   .devis-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all 0.15s}
   .devis-card:hover{border-color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.06)}
@@ -630,6 +640,15 @@
 
 <!-- PDF PREVIEW -->
 <div id="pdf-preview"></div>
+<div id="pdf-preview-modal" onclick="if(event.target===this)closePdfPreviewModal()">
+  <div id="pdf-preview-modal-inner">
+    <div id="pdf-preview-modal-bar">
+      <button class="btn btn-sm" onclick="printFromPreviewModal()">🖨 Imprimer</button>
+      <button class="btn btn-sm" onclick="closePdfPreviewModal()">Fermer ✕</button>
+    </div>
+    <div id="pdf-preview-modal-doc"></div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1400,13 +1419,42 @@ function printDevisAFaire(clientId){
     <div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid #1a1a18">PRODUITS / DESCRIPTIONS</div>
     ${itemsHTML||'<div style="color:#aaa;padding:20px 0;font-size:13px">Aucun produit</div>'}
   `;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 // ─── DEVIS BUILDER ────────────────────────────────────────────────────────────
 let currentDevisIsProforma=false;
 let currentBuilderTarget='devis'; // 'devis' or 'facture'
+let _docOutputMode='print'; // 'print' or 'preview' — set before calling any printXxx() function
+
+function finalizeDocOutput(){
+  if(_docOutputMode==='preview'){
+    document.getElementById('pdf-preview-modal-doc').innerHTML=document.getElementById('pdf-preview').innerHTML;
+    document.getElementById('pdf-preview-modal').classList.add('show');
+  } else {
+    document.getElementById('pdf-preview').style.display='block';
+    setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  }
+}
+
+function closePdfPreviewModal(){
+  document.getElementById('pdf-preview-modal').classList.remove('show');
+  document.getElementById('pdf-preview-modal-doc').innerHTML='';
+}
+
+function printFromPreviewModal(){
+  document.getElementById('pdf-preview').innerHTML=document.getElementById('pdf-preview-modal-doc').innerHTML;
+  document.getElementById('pdf-preview').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+}
+
+// Wrapper: call any printXxx(...) function in "preview" mode (shows on-screen modal instead of printing)
+function previewDoc(fn, ...args){
+  _docOutputMode='preview';
+  const result=fn(...args);
+  if(result && typeof result.finally==='function') result.finally(()=>{_docOutputMode='print';});
+  else _docOutputMode='print';
+}
 
 function returnFromBuilder(){
   if(currentBuilderTarget==='facture'){
@@ -2013,8 +2061,7 @@ async function printDevis(){
         Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
       </div>
     </div>`;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 // ─── DUPLIQUER DEVIS ──────────────────────────────────────────────────────────
@@ -2116,8 +2163,7 @@ async function printDevisById(devisId){
         Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
       </div>
     </div>`;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 async function printFactureProformaById(factureId){
@@ -2214,8 +2260,7 @@ async function printFactureProformaById(factureId){
         Capital social : 100 000 DHS | R.C : 109 729 | I.F : 47 350 876 | ICE : 002672298000046 | PATENTE : 64002515
       </div>
     </div>`;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 async function dupliquerDevis(id){
@@ -2686,8 +2731,7 @@ async function printFacture(id){
         </div>
       </div>
     </div>`;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 // ─── RH ──────────────────────────────────────────────────────────────────────
@@ -3432,8 +3476,7 @@ async function printFichePaie(salId,mois,annee){
       <div><div style="font-size:11px;color:#aaa;margin-bottom:30px">Signature employeur</div><div style="border-top:1px solid #1a1a18;padding-top:6px;font-size:11px;color:#888">Nabil Ziani — DG</div></div>
       <div><div style="font-size:11px;color:#aaa;margin-bottom:30px">Signature salarié</div><div style="border-top:1px solid #1a1a18;padding-top:6px;font-size:11px;color:#888">${s.prenom||''} ${s.nom}</div></div>
     </div>`;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 // ─── MODAL HELPER ─────────────────────────────────────────────────────────────
@@ -3879,8 +3922,7 @@ function generateFicheAtelier(){
       </div>
     </div>`;
 
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 
@@ -3986,8 +4028,7 @@ function generateFicheClient(){
       </div>
     </div>`;
 
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 // ─── LIGNES COMMANDE ─────────────────────────────────────────────────────────
@@ -4477,8 +4518,7 @@ function generateFicheProspect(){
       </div>
     </div>`;
 
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 async function printEmargement(){
@@ -4570,8 +4610,7 @@ async function printEmargement(){
       </div>
     </div>`;
 
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 // ─── ORGANIGRAMME ────────────────────────────────────────────────────────────
@@ -5763,8 +5802,7 @@ function printFicheCommande(dataStr){
     </div>`;
 
   closeModal('rh-modal');
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  finalizeDocOutput();
 }
 
 async function loadMissions(){
@@ -6635,7 +6673,7 @@ async function loadBusiness(){
       ${statCard('Devis en attente',caDevisAttente.toLocaleString('fr-FR')+' MAD','CA potentiel à confirmer','#6B7280')}
       ${statCard('Devis acceptés',caDevisAccepte.toLocaleString('fr-FR')+' MAD','commandes confirmées','#3B82F6','#EFF6FF','#BFDBFE')}
       ${statCard('Acomptes versés',acomptesVerses.toLocaleString('fr-FR')+' MAD','encaissements reçus','#F59E0B','#FFFBEB','#FDE68A')}
-      ${statCard('Factures soldées',facturesSoldees.toLocaleString('fr-FR')+' MAD','entièrement payées','#10B981','#F0FDF4','#6EE7B7')}
+      ${statCard('Factures validées',facturesSoldees.toLocaleString('fr-FR')+' MAD','entièrement payées','#10B981','#F0FDF4','#6EE7B7')}
     </div>
 
     <!-- DÉTAIL DEVIS ACCEPTÉS -->
@@ -6664,7 +6702,7 @@ async function loadBusiness(){
               <td style="padding:10px 8px;text-align:right">
                 ${acompte>0?`<span style="color:#F59E0B;font-weight:600;font-family:'DM Mono',monospace">${acompte.toLocaleString('fr-FR')} MAD</span> <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`:'<span style="color:var(--muted)">—</span>'}
               </td>
-              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="printDevisById('${d.id}')">📄 PDF</button></td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printDevisById,'${d.id}')">📄 PDF</button></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -6672,7 +6710,7 @@ async function loadBusiness(){
     </div>
 
     <!-- DÉTAIL DEVIS EN ATTENTE -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
       <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis en attente — CA potentiel</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
@@ -6689,7 +6727,41 @@ async function loadBusiness(){
                 <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${d.reference}</div>
               </td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#6B7280">${ttc.toLocaleString('fr-FR')} MAD</td>
-              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="printDevisById('${d.id}')">📄 PDF</button></td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printDevisById,'${d.id}')">📄 PDF</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- DÉTAIL FACTURES -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Factures</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
+          <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">MONTANT TTC</th>
+          <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">ACOMPTE</th>
+          <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600">STATUT</th>
+          <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
+        </tr></thead>
+        <tbody>
+          ${(factures||[]).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(f=>{
+            const ttc=calcTTC(f,f.devis?.devis_sections);
+            const acompte=Math.round(Number(f.acompte1||0)+Number(f.acompte2||0));
+            const pct=ttc>0?Math.round(acompte/ttc*100):0;
+            const isPaid=f.statut==='Payée';
+            return`<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:10px 0">
+                <div style="font-weight:600">${f.clients?.nom||'—'}${f.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+f.projet_nom+'</span>':''}</div>
+                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${f.reference}</div>
+              </td>
+              <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
+              <td style="padding:10px 8px;text-align:right">
+                ${acompte>0?`<span style="color:#F59E0B;font-weight:600;font-family:'DM Mono',monospace">${acompte.toLocaleString('fr-FR')} MAD</span> <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`:'<span style="color:var(--muted)">—</span>'}
+              </td>
+              <td style="padding:10px 8px;text-align:center"><span class="badge ${isPaid?'badge-green':'badge-amber'}">${f.statut||'Non payée'}</span></td>
+              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printFacture,'${f.id}')">📄 PDF</button></td>
             </tr>`;
           }).join('')}
         </tbody>
