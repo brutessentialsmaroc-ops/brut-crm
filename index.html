@@ -541,7 +541,7 @@
         </div>
         <!-- INFO DEVIS -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:20px">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.7fr;gap:16px">
             <div class="form-group" style="margin:0"><label>Client</label>
           <div style="display:flex;gap:8px">
             <select id="builder-client" style="flex:1" onchange="if(this.value==='__new__')openNewClientFromDevis()"></select>
@@ -552,6 +552,7 @@
             <div class="form-group" style="margin:0" id="builder-statut-wrap"><label>Statut</label>
               <select id="builder-statut"><option>En attente</option><option>Accepté</option><option>Refusé</option></select>
             </div>
+            <div class="form-group" style="margin:0"><label>Date</label><input type="date" id="builder-date"></div>
           </div>
           <div style="margin-top:12px;display:flex;gap:12px">
             <button class="btn btn-primary" id="builder-save-btn" onclick="saveDevisBuilder()">Enregistrer</button>
@@ -1449,6 +1450,7 @@ async function openFactureProformaBuilder(factureId){
       document.getElementById('builder-client').value=f.client_id||'';
       document.getElementById('builder-projet').value=f.projet_nom||'';
       document.getElementById('builder-ref').textContent=f.reference||'';
+      document.getElementById('builder-date').value=f.date_emission||new Date().toISOString().split('T')[0];
       if(document.getElementById('builder-remise')){
         if(f.remise_mad&&f.remise_mad>0){
           document.getElementById('builder-remise').value=f.remise_mad;
@@ -1465,6 +1467,7 @@ async function openFactureProformaBuilder(factureId){
   } else {
     document.getElementById('builder-ref').textContent='Nouvelle facture pro forma';
     document.getElementById('builder-projet').value='';
+    document.getElementById('builder-date').value=new Date().toISOString().split('T')[0];
     sectionsData=[{id:null,nom:'',sous_titre:'',ordre:0,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]}];
   }
   renderSections();
@@ -1501,6 +1504,7 @@ async function openDevisBuilder(devisId, isProforma=false){
       document.getElementById('builder-projet').value=d.projet_nom||'';
       document.getElementById('builder-statut').value=d.statut||'En attente';
       document.getElementById('builder-ref').textContent=d.reference||'';
+      document.getElementById('builder-date').value=d.date_envoi||new Date().toISOString().split('T')[0];
       if(document.getElementById('builder-remise')){
         if(d.remise_mad&&d.remise_mad>0){
           document.getElementById('builder-remise').value=d.remise_mad;
@@ -1519,6 +1523,7 @@ async function openDevisBuilder(devisId, isProforma=false){
     document.getElementById('builder-ref').textContent = isProforma ? 'Nouveau devis pro forma' : 'Nouveau devis';
     document.getElementById('builder-projet').value='';
     document.getElementById('builder-statut').value='En attente';
+    document.getElementById('builder-date').value=new Date().toISOString().split('T')[0];
     sectionsData=[{id:null,nom:'',sous_titre:'',ordre:0,articles:[{id:null,description:'',quantite:1,prix_unitaire:0}]}];
   }
   renderSections();
@@ -1731,6 +1736,7 @@ async function saveDevisBuilder(){
 
   const statut=document.getElementById('builder-statut').value;
   const projetNom=document.getElementById('builder-projet').value.trim();
+  const dateChoisie=document.getElementById('builder-date')?.value||new Date().toISOString().split('T')[0];
 
   let devisId=currentDevisId;
 
@@ -1739,7 +1745,7 @@ async function saveDevisBuilder(){
     const ref=(currentDevisIsProforma?'DPF-':'DEV-')+Date.now().toString().slice(-6);
     const{data,error}=await sb.from('devis').insert({
       reference:ref, client_id:clientId, projet_nom:projetNom,
-      statut, date_envoi:new Date().toISOString().split('T')[0],
+      statut, date_envoi:dateChoisie,
       type:currentDevisIsProforma?'proforma':null,
       remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
       remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
@@ -1750,7 +1756,7 @@ async function saveDevisBuilder(){
     document.getElementById('builder-ref').textContent=ref;
   } else {
     const{error}=await sb.from('devis').update({
-      client_id:clientId, projet_nom:projetNom, statut,
+      client_id:clientId, projet_nom:projetNom, statut, date_envoi:dateChoisie,
       remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
       remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
     }).eq('id',devisId);
@@ -1816,6 +1822,7 @@ async function saveFactureProformaBuilder(){
   }
 
   const projetNom=document.getElementById('builder-projet').value.trim();
+  const dateChoisie=document.getElementById('builder-date')?.value||new Date().toISOString().split('T')[0];
   let factureId=currentDevisId;
 
   // 1. Créer ou mettre à jour la facture pro forma
@@ -1824,7 +1831,7 @@ async function saveFactureProformaBuilder(){
     const{data,error}=await sb.from('factures').insert({
       reference:ref, client_id:clientId, projet_nom:projetNom,
       type:'proforma', statut:'Pro forma',
-      date_emission:new Date().toISOString().split('T')[0],
+      date_emission:dateChoisie,
       remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
       remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
     }).select().single();
@@ -1834,7 +1841,7 @@ async function saveFactureProformaBuilder(){
     document.getElementById('builder-ref').textContent=ref;
   } else {
     const{error}=await sb.from('factures').update({
-      client_id:clientId, projet_nom:projetNom,
+      client_id:clientId, projet_nom:projetNom, date_emission:dateChoisie,
       remise:remiseType==='pct'?Number(document.getElementById('builder-remise')?.value||0):0,
       remise_mad:remiseType==='mad'?Number(document.getElementById('builder-remise')?.value||0):0
     }).eq('id',factureId);
