@@ -6867,6 +6867,17 @@ async function loadBusiness(){
     return Math.round(ht*(1-Number(item.remise||0)/100)*(sansTVA?1:1.2));
   }
 
+  // 3 totaux du mois sélectionné
+  const totalFacturesMois=Math.round((factures||[]).reduce((s,f)=>s+calcTTC(f,f.devis?.devis_sections),0));
+  const totalDevisAcceptesMois=Math.round((devis||[]).filter(d=>d.statut==='Accepté').reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
+  const totalAcomptesMois=Math.round((factures||[]).reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0));
+
+  const statCard=(label,value,color='#1a1a18',bg='#fff',border='var(--border)')=>`
+    <div style="background:${bg};border:1px solid ${border};border-radius:var(--radius);padding:20px 24px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--muted);margin-bottom:10px;text-transform:uppercase">${label}</div>
+      <div style="font-size:26px;font-weight:700;color:${color};font-family:'DM Mono',monospace;letter-spacing:0.5px">${value}</div>
+    </div>`;
+
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
       <div>
@@ -6881,6 +6892,13 @@ async function loadBusiness(){
       <button class="btn btn-sm" onclick="navDashboardMois(-1)">←</button>
       <div style="font-size:15px;font-weight:600;min-width:160px;text-align:center">${moisLabel}</div>
       <button class="btn btn-sm" onclick="navDashboardMois(1)">→</button>
+    </div>
+
+    <!-- 3 STATS DU MOIS -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px">
+      ${statCard('Factures du mois',totalFacturesMois.toLocaleString('fr-FR')+' MAD','#1a1a18','#fff')}
+      ${statCard('Devis acceptés',totalDevisAcceptesMois.toLocaleString('fr-FR')+' MAD','#3B82F6','#EFF6FF','#BFDBFE')}
+      ${statCard('Acomptes versés',totalAcomptesMois.toLocaleString('fr-FR')+' MAD','#F59E0B','#FFFBEB','#FDE68A')}
     </div>
 
     <!-- DÉTAIL FACTURES -->
