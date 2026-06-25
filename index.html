@@ -431,10 +431,16 @@
           <button class="rh-tab" id="dtab-proforma" onclick="showDevisTab('proforma',this)" style="white-space:nowrap">🧾 Pro forma</button>
         </div>
         <div id="dtab-content-liste">
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
             <button class="btn btn-sm" onclick="navDevisListMois(-1)">←</button>
             <div id="devis-mois-label" style="font-size:15px;font-weight:600;min-width:160px;text-align:center"></div>
             <button class="btn btn-sm" onclick="navDevisListMois(1)">→</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:20px">
+            <button class="rh-tab active" id="dstat-tous" onclick="filterDevisListStatut('tous',this)" style="white-space:nowrap">Tous</button>
+            <button class="rh-tab" id="dstat-attente" onclick="filterDevisListStatut('En attente',this)" style="white-space:nowrap">En attente</button>
+            <button class="rh-tab" id="dstat-accepte" onclick="filterDevisListStatut('Accepté',this)" style="white-space:nowrap">Acceptés</button>
+            <button class="rh-tab" id="dstat-refuse" onclick="filterDevisListStatut('Refusé',this)" style="white-space:nowrap">Refusés</button>
           </div>
           <div id="devis-list"></div>
         </div>
@@ -1192,6 +1198,14 @@ function navDevisListMois(dir){
   loadDevisList();
 }
 
+let currentDevisListStatut='tous';
+function filterDevisListStatut(statut,btn){
+  currentDevisListStatut=statut;
+  document.querySelectorAll('#dtab-content-liste .rh-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  loadDevisList();
+}
+
 async function loadDevisList(){
   const labelEl=document.getElementById('devis-mois-label');
   if(labelEl) labelEl.textContent=`${MOIS_NOMS_LONG[currentDevisListMois-1]} ${currentDevisListAnnee}`;
@@ -1199,7 +1213,8 @@ async function loadDevisList(){
   const el=document.getElementById('devis-list');
   const moisStr=String(currentDevisListMois).padStart(2,'0');
   const prefixMois=`${currentDevisListAnnee}-${moisStr}`;
-  const filtered=(data||[]).filter(d=>d.date_envoi?.startsWith(prefixMois));
+  let filtered=(data||[]).filter(d=>d.date_envoi?.startsWith(prefixMois));
+  if(currentDevisListStatut!=='tous') filtered=filtered.filter(d=>d.statut===currentDevisListStatut);
   if(!filtered.length){el.innerHTML='<div class="empty">Aucun devis ce mois-ci.</div>';return}
   el.innerHTML=filtered.map(d=>{
     const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
