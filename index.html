@@ -6869,7 +6869,7 @@ async function loadBusiness(){
 
   // 3 totaux du mois sélectionné
   const totalFacturesMois=Math.round((factures||[]).reduce((s,f)=>s+calcTTC(f,f.devis?.devis_sections),0));
-  const totalDevisAcceptesMois=Math.round((devis||[]).filter(d=>d.statut==='Accepté').reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
+  const totalDevisAcceptesMois=Math.round((devis||[]).filter(d=>d.statut==='Accepté' && !(facturesAll||[]).some(f=>f.devis_id===d.id)).reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
   const totalAcomptesMois=Math.round((factures||[]).reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0));
 
   const statCard=(label,value,color='#1a1a18',bg='#fff',border='var(--border)')=>`
@@ -6946,23 +6946,22 @@ async function loadBusiness(){
           <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
         </tr></thead>
         <tbody>
-          ${!(devis||[]).filter(d=>d.statut==='Accepté').length?'<tr><td colspan="4" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis accepté ce mois-ci</td></tr>':(devis||[]).filter(d=>d.statut==='Accepté').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
+          ${(()=>{
+            const devisAcceptesNonFactures=(devis||[]).filter(d=>d.statut==='Accepté' && !(facturesAll||[]).some(f=>f.devis_id===d.id));
+            if(!devisAcceptesNonFactures.length) return '<tr><td colspan="4" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis accepté ce mois-ci</td></tr>';
+            return devisAcceptesNonFactures.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
             const ttc=calcTTC(d,d.devis_sections);
-            // Chercher la facture liée
-            const fac=(factures||[]).find(f=>f.devis_id===d.id);
-            const acompte=fac?Math.round(Number(fac.acompte1||0)+Number(fac.acompte2||0)):0;
-            const pct=ttc>0?Math.round(acompte/ttc*100):0;
             return`<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:10px 0">
                 <div style="font-weight:600">${d.clients?.nom||'—'}${d.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+d.projet_nom+'</span>':''}</div>
                 <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${d.reference}</div>
               </td>
               <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${ttc.toLocaleString('fr-FR')} MAD</td>
-              <td style="padding:10px 8px;text-align:right">
-                ${acompte>0?`<span style="color:#F59E0B;font-weight:600;font-family:'DM Mono',monospace">${acompte.toLocaleString('fr-FR')} MAD</span> <span style="color:var(--muted);font-size:10px">(${pct}%)</span>`:'<span style="color:var(--muted)">—</span>'}
-              </td>
+              <td style="padding:10px 8px;text-align:right"><span style="color:var(--muted)">—</span></td>
               <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printDevisById,'${d.id}')">📄 PDF</button></td>
             </tr>`;
+            }).join('');
+          })()}
           }).join('')}
         </tbody>
       </table>
