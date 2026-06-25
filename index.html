@@ -2545,8 +2545,8 @@ async function loadPaiements(){
     ${factures.map(f=>{
       const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
       const remise=Number(f.remise||0);
-      const htNet=ht*(1-remise/100);
-      const ttc=Math.round(htNet*1.2*100)/100;
+      const htNet=Math.round(ht*(1-remise/100));
+      const ttc=Math.round(htNet*1.2);
       const paiements=getPaiementsArr(f);
       return renderPaiementCard(f, ttc, paiements);
     }).join('')}
@@ -2709,8 +2709,8 @@ async function loadFactures(){
   el.innerHTML=filtered.map(f=>{
     const ht=(f.devis?.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
     const remise=Number(f.remise||0);
-    const htNet=ht*(1-remise/100);
-    const ttc=Math.round(htNet*1.2*100)/100;
+    const htNet=Math.round(ht*(1-remise/100));
+    const ttc=Math.round(htNet*1.2);
     const a1=Number(f.acompte1||0);
     const a2=Number(f.acompte2||0);
     const totalVerse=a1+a2;
@@ -6669,7 +6669,7 @@ async function loadBusinessObjectifs(){
 
   function calcTTCDevis(d){
     const ht=(d.devis_sections||[]).reduce((s,sec)=>s+(sec.devis_articles||[]).reduce((s2,a)=>s2+Number(a.quantite||0)*Number(a.prix_unitaire||0),0),0);
-    return Math.round(ht*(1-Number(d.remise||0)/100)*1.2*100)/100;
+    return Math.round(ht*(1-Number(d.remise||0)/100)*1.2);
   }
 
   function facturePourMois(mois,annee){
@@ -6867,19 +6867,6 @@ async function loadBusiness(){
     return Math.round(ht*(1-Number(item.remise||0)/100)*(sansTVA?1:1.2));
   }
 
-  // 4 métriques CA (filtrées sur le mois sélectionné)
-  const caDevisAttente=Math.round((devis||[]).filter(d=>d.statut==='En attente').reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
-  const caDevisAccepte=Math.round((devis||[]).filter(d=>d.statut==='Accepté').reduce((s,d)=>s+calcTTC(d,d.devis_sections),0));
-  const acomptesVerses=Math.round((factures||[]).reduce((s,f)=>s+Number(f.acompte1||0)+Number(f.acompte2||0),0));
-  const facturesSoldees=Math.round((factures||[]).filter(f=>f.statut==='Payée').reduce((s,f)=>s+calcTTC(f,f.devis?.devis_sections),0));
-
-  const statCard=(label,value,sub,color='#1a1a18',bg='#fff',border='var(--border)')=>`
-    <div style="background:${bg};border:1px solid ${border};border-radius:var(--radius);padding:24px 28px">
-      <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--muted);margin-bottom:10px;text-transform:uppercase">${label}</div>
-      <div style="font-size:28px;font-weight:700;color:${color};font-family:'DM Mono',monospace;letter-spacing:0.5px">${value}</div>
-      ${sub?`<div style="font-size:11px;color:var(--muted);margin-top:6px">${sub}</div>`:''}
-    </div>`;
-
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
       <div>
@@ -6896,16 +6883,8 @@ async function loadBusiness(){
       <button class="btn btn-sm" onclick="navDashboardMois(1)">→</button>
     </div>
 
-    <!-- 4 STATS CA -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
-      ${statCard('Devis en attente',caDevisAttente.toLocaleString('fr-FR')+' MAD','CA potentiel à confirmer','#6B7280')}
-      ${statCard('Devis acceptés',caDevisAccepte.toLocaleString('fr-FR')+' MAD','commandes confirmées','#3B82F6','#EFF6FF','#BFDBFE')}
-      ${statCard('Acomptes versés',acomptesVerses.toLocaleString('fr-FR')+' MAD','encaissements reçus','#F59E0B','#FFFBEB','#FDE68A')}
-      ${statCard('Factures validées',facturesSoldees.toLocaleString('fr-FR')+' MAD','entièrement payées','#10B981','#F0FDF4','#6EE7B7')}
-    </div>
-
     <!-- DÉTAIL FACTURES -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
       <div style="font-size:13px;font-weight:600;margin-bottom:16px">Factures — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
@@ -6938,33 +6917,8 @@ async function loadBusiness(){
       </table>
     </div>
 
-    <!-- DÉTAIL DEVIS EN ATTENTE -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis en attente — ${moisLabel}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="border-bottom:1px solid var(--border)">
-          <th style="padding:8px 0;text-align:left;color:var(--muted);font-weight:600">CLIENT / PROJET</th>
-          <th style="padding:8px;text-align:right;color:var(--muted);font-weight:600">MONTANT TTC</th>
-          <th style="padding:8px;text-align:center;color:var(--muted);font-weight:600"></th>
-        </tr></thead>
-        <tbody>
-          ${!(devis||[]).filter(d=>d.statut==='En attente').length?'<tr><td colspan="3" style="padding:20px 0;text-align:center;color:var(--muted)">Aucun devis en attente ce mois-ci</td></tr>':(devis||[]).filter(d=>d.statut==='En attente').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(d=>{
-            const ttc=calcTTC(d,d.devis_sections);
-            return`<tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:10px 0">
-                <div style="font-weight:600">${d.clients?.nom||'—'}${d.projet_nom?' <span style="font-weight:400;color:var(--muted)">— '+d.projet_nom+'</span>':''}</div>
-                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px">${d.reference}</div>
-              </td>
-              <td style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#6B7280">${ttc.toLocaleString('fr-FR')} MAD</td>
-              <td style="padding:10px 8px;text-align:center"><button class="btn btn-sm" onclick="previewDoc(printDevisById,'${d.id}')">📄 PDF</button></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-
     <!-- DÉTAIL DEVIS ACCEPTÉS -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px">
       <div style="font-size:13px;font-weight:600;margin-bottom:16px">Devis acceptés — ${moisLabel}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="border-bottom:1px solid var(--border)">
