@@ -245,19 +245,20 @@
     <nav>
       <button class="nav-item active" onclick="showPage('dashboard',this)">⊞ Tableau de bord</button>
       <button class="nav-item" onclick="showPage('clients',this)">◎ Clients</button>
+      <button class="nav-item" onclick="showPage('prospects',this)">◈ Prospects</button>
       <button class="nav-item" onclick="showPage('devis',this)">◧ Devis</button>
-      <button class="nav-item" onclick="showPage('commandes',this)" style="display:none">◫ Commandes</button>
-      <button class="nav-item" onclick="showPage('suivi',this)">◑ Suivi Projets</button>
-      <button class="nav-item" onclick="showPage('atelier',this)" style="display:none">⚙ Atelier</button>
       <button class="nav-item" onclick="showPage('factures',this)">◈ Factures</button>
+      <button class="nav-item" onclick="showPage('commandes',this)" style="display:none">◫ Commandes</button>
+      <button class="nav-item" onclick="showPage('atelier',this)" style="display:none">⚙ Atelier</button>
       <div style="height:1px;background:var(--border);margin:10px 4px"></div>
-      <button class="nav-item" onclick="openBusinessDashboard(this)" style="color:#8B5CF6">📊 Business</button>
+      <button class="nav-item" onclick="showPage('suivi',this)">◑ Suivi Projets</button>
+      <button class="nav-item" onclick="showPage('achats',this)">◎ Achats</button>
+      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
+      <button class="nav-item" onclick="showPage('rh',this)">◉ RH</button>
+      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
       <button class="nav-item" onclick="showPage('admin',this)" style="color:#0EA5E9">📋 Administration</button>
       <div style="height:1px;background:var(--border);margin:10px 4px"></div>
-      <button class="nav-item" onclick="showPage('prospects',this)">◈ Prospects</button>
-      <div style="height:1px;background:var(--border);margin:10px 4px"></div>
-      <button class="nav-item" onclick="showPage('achats',this)">◎ Achats</button>
-      <button class="nav-item" onclick="showPage('rh',this)">◉ RH</button>
+      <button class="nav-item" onclick="openBusinessDashboard(this)" style="color:#8B5CF6">📊 Business</button>
     </nav>
     <div class="sidebar-footer">
       <div class="user-email" id="user-email"></div>
@@ -355,7 +356,7 @@
       <!-- TICKET DETAIL -->
       <div id="page-ticket" class="hidden">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-          <button class="btn btn-sm" onclick="showPage('atelier',document.querySelector('.nav-item:nth-child(4)'))">← Atelier</button>
+          <button class="btn btn-sm" onclick="showPage('atelier',document.querySelector('.nav-item:nth-child(7)'))">← Atelier</button>
           <span id="ticket-ref" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)"></span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 340px;gap:20px">
@@ -1514,7 +1515,7 @@ function returnFromBuilder(){
     const btn=document.getElementById('ftab-proforma');
     if(btn) showFactureTab('proforma',btn);
   } else {
-    showPage('devis', document.querySelector('.nav-item:nth-child(5)'));
+    showPage('devis', document.querySelector('.nav-item:nth-child(4)'));
     if(currentDevisIsProforma){
       const btn=document.getElementById('dtab-proforma');
       if(btn) showDevisTab('proforma',btn);
