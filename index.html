@@ -3532,7 +3532,7 @@ async function loadPaie(){
           <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
           <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences}j</td>
           <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}×</td>
-          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
+          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR'):'—'}</td>
           <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${primesMontant>0?'var(--green)':primesMontant<0?'var(--red)':'var(--muted)'}">${primesMontant!==0?(primesMontant>0?'+':'')+primesMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
           <td style="font-family:'DM Mono',monospace;font-size:12px;color:${totalAvances>0?'var(--red)':'var(--muted)'}">${totalAvances>0?'-'+totalAvances.toLocaleString('fr-FR')+' MAD':'—'}</td>
