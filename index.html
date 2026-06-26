@@ -541,9 +541,9 @@
       <!-- ACHATS -->
       <div id="page-achats" class="hidden">
         <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px;flex-wrap:wrap">
-          <button class="rh-tab active" id="achat-tab-suivi" onclick="showAchatTab('suivi',this)">📋 Suivi mensuel</button>
-          <button class="rh-tab" id="achat-tab-bilan" onclick="showAchatTab('bilan',this)">📊 Bilan des dépenses</button>
-          <button class="rh-tab" id="achat-tab-fournisseurs" onclick="showAchatTab('fournisseurs',this)">🏭 Fournisseurs</button>
+          <button class="rh-tab" id="achat-tab-suivi" onclick="showAchatTab('suivi',this)" style="display:none">📋 Suivi mensuel</button>
+          <button class="rh-tab" id="achat-tab-bilan" onclick="showAchatTab('bilan',this)" style="display:none">📊 Bilan des dépenses</button>
+          <button class="rh-tab active" id="achat-tab-fournisseurs" onclick="showAchatTab('fournisseurs',this)">🏭 Fournisseurs</button>
         </div>
         <div id="achat-suivi"><div class="loading">Chargement…</div></div>
         <div id="achat-bilan" class="hidden"><div class="loading">Chargement…</div></div>
@@ -760,7 +760,7 @@ function loadPage(p){
   else if(p==='devis')loadDevisList();
   else if(p==='factures')loadFactures();
   else if(p==='prospects')loadProspects();
-  else if(p==='achats'){currentAchatTab='suivi';loadAchatsSuivi();}
+  else if(p==='achats'){currentAchatTab='fournisseurs';loadFournisseurs();}
   else if(p==='rh'){currentRhTab='salaries';loadRhSalaries();}
   else if(p==='suivi')loadSuivi();
   else if(p==='business')loadBusiness();
