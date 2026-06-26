@@ -3150,6 +3150,10 @@ async function loadPointage(){
   const{data:pts}=await sb.from('pointages').select('*')
     .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
     .lte('date',`${year}-${String(month+1).padStart(2,'0')}-${String(lastDay1).padStart(2,'0')}`);
+  // Charger les heures sup enregistrées dans la Paie pour ce même mois — c'est la Paie qui fait foi, pas le pointage
+  const{data:paieMois}=await sb.from('paie').select('salarie_id,heures_sup_montant').eq('mois',month+1).eq('annee',year);
+  const hSupParSalarie={};
+  (paieMois||[]).forEach(p=>{hSupParSalarie[p.salarie_id]=Number(p.heures_sup_montant||0);});
   const el=document.getElementById('rh-pointage');
   const daysInMonth=new Date(year,month+1,0).getDate();
   const ptMap={};
@@ -3171,23 +3175,23 @@ async function loadPointage(){
   }).join('');
 
   const buildRows=(sals)=>sals.map(s=>{
-    let absences=0; let hSup=0;
+    let absences=0;
+    const hSup=hSupParSalarie[s.id]||0;
     const cells=Array.from({length:daysInMonth},(_,i)=>{
       const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
       const d=new Date(year,month,i+1);
       const isWeekend=d.getDay()===0||d.getDay()===6;
       const pt=ptMap[s.id+'_'+dateStr];
       if(pt&&pt.statut==='Absent') absences++;
-      if(pt&&pt.heures_sup) hSup+=Number(pt.heures_sup);
       const icon=pt?statusIcon[pt.statut]||'?':'';
       const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':pt.statut==='Demi-J'?'#FFF7ED':pt.statut==='En mission extérieure'?'#F0FDF4':'#fff':'#fff';
-      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:13px;width:32px;min-width:32px;max-width:32px" onclick="openPointageDetail('${s.id}','${(s.prenom||"")+" "+s.nom}','${dateStr}')" title="${pt?(pt.statut+(pt.heure_arrivee?" · "+pt.heure_arrivee:"")+(pt.heures_sup>0?" · +"+pt.heures_sup+"h sup":"")):dateStr}">${icon}</td>`;
+      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:13px;width:32px;min-width:32px;max-width:32px" onclick="openPointageDetail('${s.id}','${(s.prenom||"")+" "+s.nom}','${dateStr}')" title="${pt?(pt.statut+(pt.heure_arrivee?" · "+pt.heure_arrivee:"")):dateStr}">${icon}</td>`;
     }).join('');
     return`<tr>
       <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;width:160px;min-width:160px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.prenom||''} ${s.nom}">${s.prenom||''} ${s.nom}</td>
       ${cells}
       <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences}</td>
-      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup:''}</td>
+      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup.toLocaleString('fr-FR'):''}</td>
     </tr>`;
   }).join('');
 
