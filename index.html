@@ -282,14 +282,6 @@
           <div id="dash-date" style="font-size:15px;font-weight:500;min-width:180px;text-align:center"></div>
           <button class="btn btn-sm" onclick="navDashDate(1)" id="btn-dash-next">→</button>
         </div>
-        <!-- Stats -->
-        <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
-          <div class="stat"><div class="stat-label">Clients</div><div class="stat-value" id="stat-clients">—</div><div class="stat-sub">actifs</div></div>
-          <div class="stat"><div class="stat-label">Commandes</div><div class="stat-value" id="stat-commandes">—</div><div class="stat-sub">en cours</div></div>
-          
-          <div class="stat"><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">—</div><div class="stat-sub">en attente</div></div>
-          
-        </div>
         <!-- Absences EN PREMIER -->
         <div style="margin-bottom:16px">
           <div class="section-title">Absences & congés aujourd'hui</div>
@@ -300,12 +292,9 @@
           <div class="section-title" style="display:flex;align-items:center;gap:8px">⚡ Missions tâches atelier <span style="font-size:11px;color:var(--muted);font-weight:400">— en cours</span></div>
           <div id="dash-missions" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
         </div>
-        <div class="two-col" style="margin-bottom:16px">
-          <div><div class="section-title">Dernières commandes</div><div class="table-wrap" id="dash-commandes"><div class="loading">Chargement…</div></div></div>
-          <div>
-            <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Tâches urgentes <span style="font-size:11px;color:var(--muted);font-weight:400">— Administration</span></div>
-            <div id="dash-admin-urgentes" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
-          </div>
+        <div style="margin-bottom:16px">
+          <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Tâches urgentes <span style="font-size:11px;color:var(--muted);font-weight:400">— Administration</span></div>
+          <div id="dash-admin-urgentes" class="table-wrap" style="padding:16px"><div class="loading">Chargement…</div></div>
         </div>
         <div style="margin-bottom:16px">
           <div class="section-title" style="display:flex;align-items:center;gap:8px">🔴 Projets bloqués <span style="font-size:11px;color:var(--muted);font-weight:400">— Suivi Projets</span></div>
@@ -811,16 +800,13 @@ async function loadDashboard(){
   if(btnNext) btnNext.style.opacity=cur>=today?'0.3':'1';
 
   const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const[r1,r2,r3,r5,r6,r7,r8]=await Promise.all([
-    sb.from('clients').select('*'),
-    sb.from('commandes').select('*,clients(nom)').order('created_at',{ascending:false}),
-    sb.from('devis').select('*').eq('statut','En attente').is('type',null),
+  const[r5,r6,r7,r8]=await Promise.all([
     sb.from('conges').select('*,salaries(nom,prenom)').lte('date_debut',todayStr).gte('date_fin',todayStr).eq('statut','Approuvé'),
     sb.from('pointages').select('*,salaries(nom,prenom)').eq('date',todayStr).or('statut.eq.Absent,statut.eq.Retard'),
     sb.from('projets_suivi').select('*').eq('statut','Bloqué').order('ordre',{ascending:true}),
     sb.from('missions').select('*,projets_suivi(nom)').neq('statut','Terminé').order('created_at',{ascending:false})
   ]);
-  const clients=r1.data, commandes=r2.data, devis=r3.data, congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[];
+  const congesAujourd=r5.data, pointagesAujourd=r6.data, bloques=r7.data||[], missionsEnCours=r8.data||[];
 
   // Admin urgentes — chargement séparé pour ne pas bloquer le reste
   let adminUrgentes=[];
@@ -828,9 +814,6 @@ async function loadDashboard(){
     const{data:au}=await sb.from('admin_taches').select('*').eq('priorite','Urgente').neq('statut','Terminé').order('date_echeance',{ascending:true});
     adminUrgentes=au||[];
   }catch(e){}
-  document.getElementById('stat-clients').textContent=(clients||[]).length;
-  document.getElementById('stat-commandes').textContent=(commandes||[]).filter(c=>c.statut!=='Livré').length;
-  document.getElementById('stat-devis').textContent=(devis||[]).length;
   // Congés & absences aujourd'hui
   const elConges=document.getElementById('dash-conges-today');
   const absToday=[
@@ -851,9 +834,6 @@ async function loadDashboard(){
   } else {
     elConges.innerHTML='<div style="padding:12px 0;font-size:13px;color:var(--muted)">&#9989; Toute l&#39;&#233;quipe est pr&#233;sente aujourd&#39;hui</div>';
   }
-
-  const recent=(commandes||[]).slice(0,5);
-  document.getElementById('dash-commandes').innerHTML=recent.length?`<table><thead><tr><th>Client</th><th>Description</th><th>Statut</th></tr></thead><tbody>${recent.map(c=>`<tr><td>${c.clients?.nom||'—'}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description||'—'}</td><td><span class="badge ${badgeClass(c.statut)}">${c.statut}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aucune commande</div>';
 
   // Missions en cours
   const elMissions=document.getElementById('dash-missions');
