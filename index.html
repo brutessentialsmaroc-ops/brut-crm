@@ -5509,7 +5509,8 @@ async function removeAchatBon(achatId){
 
 // ─── SUIVI PROJETS ────────────────────────────────────────────────────────────
 
-const SUIVI_GESTIONNAIRES = ['Nabil','Cherazade','Loubna'];
+const SUIVI_GESTIONNAIRES_TOUS = ['Nabil','Cherazade','Loubna']; // utilisé pour les listes déroulantes (gestionnaire/suppléant)
+const SUIVI_GESTIONNAIRES = ['Cherazade','Loubna']; // colonnes affichées dans le Kanban (Nabil masqué — vide la plupart du temps)
 const SUIVI_STATUTS = {
   'En cours':   {color:'#3B82F6', bg:'#EFF6FF', icon:'🔵'},
   'Bloqué':     {color:'#EF4444', bg:'#FEF2F2', icon:'🔴'},
@@ -5765,7 +5766,7 @@ async function openSuiviFiche(id){
         <div style="padding:14px 16px;border-top:1px solid var(--border);background:var(--bg)">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <select id="su-auteur" style="font-size:12px">
-              ${SUIVI_GESTIONNAIRES.map(g=>`<option>${g}</option>`).join('')}
+              ${SUIVI_GESTIONNAIRES_TOUS.map(g=>`<option>${g}</option>`).join('')}
             </select>
             <select id="su-type" style="font-size:12px">
               ${UPDATE_TYPES.map(t=>`<option>${t}</option>`).join('')}
@@ -6463,13 +6464,13 @@ async function openSuiviModal(id=null){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Gestionnaire *</label>
         <select id="sp-gestionnaire">
-          ${SUIVI_GESTIONNAIRES.map(g=>`<option ${data.gestionnaire===g?'selected':''}>${g}</option>`).join('')}
+          ${SUIVI_GESTIONNAIRES_TOUS.map(g=>`<option ${data.gestionnaire===g?'selected':''}>${g}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>Suppléant</label>
         <select id="sp-suppleant">
           <option value="">— Aucun —</option>
-          ${SUIVI_GESTIONNAIRES.map(g=>`<option ${data.suppleant===g?'selected':''}>${g}</option>`).join('')}
+          ${SUIVI_GESTIONNAIRES_TOUS.map(g=>`<option ${data.suppleant===g?'selected':''}>${g}</option>`).join('')}
         </select>
       </div>
     </div>
