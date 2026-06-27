@@ -484,6 +484,7 @@
           <button class="rh-tab active" id="suivi-tab-projets" onclick="showSuiviMainTab('projets',this)">◑ Projets</button>
           <button class="rh-tab" id="suivi-tab-missions" onclick="showSuiviMainTab('missions',this)">⚡ Suivi Missions Tâches Atelier</button>
           <button class="rh-tab" id="suivi-tab-fiches" onclick="showSuiviMainTab('fiches',this)">📋 Fiches Commande</button>
+          <button class="rh-tab" id="suivi-tab-livraison" onclick="showSuiviMainTab('livraison',this)">🚚 Livraison</button>
         </div>
         <!-- PROJETS -->
         <div id="suivi-tab-content-projets">
@@ -510,6 +511,17 @@
         <div id="suivi-tab-content-fiches" class="hidden">
           <div id="fiches-list"></div>
         </div>
+        <!-- LIVRAISON -->
+        <div id="suivi-tab-content-livraison" class="hidden">
+          <div id="livraison-main">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <button class="btn btn-sm" onclick="showPage('achats',document.querySelector('.nav-item[onclick*=\'achats\']'));setTimeout(()=>showAchatTab('transporteurs',document.getElementById('achat-tab-transporteurs')),200)" style="color:var(--muted)">🚛 Répertoire transporteurs</button>
+              <button class="btn btn-primary btn-sm" onclick="openLivraisonModal(null)">+ Nouvelle livraison</button>
+            </div>
+            <div id="livraison-kanban" style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px;overflow-x:auto"></div>
+          </div>
+          <div id="livraison-fiche" class="hidden"></div>
+        </div>
       </div>
       <!-- ADMIN -->
       <div id="page-admin" class="hidden">
@@ -534,10 +546,12 @@
           <button class="rh-tab" id="achat-tab-suivi" onclick="showAchatTab('suivi',this)" style="display:none">📋 Suivi mensuel</button>
           <button class="rh-tab" id="achat-tab-bilan" onclick="showAchatTab('bilan',this)" style="display:none">📊 Bilan des dépenses</button>
           <button class="rh-tab active" id="achat-tab-fournisseurs" onclick="showAchatTab('fournisseurs',this)">🏭 Fournisseurs</button>
+          <button class="rh-tab" id="achat-tab-transporteurs" onclick="showAchatTab('transporteurs',this)">🚛 Transporteurs</button>
         </div>
         <div id="achat-suivi" class="hidden"><div class="loading">Chargement…</div></div>
         <div id="achat-bilan" class="hidden"><div class="loading">Chargement…</div></div>
         <div id="achat-fournisseurs"><div class="loading">Chargement…</div></div>
+        <div id="achat-transporteurs" class="hidden"><div class="loading">Chargement…</div></div>
       </div>
       <!-- RH -->
       <div id="page-rh" class="hidden">
@@ -5057,8 +5071,10 @@ function showAchatTab(tab, el){
   document.getElementById('achat-suivi').classList.toggle('hidden', tab!=='suivi');
   document.getElementById('achat-bilan').classList.toggle('hidden', tab!=='bilan');
   document.getElementById('achat-fournisseurs').classList.toggle('hidden', tab!=='fournisseurs');
+  document.getElementById('achat-transporteurs').classList.toggle('hidden', tab!=='transporteurs');
   if(tab==='suivi') loadAchatsSuivi();
   else if(tab==='bilan') loadAchatsBilan();
+  else if(tab==='transporteurs') loadTransporteurs();
   else loadFournisseurs();
 }
 
@@ -5242,6 +5258,152 @@ async function deleteFournMouvement(id,fournisseurId){
   toast('Supprimé');
   loadFournisseurs();
 }
+
+// ─── TRANSPORTEURS ────────────────────────────────────────────────────────────
+async function loadTransporteurs(){
+  const el=document.getElementById('achat-transporteurs');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const{data:transporteurs,error}=await sb.from('transporteurs').select('*').order('created_at',{ascending:false});
+  if(error){el.innerHTML='<div class="empty">Table transporteurs manquante — exécutez le SQL transporteurs dans Supabase.</div>';return;}
+  const{data:livraisons}=await sb.from('livraisons').select('*,factures(clients(nom),projet_nom)').eq('mode','externe').order('date_estimee',{ascending:false});
+
+  const livByTransp={};
+  (livraisons||[]).forEach(l=>{
+    if(!l.transporteur_id) return;
+    if(!livByTransp[l.transporteur_id]) livByTransp[l.transporteur_id]=[];
+    livByTransp[l.transporteur_id].push(l);
+  });
+
+  el.innerHTML=`
+    <div style="margin-bottom:20px">
+      <button class="btn btn-primary btn-sm" onclick="openAddTransporteurModal()">+ Nouveau transporteur</button>
+    </div>
+    <div id="transp-list">
+      ${!transporteurs||!transporteurs.length?'<div class="empty">Aucun transporteur. Cliquez sur "+ Nouveau transporteur".</div>':
+      transporteurs.map(t=>{
+        const courses=livByTransp[t.id]||[];
+        const totalBrut=courses.filter(c=>c.paye_par==='brut').reduce((s,c)=>s+Number(c.prix_transport||0),0);
+        const totalClient=courses.filter(c=>c.paye_par==='client').reduce((s,c)=>s+Number(c.prix_transport||0),0);
+        const totalGeneral=courses.reduce((s,c)=>s+Number(c.prix_transport||0),0);
+        return `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg);cursor:pointer" onclick="toggleTransporteurCard('${t.id}',event)">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="transp-chevron-${t.id}" style="font-size:12px;color:var(--muted);transition:transform 0.15s;display:inline-block">▶</span>
+              <div>
+                <div style="font-weight:600;font-size:16px">${t.nom}</div>
+                ${t.telephone?`<div style="font-size:12px;color:var(--muted);margin-top:2px">📞 ${t.telephone}</div>`:''}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px" onclick="event.stopPropagation()">
+              <div style="text-align:right">
+                <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">TOTAL COURSES</div>
+                <div style="font-size:18px;font-weight:700">${totalGeneral.toLocaleString('fr-FR')} MAD</div>
+              </div>
+              <button class="btn btn-sm" onclick="editTransporteur('${t.id}')">Modifier</button>
+              <button onclick="deleteTransporteur('${t.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0 6px">×</button>
+            </div>
+          </div>
+          <div id="transp-detail-${t.id}" style="display:none;border-top:1px solid var(--border)">
+            <div style="display:flex;gap:20px;padding:10px 18px;background:var(--bg);font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">
+              <span>${courses.length} course(s)</span>
+              <span>Payé par Brut: <strong style="color:var(--text)">${totalBrut.toLocaleString('fr-FR')} MAD</strong></span>
+              <span>Payé par client: <strong style="color:var(--text)">${totalClient.toLocaleString('fr-FR')} MAD</strong></span>
+            </div>
+            <div style="padding:6px 0">
+              ${!courses.length?'<div style="padding:14px 18px;font-size:13px;color:var(--muted)">Aucune course enregistrée</div>':
+              courses.map(c=>{
+                const client=c.factures?.clients?.nom||c.client_nom||'—';
+                const projet=c.factures?.projet_nom||c.projet_nom||'';
+                return`
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openLivraisonFicheFromTransp('${c.id}')">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;min-width:80px">${c.date_estimee?new Date(c.date_estimee).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):'—'}</span>
+                    <span style="font-size:13px;font-weight:500">${client}</span>
+                    ${projet?`<span style="font-size:12px;color:var(--muted)">— ${projet}</span>`:''}
+                    <span class="badge ${c.paye_par==='client'?'badge-blue':'badge-gray'}">${c.paye_par==='client'?'Payé client':'Payé Brut'}</span>
+                  </div>
+                  <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${Number(c.prix_transport||0).toLocaleString('fr-FR')} MAD</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function toggleTransporteurCard(id, event){
+  if(event) event.stopPropagation();
+  const detail=document.getElementById('transp-detail-'+id);
+  const chevron=document.getElementById('transp-chevron-'+id);
+  if(!detail) return;
+  const isOpen=detail.style.display!=='none';
+  detail.style.display=isOpen?'none':'block';
+  if(chevron) chevron.style.transform=isOpen?'rotate(0deg)':'rotate(90deg)';
+}
+
+function openLivraisonFicheFromTransp(livraisonId){
+  showPage('suivi', document.querySelector('.nav-item[onclick*="suivi"]'));
+  setTimeout(()=>{
+    showSuiviMainTab('livraison', document.getElementById('suivi-tab-livraison'));
+    setTimeout(()=>openLivraisonFiche(livraisonId), 300);
+  }, 200);
+}
+
+function openAddTransporteurModal(){
+  const html=`<div class="modal" style="max-width:420px">
+    <div class="modal-title">Nouveau transporteur</div>
+    <div class="form-group"><label>Nom *</label><input id="transp-nom" placeholder="Ex: Mohamed Transporteur"></div>
+    <div class="form-group"><label>Téléphone</label><input id="transp-tel" placeholder="06..."></div>
+    <div class="form-group"><label>Notes (optionnel)</label><input id="transp-notes" placeholder="Zone desservie, véhicule..."></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTransporteur()">Créer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function editTransporteur(id){
+  const{data:t}=await sb.from('transporteurs').select('*').eq('id',id).single();
+  if(!t)return;
+  const html=`<div class="modal" style="max-width:420px">
+    <div class="modal-title">Modifier transporteur</div>
+    <input type="hidden" id="transp-id" value="${id}">
+    <div class="form-group"><label>Nom *</label><input id="transp-nom" value="${t.nom||''}"></div>
+    <div class="form-group"><label>Téléphone</label><input id="transp-tel" value="${t.telephone||''}"></div>
+    <div class="form-group"><label>Notes (optionnel)</label><input id="transp-notes" value="${t.notes||''}"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTransporteur()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveTransporteur(){
+  const id=document.getElementById('transp-id')?.value;
+  const nom=document.getElementById('transp-nom').value.trim();
+  if(!nom){toast('Nom requis');return;}
+  const telephone=document.getElementById('transp-tel').value.trim();
+  const notes=document.getElementById('transp-notes').value.trim();
+  let error;
+  if(id){({error}=await sb.from('transporteurs').update({nom,telephone,notes}).eq('id',id));}
+  else{({error}=await sb.from('transporteurs').insert({nom,telephone,notes}));}
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast('Transporteur enregistré ✓');
+  loadTransporteurs();
+}
+
+async function deleteTransporteur(id){
+  if(!confirm('Supprimer ce transporteur ?'))return;
+  await sb.from('transporteurs').delete().eq('id',id);
+  toast('Supprimé');
+  loadTransporteurs();
+}
+
 
 function navAchat(dir){
   currentAchatMois+=dir;
@@ -5515,13 +5677,334 @@ const SUIVI_STATUTS = {
 };
 const UPDATE_TYPES = ['💬 Info','✅ Avancement','🔴 Bloqué','📦 Livraison','📋 Action requise'];
 
+// ─── LIVRAISON ────────────────────────────────────────────────────────────────
+const LIVRAISON_ETAPES = [
+  {key:'preparation', label:'Préparation', icon:'📦'},
+  {key:'transporteur_choisi', label:'Transporteur choisi', icon:'🚛'},
+  {key:'check_marchandise', label:'Check marchandise', icon:'✅'},
+  {key:'relance_j1', label:'Relance J-1', icon:'📞'},
+  {key:'charge', label:'Chargé', icon:'📸'},
+  {key:'preuve_envoyee', label:'Preuve envoyée', icon:'📨'},
+  {key:'livre', label:'Livré', icon:'🏠'},
+];
+
+async function loadLivraisonKanban(){
+  document.getElementById('livraison-fiche').classList.add('hidden');
+  document.getElementById('livraison-main').classList.remove('hidden');
+  const{data:livraisons}=await sb.from('livraisons')
+    .select('*,factures(reference,clients(nom),projet_nom),transporteurs(nom,telephone)')
+    .order('ordre',{ascending:true});
+  const kanban=document.getElementById('livraison-kanban');
+  if(!kanban) return;
+  kanban.innerHTML=LIVRAISON_ETAPES.map(etape=>{
+    const mine=(livraisons||[]).filter(l=>l.etape===etape.key);
+    return`<div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border)">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase">${etape.icon} ${etape.label}</div>
+        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:10px;color:var(--muted)">${mine.length}</span>
+      </div>
+      <div class="livraison-col" data-etape="${etape.key}" style="display:flex;flex-direction:column;gap:8px;min-height:60px"
+        ondragover="livraisondragOver(event)" ondrop="livraisondrop(event,'${etape.key}')">
+        ${mine.map(l=>renderLivraisonCard(l)).join('')}
+        ${mine.length===0?`<div style="padding:14px;text-align:center;color:var(--muted);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius)">—</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLivraisonCard(l){
+  const client=l.factures?.clients?.nom||l.client_nom||'—';
+  const projet=l.factures?.projet_nom||l.projet_nom||'';
+  const mode=l.mode==='interne'?'🏠 Interne':(l.transporteurs?.nom||'🚛 Externe');
+  const retardJ1=l.date_j1&&new Date(l.date_j1)<new Date(new Date().setHours(0,0,0,0))&&l.etape!=='livre';
+  return`<div draggable="true" ondragstart="livraisondragStart(event,'${l.id}')"
+    onclick="openLivraisonFiche('${l.id}')"
+    style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;cursor:pointer;font-size:12px">
+    <div style="font-weight:600;font-size:12px;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${client}</div>
+    ${projet?`<div style="font-size:10px;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${projet}</div>`:''}
+    <div style="font-size:10px;color:var(--muted)">${mode}</div>
+    ${retardJ1?`<div style="font-size:9px;color:var(--red);font-weight:600;margin-top:4px">⚠️ Relance J-1 à faire</div>`:''}
+  </div>`;
+}
+
+let livraisonDragId=null;
+function livraisondragStart(e,id){livraisonDragId=id;}
+function livraisondragOver(e){e.preventDefault();}
+async function livraisondrop(e,etape){
+  e.preventDefault();
+  if(!livraisonDragId)return;
+  await sb.from('livraisons').update({etape}).eq('id',livraisonDragId);
+  livraisonDragId=null;
+  loadLivraisonKanban();
+}
+
+async function openLivraisonModal(id){
+  let data={};
+  if(id){
+    const{data:l}=await sb.from('livraisons').select('*').eq('id',id).single();
+    data=l||{};
+  }
+  const{data:transporteurs}=await sb.from('transporteurs').select('id,nom,telephone').order('nom');
+  const{data:factures}=await sb.from('factures').select('id,reference,clients(nom),projet_nom').order('created_at',{ascending:false}).limit(80);
+  const todayStr=new Date().toISOString().split('T')[0];
+  const html=`<div class="modal" style="max-width:560px">
+    <div class="modal-title">${id?'Modifier la livraison':'Nouvelle livraison'}</div>
+    <input type="hidden" id="lv-id" value="${id||''}">
+    <div class="form-group"><label>Lier à une facture (optionnel)</label>
+      <select id="lv-facture">
+        <option value="">— Aucune facture —</option>
+        ${(factures||[]).map(f=>`<option value="${f.id}" ${data.facture_id===f.id?'selected':''}>${f.reference||'—'} · ${f.clients?.nom||''}${f.projet_nom?' — '+f.projet_nom:''}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Client (si pas de facture liée)</label><input id="lv-client-nom" value="${data.client_nom||''}" placeholder="Nom du client"></div>
+      <div class="form-group"><label>Projet</label><input id="lv-projet-nom" value="${data.projet_nom||''}" placeholder="Ex: Villa Oujda"></div>
+    </div>
+    <div class="form-group"><label>Mode de livraison *</label>
+      <select id="lv-mode" onchange="toggleLvTransporteurFields()">
+        <option value="interne" ${data.mode==='interne'?'selected':''}>🏠 Interne (notre équipe)</option>
+        <option value="externe" ${data.mode==='externe'?'selected':''}>🚛 Transporteur externe</option>
+      </select>
+    </div>
+    <div id="lv-transporteur-fields" style="display:${data.mode==='externe'?'block':'none'}">
+      <div class="form-group"><label>Transporteur</label>
+        <div style="display:flex;gap:8px">
+          <select id="lv-transporteur" style="flex:1">
+            <option value="">— Sélectionnez —</option>
+            ${(transporteurs||[]).map(t=>`<option value="${t.id}" ${data.transporteur_id===t.id?'selected':''}>${t.nom}${t.telephone?' · '+t.telephone:''}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-sm" onclick="openAddTransporteurInline()">+</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label>Prix de la course (MAD)</label><input type="number" id="lv-prix" min="0" step="1" value="${data.prix_transport||''}" placeholder="Ex: 600"></div>
+        <div class="form-group"><label>Payé par</label>
+          <select id="lv-paye-par">
+            <option value="brut" ${data.paye_par==='brut'?'selected':''}>Brut</option>
+            <option value="client" ${data.paye_par==='client'?'selected':''}>Client</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Date relance J-1</label><input type="date" id="lv-date-j1" value="${data.date_j1||''}"></div>
+      <div class="form-group"><label>Date livraison estimée</label><input type="date" id="lv-date-estimee" value="${data.date_estimee||todayStr}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveLivraison()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+function toggleLvTransporteurFields(){
+  const mode=document.getElementById('lv-mode').value;
+  document.getElementById('lv-transporteur-fields').style.display=mode==='externe'?'block':'none';
+}
+
+function openAddTransporteurInline(){
+  const html=`<div class="modal" style="max-width:420px">
+    <div class="modal-title">Nouveau transporteur</div>
+    <div class="form-group"><label>Nom *</label><input id="tr-nom-inline" placeholder="Ex: Mohamed Transporteur"></div>
+    <div class="form-group"><label>Téléphone</label><input id="tr-tel-inline" placeholder="06..."></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="openLivraisonModal(document.getElementById('lv-id').value||null)">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTransporteurInline()">Créer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveTransporteurInline(){
+  const nom=document.getElementById('tr-nom-inline').value.trim();
+  if(!nom){toast('Nom requis');return;}
+  const telephone=document.getElementById('tr-tel-inline').value.trim();
+  const{error}=await sb.from('transporteurs').insert({nom,telephone});
+  if(error){toast('Erreur: '+error.message);return;}
+  toast('Transporteur créé ✓');
+  openLivraisonModal(document.getElementById('lv-id')?.value||null);
+}
+
+async function saveLivraison(){
+  const id=document.getElementById('lv-id').value;
+  const mode=document.getElementById('lv-mode').value;
+  const payload={
+    facture_id:document.getElementById('lv-facture').value||null,
+    client_nom:document.getElementById('lv-client-nom').value.trim()||null,
+    projet_nom:document.getElementById('lv-projet-nom').value.trim()||null,
+    mode,
+    transporteur_id:mode==='externe'?(document.getElementById('lv-transporteur').value||null):null,
+    prix_transport:mode==='externe'?Number(document.getElementById('lv-prix').value||0):0,
+    paye_par:mode==='externe'?document.getElementById('lv-paye-par').value:null,
+    date_j1:document.getElementById('lv-date-j1').value||null,
+    date_estimee:document.getElementById('lv-date-estimee').value||null,
+  };
+  let error;
+  if(id){({error}=await sb.from('livraisons').update(payload).eq('id',id));}
+  else{({error}=await sb.from('livraisons').insert({...payload,etape:'preparation'}));}
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast('Livraison enregistrée ✓');
+  loadLivraisonKanban();
+}
+
+async function deleteLivraison(id){
+  if(!confirm('Supprimer cette livraison ?'))return;
+  await sb.from('livraisons').delete().eq('id',id);
+  toast('Supprimé');
+  document.getElementById('livraison-fiche').classList.add('hidden');
+  document.getElementById('livraison-main').classList.remove('hidden');
+  loadLivraisonKanban();
+}
+
+async function openLivraisonFiche(id){
+  document.getElementById('livraison-main').classList.add('hidden');
+  const elFiche=document.getElementById('livraison-fiche');
+  elFiche.classList.remove('hidden');
+  elFiche.innerHTML='<div class="loading">Chargement…</div>';
+  const{data:l}=await sb.from('livraisons').select('*,factures(reference,clients(nom),projet_nom),transporteurs(nom,telephone)').eq('id',id).single();
+  if(!l){elFiche.innerHTML='<div class="empty">Livraison introuvable</div>';return;}
+  const client=l.factures?.clients?.nom||l.client_nom||'—';
+  const projet=l.factures?.projet_nom||l.projet_nom||'';
+  const etapeActuelle=LIVRAISON_ETAPES.find(e=>e.key===l.etape)||LIVRAISON_ETAPES[0];
+  const photos=l.photos_chargement||[];
+
+  elFiche.innerHTML=`
+    <button class="btn btn-sm" onclick="document.getElementById('livraison-fiche').classList.add('hidden');document.getElementById('livraison-main').classList.remove('hidden');loadLivraisonKanban()" style="margin-bottom:16px">← Retour</button>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div>
+          <div style="font-size:18px;font-weight:600">${client}</div>
+          ${projet?`<div style="font-size:13px;color:var(--muted);margin-top:2px">${projet}</div>`:''}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="openLivraisonModal('${l.id}')">Modifier</button>
+          <button class="btn btn-sm" onclick="printLivraisonRapport('${l.id}')">📄 Rapport PDF</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteLivraison('${l.id}')">Suppr.</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:16px">
+        <span>${l.mode==='interne'?'🏠 Livraison interne':'🚛 '+(l.transporteurs?.nom||'Transporteur externe')}</span>
+        ${l.transporteurs?.telephone?`<span>📞 ${l.transporteurs.telephone}</span>`:''}
+        ${l.prix_transport>0?`<span>💰 ${Number(l.prix_transport).toLocaleString('fr-FR')} MAD — payé par ${l.paye_par==='client'?'le client':'Brut'}</span>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        ${LIVRAISON_ETAPES.map(e=>`<button onclick="setLivraisonEtape('${l.id}','${e.key}')" class="btn btn-sm" style="${e.key===l.etape?'background:var(--text);color:#fff':''}">${e.icon} ${e.label}</button>`).join('')}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Suivi</div>
+        <div style="font-size:13px;margin-bottom:6px">📞 Relance transporteur J-1 : <strong>${l.date_j1?new Date(l.date_j1).toLocaleDateString('fr-FR'):'—'}</strong> ${l.relance_j1_faite?'<span style="color:var(--green)">✓ faite</span>':''}</div>
+        <div style="font-size:13px;margin-bottom:6px">🚚 Date livraison estimée : <strong>${l.date_estimee?new Date(l.date_estimee).toLocaleDateString('fr-FR'):'—'}</strong></div>
+        <div style="font-size:13px;margin-bottom:10px">📨 Preuve envoyée au client : ${l.preuve_envoyee?'<span style="color:var(--green)">✓ Oui</span>':'<span style="color:var(--muted)">Non</span>'}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${!l.relance_j1_faite?`<button class="btn btn-sm" onclick="markLivraisonFlag('${l.id}','relance_j1_faite')">✓ Marquer relance J-1 faite</button>`:''}
+          ${!l.preuve_envoyee?`<button class="btn btn-sm" onclick="markLivraisonFlag('${l.id}','preuve_envoyee')">✓ Marquer preuve envoyée</button>`:''}
+          ${!l.client_confirme?`<button class="btn btn-sm" onclick="markLivraisonFlag('${l.id}','client_confirme')">✓ Client a confirmé réception</button>`:`<span style="font-size:12px;color:var(--green)">✓ Client a confirmé réception</span>`}
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Check marchandise</div>
+        <textarea id="lv-note-check" rows="3" placeholder="Notes de vérification avant départ…" onblur="saveLivraisonNote('${l.id}','note_check',this.value)">${l.note_check||''}</textarea>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">📸 Photos de chargement</div>
+        <label class="btn btn-sm" style="cursor:pointer">+ Ajouter photo<input type="file" accept="image/*" multiple style="display:none" onchange="uploadLivraisonPhotos('${l.id}',this)"></label>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${photos.length?photos.map((url,i)=>`<div style="position:relative"><img src="${url}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')"><button onclick="removeLivraisonPhoto('${l.id}',${i})" style="position:absolute;top:-6px;right:-6px;background:#1a1a18;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted)">Aucune photo</div>'}
+      </div>
+    </div>`;
+}
+
+async function setLivraisonEtape(id,etape){
+  await sb.from('livraisons').update({etape}).eq('id',id);
+  openLivraisonFiche(id);
+}
+
+async function markLivraisonFlag(id,field){
+  await sb.from('livraisons').update({[field]:true}).eq('id',id);
+  openLivraisonFiche(id);
+}
+
+async function saveLivraisonNote(id,field,value){
+  await sb.from('livraisons').update({[field]:value}).eq('id',id);
+}
+
+async function uploadLivraisonPhotos(id,input){
+  const files=Array.from(input.files||[]);
+  if(!files.length)return;
+  toast('Envoi des photos…');
+  const{data:l}=await sb.from('livraisons').select('photos_chargement').eq('id',id).single();
+  const existing=l?.photos_chargement||[];
+  const newUrls=[];
+  for(const file of files){
+    const reader=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file);});
+    newUrls.push(reader);
+  }
+  await sb.from('livraisons').update({photos_chargement:[...existing,...newUrls]}).eq('id',id);
+  toast('Photos ajoutées ✓');
+  openLivraisonFiche(id);
+}
+
+async function removeLivraisonPhoto(id,index){
+  const{data:l}=await sb.from('livraisons').select('photos_chargement').eq('id',id).single();
+  const photos=(l?.photos_chargement||[]).filter((_,i)=>i!==index);
+  await sb.from('livraisons').update({photos_chargement:photos}).eq('id',id);
+  openLivraisonFiche(id);
+}
+
+async function printLivraisonRapport(id){
+  toast('Préparation du rapport…');
+  const{data:l}=await sb.from('livraisons').select('*,factures(reference,clients(nom,telephone),projet_nom),transporteurs(nom,telephone)').eq('id',id).single();
+  if(!l){toast('Livraison introuvable');return;}
+  const client=l.factures?.clients?.nom||l.client_nom||'—';
+  const tel=l.factures?.clients?.telephone||'';
+  const projet=l.factures?.projet_nom||l.projet_nom||'';
+  const photos=l.photos_chargement||[];
+  const etapeActuelle=LIVRAISON_ETAPES.find(e=>e.key===l.etape)||LIVRAISON_ETAPES[0];
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:16mm}</style>
+    <div style="border-bottom:2px solid #1a1a18;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:56px;height:56px">
+        <div><div style="font-size:11px;color:#888">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div></div>
+      </div>
+      <div style="text-align:right"><div style="font-size:16px;font-weight:600">RAPPORT DE LIVRAISON</div><div style="font-size:11px;color:#888">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:14px;background:#f8f6f1;border-radius:8px">
+      <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">CLIENT</div><div style="font-size:14px;font-weight:600">${client}</div>${tel?`<div style="font-size:12px;color:#888">${tel}</div>`:''}${projet?`<div style="font-size:12px;color:#888;margin-top:2px">${projet}</div>`:''}</div>
+      <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">STATUT</div><div style="font-size:13px;font-weight:600">${etapeActuelle.icon} ${etapeActuelle.label}</div></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px">
+      <tr><td style="padding:8px 0;color:#888;width:200px">Mode de livraison</td><td style="padding:8px 0;font-weight:500">${l.mode==='interne'?'Interne (équipe Brut)':'Transporteur externe — '+(l.transporteurs?.nom||'—')}</td></tr>
+      ${l.transporteurs?.telephone?`<tr><td style="padding:8px 0;color:#888">Téléphone transporteur</td><td style="padding:8px 0;font-weight:500">${l.transporteurs.telephone}</td></tr>`:''}
+      ${l.prix_transport>0?`<tr><td style="padding:8px 0;color:#888">Prix transport</td><td style="padding:8px 0;font-weight:500">${Number(l.prix_transport).toLocaleString('fr-FR')} MAD — payé par ${l.paye_par==='client'?'le client':'Brut'}</td></tr>`:''}
+      <tr><td style="padding:8px 0;color:#888">Relance J-1</td><td style="padding:8px 0;font-weight:500">${l.date_j1?new Date(l.date_j1).toLocaleDateString('fr-FR'):'—'} ${l.relance_j1_faite?'✓ faite':''}</td></tr>
+      <tr><td style="padding:8px 0;color:#888">Date livraison estimée</td><td style="padding:8px 0;font-weight:500">${l.date_estimee?new Date(l.date_estimee).toLocaleDateString('fr-FR'):'—'}</td></tr>
+      <tr><td style="padding:8px 0;color:#888">Preuve envoyée au client</td><td style="padding:8px 0;font-weight:500">${l.preuve_envoyee?'✓ Oui':'Non'}</td></tr>
+      <tr><td style="padding:8px 0;color:#888">Client a confirmé réception</td><td style="padding:8px 0;font-weight:500">${l.client_confirme?'✓ Oui':'Non'}</td></tr>
+    </table>
+    ${l.note_check?`<div style="margin-bottom:20px;padding:12px;background:#f8f6f1;border-radius:6px"><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">CHECK MARCHANDISE</div><div style="font-size:13px">${l.note_check}</div></div>`:''}
+    ${photos.length?`<div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">PHOTOS DE CHARGEMENT</div><div style="display:flex;gap:8px;flex-wrap:wrap">${photos.map(url=>`<img src="${url}" style="width:140px;height:140px;object-fit:cover;border-radius:6px;border:1px solid #e8e4dc">`).join('')}</div></div>`:''}
+    <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center">CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96</div>`;
+  finalizeDocOutput();
+}
+
 function showSuiviMainTab(tab, el){
-  ['projets','missions','fiches'].forEach(t=>{
+  ['projets','missions','fiches','livraison'].forEach(t=>{
     document.getElementById('suivi-tab-content-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('suivi-tab-'+t).classList.toggle('active', t===tab);
   });
   if(tab==='missions') loadMissions();
   else if(tab==='fiches') loadFichesCommande();
+  else if(tab==='livraison') loadLivraisonKanban();
   else loadSuiviKanban();
 }
 
