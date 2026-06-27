@@ -5089,12 +5089,15 @@ async function loadFournisseurs(){
         const solde=credits-depenses;
         return `
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg);border-bottom:1px solid var(--border)">
-            <div>
-              <div style="font-weight:600;font-size:16px">${f.nom}</div>
-              ${f.notes?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${f.notes}</div>`:''}
-            </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg);cursor:pointer" onclick="toggleFournisseurCard('${f.id}',event)">
             <div style="display:flex;align-items:center;gap:10px">
+              <span id="fourn-chevron-${f.id}" style="font-size:12px;color:var(--muted);transition:transform 0.15s;display:inline-block">▶</span>
+              <div>
+                <div style="font-weight:600;font-size:16px">${f.nom}</div>
+                ${f.notes?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${f.notes}</div>`:''}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px" onclick="event.stopPropagation()">
               <div style="text-align:right">
                 <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.5px">SOLDE RESTANT</div>
                 <div style="font-size:18px;font-weight:700;color:${solde>=0?'var(--green)':'var(--red)'}">${solde.toLocaleString('fr-FR')} MAD</div>
@@ -5104,28 +5107,40 @@ async function loadFournisseurs(){
               <button onclick="deleteFournisseur('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0 6px">×</button>
             </div>
           </div>
-          <div style="display:flex;gap:20px;padding:10px 18px;background:var(--bg);font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">
-            <span>Crédit total: <strong style="color:var(--text)">${credits.toLocaleString('fr-FR')} MAD</strong></span>
-            <span>Dépensé: <strong style="color:var(--text)">${depenses.toLocaleString('fr-FR')} MAD</strong></span>
-          </div>
-          <div style="padding:6px 0">
-            ${!movs.length?'<div style="padding:14px 18px;font-size:13px;color:var(--muted)">Aucun mouvement</div>':
-            movs.map(m=>`
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border)">
-                <div style="display:flex;align-items:center;gap:10px">
-                  <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;min-width:80px">${new Date(m.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
-                  <span class="badge ${m.type==='credit'?'badge-green':'badge-amber'}">${m.type==='credit'?'Crédit':'Dépense'}</span>
-                  <span style="font-size:13px">${m.description||'—'}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px">
-                  <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:${m.type==='credit'?'var(--green)':'var(--red)'}">${m.type==='credit'?'+':'-'}${Number(m.montant).toLocaleString('fr-FR')} MAD</span>
-                  <button onclick="deleteFournMouvement('${m.id}','${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px">×</button>
-                </div>
-              </div>`).join('')}
+          <div id="fourn-detail-${f.id}" style="display:none;border-top:1px solid var(--border)">
+            <div style="display:flex;gap:20px;padding:10px 18px;background:var(--bg);font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">
+              <span>Crédit total: <strong style="color:var(--text)">${credits.toLocaleString('fr-FR')} MAD</strong></span>
+              <span>Dépensé: <strong style="color:var(--text)">${depenses.toLocaleString('fr-FR')} MAD</strong></span>
+            </div>
+            <div style="padding:6px 0">
+              ${!movs.length?'<div style="padding:14px 18px;font-size:13px;color:var(--muted)">Aucun mouvement</div>':
+              movs.map(m=>`
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border)">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;min-width:80px">${new Date(m.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                    <span class="badge ${m.type==='credit'?'badge-green':'badge-amber'}">${m.type==='credit'?'Crédit':'Dépense'}</span>
+                    <span style="font-size:13px">${m.description||'—'}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:${m.type==='credit'?'var(--green)':'var(--red)'}">${m.type==='credit'?'+':'-'}${Number(m.montant).toLocaleString('fr-FR')} MAD</span>
+                    <button onclick="deleteFournMouvement('${m.id}','${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px">×</button>
+                  </div>
+                </div>`).join('')}
+            </div>
           </div>
         </div>`;
       }).join('')}
     </div>`;
+}
+
+function toggleFournisseurCard(id, event){
+  if(event) event.stopPropagation();
+  const detail=document.getElementById('fourn-detail-'+id);
+  const chevron=document.getElementById('fourn-chevron-'+id);
+  if(!detail) return;
+  const isOpen=detail.style.display!=='none';
+  detail.style.display=isOpen?'none':'block';
+  if(chevron) chevron.style.transform=isOpen?'rotate(0deg)':'rotate(90deg)';
 }
 
 function openAddFournisseurModal(){
