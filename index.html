@@ -518,7 +518,7 @@
               <button class="btn btn-sm" onclick="showPage('achats',document.querySelector('.nav-item[onclick*=\'achats\']'));setTimeout(()=>showAchatTab('transporteurs',document.getElementById('achat-tab-transporteurs')),200)" style="color:var(--muted)">🚛 Répertoire transporteurs</button>
               <button class="btn btn-primary btn-sm" onclick="openLivraisonModal(null)">+ Nouvelle livraison</button>
             </div>
-            <div id="livraison-kanban" style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px;overflow-x:auto"></div>
+            <div id="livraison-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
           </div>
           <div id="livraison-fiche" class="hidden"></div>
         </div>
@@ -5678,14 +5678,17 @@ const SUIVI_STATUTS = {
 const UPDATE_TYPES = ['💬 Info','✅ Avancement','🔴 Bloqué','📦 Livraison','📋 Action requise'];
 
 // ─── LIVRAISON ────────────────────────────────────────────────────────────────
+const LIVRAISON_STATUTS = {
+  'À faire':   {color:'#6B7280', bg:'#F3F4F6', icon:'⚪'},
+  'En cours':  {color:'#3B82F6', bg:'#EFF6FF', icon:'🔵'},
+  'Terminé':   {color:'#10B981', bg:'#F0FDF4', icon:'✅'},
+};
 const LIVRAISON_ETAPES = [
-  {key:'preparation', label:'Préparation', icon:'📦'},
-  {key:'transporteur_choisi', label:'Transporteur choisi', icon:'🚛'},
-  {key:'check_marchandise', label:'Check marchandise', icon:'✅'},
-  {key:'relance_j1', label:'Relance J-1', icon:'📞'},
-  {key:'charge', label:'Chargé', icon:'📸'},
-  {key:'preuve_envoyee', label:'Preuve envoyée', icon:'📨'},
-  {key:'livre', label:'Livré', icon:'🏠'},
+  {key:'check_marchandise', label:'Check marchandise avant départ'},
+  {key:'relance_j1', label:'Relance transporteur J-1'},
+  {key:'charge', label:'Chargement (photos prises)'},
+  {key:'preuve_envoyee', label:'Preuve de chargement envoyée au client'},
+  {key:'client_confirme', label:'Client a confirmé la réception'},
 ];
 
 async function loadLivraisonKanban(){
@@ -5693,20 +5696,21 @@ async function loadLivraisonKanban(){
   document.getElementById('livraison-main').classList.remove('hidden');
   const{data:livraisons}=await sb.from('livraisons')
     .select('*,factures(reference,clients(nom),projet_nom),transporteurs(nom,telephone)')
-    .order('ordre',{ascending:true});
+    .order('created_at',{ascending:false});
   const kanban=document.getElementById('livraison-kanban');
   if(!kanban) return;
-  kanban.innerHTML=LIVRAISON_ETAPES.map(etape=>{
-    const mine=(livraisons||[]).filter(l=>l.etape===etape.key);
+  kanban.innerHTML=Object.keys(LIVRAISON_STATUTS).map(statut=>{
+    const mine=(livraisons||[]).filter(l=>(l.statut||'À faire')===statut);
+    const st=LIVRAISON_STATUTS[statut];
     return`<div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border)">
-        <div style="font-size:11px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase">${etape.icon} ${etape.label}</div>
-        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:10px;color:var(--muted)">${mine.length}</span>
+        <div style="font-size:13px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase">${st.icon} ${statut}</div>
+        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--muted)">${mine.length}</span>
       </div>
-      <div class="livraison-col" data-etape="${etape.key}" style="display:flex;flex-direction:column;gap:8px;min-height:60px"
-        ondragover="livraisondragOver(event)" ondrop="livraisondrop(event,'${etape.key}')">
+      <div class="livraison-col" data-statut="${statut}" style="display:flex;flex-direction:column;gap:10px;min-height:60px"
+        ondragover="livraisondragOver(event)" ondrop="livraisondrop(event,'${statut}')">
         ${mine.map(l=>renderLivraisonCard(l)).join('')}
-        ${mine.length===0?`<div style="padding:14px;text-align:center;color:var(--muted);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius)">—</div>`:''}
+        ${mine.length===0?`<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Aucune livraison</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -5715,25 +5719,25 @@ async function loadLivraisonKanban(){
 function renderLivraisonCard(l){
   const client=l.factures?.clients?.nom||l.client_nom||'—';
   const projet=l.factures?.projet_nom||l.projet_nom||'';
-  const mode=l.mode==='interne'?'🏠 Interne':(l.transporteurs?.nom||'🚛 Externe');
-  const retardJ1=l.date_j1&&new Date(l.date_j1)<new Date(new Date().setHours(0,0,0,0))&&l.etape!=='livre';
+  const mode=l.mode==='interne'?'🏠 Interne':'🚛 '+(l.transporteurs?.nom||'Externe');
+  const retardJ1=l.date_j1&&new Date(l.date_j1)<new Date(new Date().setHours(0,0,0,0))&&!l.relance_j1_faite;
   return`<div draggable="true" ondragstart="livraisondragStart(event,'${l.id}')"
     onclick="openLivraisonFiche('${l.id}')"
-    style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;cursor:pointer;font-size:12px">
-    <div style="font-weight:600;font-size:12px;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${client}</div>
-    ${projet?`<div style="font-size:10px;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${projet}</div>`:''}
-    <div style="font-size:10px;color:var(--muted)">${mode}</div>
-    ${retardJ1?`<div style="font-size:9px;color:var(--red);font-weight:600;margin-top:4px">⚠️ Relance J-1 à faire</div>`:''}
+    style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer">
+    <div style="font-weight:600;font-size:13px;margin-bottom:3px">${client}</div>
+    ${projet?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">${projet}</div>`:''}
+    <div style="font-size:11px;color:var(--muted)">${mode}</div>
+    ${retardJ1?`<div style="font-size:10px;color:var(--red);font-weight:600;margin-top:6px">⚠️ Relance J-1 à faire</div>`:''}
   </div>`;
 }
 
 let livraisonDragId=null;
 function livraisondragStart(e,id){livraisonDragId=id;}
 function livraisondragOver(e){e.preventDefault();}
-async function livraisondrop(e,etape){
+async function livraisondrop(e,statut){
   e.preventDefault();
   if(!livraisonDragId)return;
-  await sb.from('livraisons').update({etape}).eq('id',livraisonDragId);
+  await sb.from('livraisons').update({statut}).eq('id',livraisonDragId);
   livraisonDragId=null;
   loadLivraisonKanban();
 }
@@ -5842,7 +5846,7 @@ async function saveLivraison(){
   };
   let error;
   if(id){({error}=await sb.from('livraisons').update(payload).eq('id',id));}
-  else{({error}=await sb.from('livraisons').insert({...payload,etape:'preparation'}));}
+  else{({error}=await sb.from('livraisons').insert({...payload,statut:'À faire'}));}
   if(error){toast('Erreur: '+error.message);return;}
   closeModal('rh-modal');
   toast('Livraison enregistrée ✓');
@@ -5865,71 +5869,132 @@ async function openLivraisonFiche(id){
   elFiche.innerHTML='<div class="loading">Chargement…</div>';
   const{data:l}=await sb.from('livraisons').select('*,factures(reference,clients(nom),projet_nom),transporteurs(nom,telephone)').eq('id',id).single();
   if(!l){elFiche.innerHTML='<div class="empty">Livraison introuvable</div>';return;}
+  const{data:updates}=await sb.from('livraison_updates').select('*').eq('livraison_id',id).order('created_at',{ascending:false});
   const client=l.factures?.clients?.nom||l.client_nom||'—';
   const projet=l.factures?.projet_nom||l.projet_nom||'';
-  const etapeActuelle=LIVRAISON_ETAPES.find(e=>e.key===l.etape)||LIVRAISON_ETAPES[0];
+  const st=LIVRAISON_STATUTS[l.statut||'À faire'];
   const photos=l.photos_chargement||[];
+  const etapesDates=l.etapes_dates||{};
 
   elFiche.innerHTML=`
     <button class="btn btn-sm" onclick="document.getElementById('livraison-fiche').classList.add('hidden');document.getElementById('livraison-main').classList.remove('hidden');loadLivraisonKanban()" style="margin-bottom:16px">← Retour</button>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div>
           <div style="font-size:18px;font-weight:600">${client}</div>
           ${projet?`<div style="font-size:13px;color:var(--muted);margin-top:2px">${projet}</div>`:''}
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="position:relative" onclick="event.stopPropagation()">
+            <span id="lv-statut-badge" onclick="toggleLvStatutMenu()"
+              style="background:${st.bg};color:${st.color};padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${st.color}33">
+              ${st.icon} ${l.statut||'À faire'} ▾
+            </span>
+            <div id="lv-statut-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:140px">
+              ${Object.entries(LIVRAISON_STATUTS).map(([key,s])=>`<div onclick="updateLivraisonStatut('${l.id}','${key}')"
+                style="padding:7px 14px;font-size:12px;cursor:pointer;color:${s.color};display:flex;align-items:center;gap:6px"
+                onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">${s.icon} ${key}</div>`).join('')}
+            </div>
+          </div>
           <button class="btn btn-sm" onclick="openLivraisonModal('${l.id}')">Modifier</button>
           <button class="btn btn-sm" onclick="printLivraisonRapport('${l.id}')">📄 Rapport PDF</button>
           <button class="btn btn-sm btn-danger" onclick="deleteLivraison('${l.id}')">Suppr.</button>
         </div>
       </div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:16px">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--muted)">
         <span>${l.mode==='interne'?'🏠 Livraison interne':'🚛 '+(l.transporteurs?.nom||'Transporteur externe')}</span>
         ${l.transporteurs?.telephone?`<span>📞 ${l.transporteurs.telephone}</span>`:''}
         ${l.prix_transport>0?`<span>💰 ${Number(l.prix_transport).toLocaleString('fr-FR')} MAD — payé par ${l.paye_par==='client'?'le client':'Brut'}</span>`:''}
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-        ${LIVRAISON_ETAPES.map(e=>`<button onclick="setLivraisonEtape('${l.id}','${e.key}')" class="btn btn-sm" style="${e.key===l.etape?'background:var(--text);color:#fff':''}">${e.icon} ${e.label}</button>`).join('')}
+        ${l.date_estimee?`<span>🚚 Estimée : ${new Date(l.date_estimee).toLocaleDateString('fr-FR')}</span>`:''}
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Suivi</div>
-        <div style="font-size:13px;margin-bottom:6px">📞 Relance transporteur J-1 : <strong>${l.date_j1?new Date(l.date_j1).toLocaleDateString('fr-FR'):'—'}</strong> ${l.relance_j1_faite?'<span style="color:var(--green)">✓ faite</span>':''}</div>
-        <div style="font-size:13px;margin-bottom:6px">🚚 Date livraison estimée : <strong>${l.date_estimee?new Date(l.date_estimee).toLocaleDateString('fr-FR'):'—'}</strong></div>
-        <div style="font-size:13px;margin-bottom:10px">📨 Preuve envoyée au client : ${l.preuve_envoyee?'<span style="color:var(--green)">✓ Oui</span>':'<span style="color:var(--muted)">Non</span>'}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${!l.relance_j1_faite?`<button class="btn btn-sm" onclick="markLivraisonFlag('${l.id}','relance_j1_faite')">✓ Marquer relance J-1 faite</button>`:''}
-          ${!l.preuve_envoyee?`<button class="btn btn-sm" onclick="markLivraisonFlag('${l.id}','preuve_envoyee')">✓ Marquer preuve envoyée</button>`:''}
-          ${!l.client_confirme?`<button class="btn btn-sm" onclick="markLivraisonFlag('${l.id}','client_confirme')">✓ Client a confirmé réception</button>`:`<span style="font-size:12px;color:var(--green)">✓ Client a confirmé réception</span>`}
-        </div>
+    <!-- ONGLETS -->
+    <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0">
+      <button class="rh-tab active" id="lvtab-etapes" onclick="showLvTab('etapes',this)" style="font-size:13px">☑️ Étapes</button>
+      <button class="rh-tab" id="lvtab-photos" onclick="showLvTab('photos',this)" style="font-size:13px">📸 Photos (${photos.length})</button>
+      <button class="rh-tab" id="lvtab-commentaires" onclick="showLvTab('commentaires',this)" style="font-size:13px">💬 Commentaires (${updates?.length||0})</button>
+    </div>
+
+    <!-- ÉTAPES -->
+    <div id="lvtab-content-etapes">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        ${LIVRAISON_ETAPES.map((e,i)=>{
+          const done=!!etapesDates[e.key];
+          return`<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;${i<LIVRAISON_ETAPES.length-1?'border-bottom:1px solid var(--border)':''}">
+            <input type="checkbox" ${done?'checked':''} onchange="toggleLivraisonEtape('${l.id}','${e.key}',this.checked)" style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
+            <div style="flex:1">
+              <div style="font-size:13px;${done?'color:var(--muted);text-decoration:line-through':''}">${e.label}</div>
+            </div>
+            ${done?`<div style="font-size:11px;color:var(--green);font-family:'DM Mono',monospace;white-space:nowrap">✓ ${new Date(etapesDates[e.key]).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</div>`:''}
+          </div>`;
+        }).join('')}
       </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Check marchandise</div>
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Notes check marchandise</div>
         <textarea id="lv-note-check" rows="3" placeholder="Notes de vérification avant départ…" onblur="saveLivraisonNote('${l.id}','note_check',this.value)">${l.note_check||''}</textarea>
       </div>
     </div>
 
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">📸 Photos de chargement</div>
-        <label class="btn btn-sm" style="cursor:pointer">+ Ajouter photo<input type="file" accept="image/*" multiple style="display:none" onchange="uploadLivraisonPhotos('${l.id}',this)"></label>
+    <!-- PHOTOS -->
+    <div id="lvtab-content-photos" class="hidden">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Photos de chargement</div>
+          <label class="btn btn-sm" style="cursor:pointer">+ Ajouter photo<input type="file" accept="image/*" multiple style="display:none" onchange="uploadLivraisonPhotos('${l.id}',this)"></label>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${photos.length?photos.map((url,i)=>`<div style="position:relative"><img src="${url}" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')"><button onclick="removeLivraisonPhoto('${l.id}',${i})" style="position:absolute;top:-6px;right:-6px;background:#1a1a18;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted)">Aucune photo</div>'}
+        </div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${photos.length?photos.map((url,i)=>`<div style="position:relative"><img src="${url}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')"><button onclick="removeLivraisonPhoto('${l.id}',${i})" style="position:absolute;top:-6px;right:-6px;background:#1a1a18;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">×</button></div>`).join(''):'<div style="font-size:12px;color:var(--muted)">Aucune photo</div>'}
+    </div>
+
+    <!-- COMMENTAIRES -->
+    <div id="lvtab-content-commentaires" class="hidden">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <select id="lv-auteur" style="font-size:12px">
+            <option>Nabil</option><option>Cherazade</option><option>Loubna</option>
+          </select>
+          <select id="lv-update-type" style="font-size:12px">
+            <option value="Info">💬 Info</option>
+            <option value="Bloqué">🔴 Bloqué</option>
+            <option value="Avancement">✅ Avancement</option>
+          </select>
+        </div>
+        <textarea id="lv-update-texte" rows="2" placeholder="Ajouter un commentaire…" style="margin-bottom:8px"></textarea>
+        <button class="btn btn-primary btn-sm" onclick="addLivraisonUpdate('${l.id}')">Publier</button>
+      </div>
+      <div id="livraison-updates-list">
+        ${!updates||!updates.length?'<div style="font-size:13px;color:var(--muted);padding:10px 0">Aucun commentaire</div>':
+        updates.map(u=>renderLivraisonUpdate(u)).join('')}
       </div>
     </div>`;
 }
 
-async function setLivraisonEtape(id,etape){
-  await sb.from('livraisons').update({etape}).eq('id',id);
+function showLvTab(tab, el){
+  ['etapes','photos','commentaires'].forEach(t=>{
+    document.getElementById('lvtab-content-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('lvtab-'+t).classList.toggle('active', t===tab);
+  });
+}
+
+function toggleLvStatutMenu(){
+  const menu=document.getElementById('lv-statut-menu');
+  menu.style.display=menu.style.display==='none'?'block':'none';
+}
+
+async function updateLivraisonStatut(id,statut){
+  await sb.from('livraisons').update({statut}).eq('id',id);
   openLivraisonFiche(id);
 }
 
-async function markLivraisonFlag(id,field){
-  await sb.from('livraisons').update({[field]:true}).eq('id',id);
+async function toggleLivraisonEtape(id,etapeKey,checked){
+  const{data:l}=await sb.from('livraisons').select('etapes_dates').eq('id',id).single();
+  const etapesDates={...(l?.etapes_dates||{})};
+  if(checked) etapesDates[etapeKey]=new Date().toISOString();
+  else delete etapesDates[etapeKey];
+  await sb.from('livraisons').update({etapes_dates:etapesDates}).eq('id',id);
   openLivraisonFiche(id);
 }
 
@@ -5960,15 +6025,39 @@ async function removeLivraisonPhoto(id,index){
   openLivraisonFiche(id);
 }
 
+function renderLivraisonUpdate(u){
+  const typeColors={'Info':{c:'#6366F1',bg:'#EEF2FF',icon:'💬'},'Bloqué':{c:'#EF4444',bg:'#FEF2F2',icon:'🔴'},'Avancement':{c:'#10B981',bg:'#F0FDF4',icon:'✅'}};
+  const tc=typeColors[u.type]||typeColors['Info'];
+  return`<div style="padding:10px 14px;border-left:3px solid ${tc.c};background:${tc.bg};border-radius:4px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:11px;font-weight:600;color:${tc.c}">${tc.icon} ${u.type} · ${u.auteur}</span>
+      <span style="font-size:10px;color:var(--muted)">${new Date(u.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
+    </div>
+    <div style="font-size:13px;color:#333">${u.texte}</div>
+  </div>`;
+}
+
+async function addLivraisonUpdate(livraisonId){
+  const texte=document.getElementById('lv-update-texte').value.trim();
+  if(!texte){toast('Écrivez votre commentaire');return;}
+  const auteur=document.getElementById('lv-auteur').value;
+  const type=document.getElementById('lv-update-type').value;
+  const{error}=await sb.from('livraison_updates').insert({livraison_id:livraisonId,auteur,type,texte});
+  if(error){toast('Erreur: '+error.message);return;}
+  toast('Commentaire ajouté ✓');
+  openLivraisonFiche(livraisonId);
+}
+
 async function printLivraisonRapport(id){
   toast('Préparation du rapport…');
   const{data:l}=await sb.from('livraisons').select('*,factures(reference,clients(nom,telephone),projet_nom),transporteurs(nom,telephone)').eq('id',id).single();
   if(!l){toast('Livraison introuvable');return;}
+  const{data:updates}=await sb.from('livraison_updates').select('*').eq('livraison_id',id).order('created_at',{ascending:true});
   const client=l.factures?.clients?.nom||l.client_nom||'—';
   const tel=l.factures?.clients?.telephone||'';
   const projet=l.factures?.projet_nom||l.projet_nom||'';
   const photos=l.photos_chargement||[];
-  const etapeActuelle=LIVRAISON_ETAPES.find(e=>e.key===l.etape)||LIVRAISON_ETAPES[0];
+  const etapesDates=l.etapes_dates||{};
   document.getElementById('pdf-preview').innerHTML=`
     <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:16mm}</style>
     <div style="border-bottom:2px solid #1a1a18;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
@@ -5980,19 +6069,23 @@ async function printLivraisonRapport(id){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:14px;background:#f8f6f1;border-radius:8px">
       <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">CLIENT</div><div style="font-size:14px;font-weight:600">${client}</div>${tel?`<div style="font-size:12px;color:#888">${tel}</div>`:''}${projet?`<div style="font-size:12px;color:#888;margin-top:2px">${projet}</div>`:''}</div>
-      <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">STATUT</div><div style="font-size:13px;font-weight:600">${etapeActuelle.icon} ${etapeActuelle.label}</div></div>
+      <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">STATUT</div><div style="font-size:13px;font-weight:600">${l.statut||'À faire'}</div></div>
     </div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px">
-      <tr><td style="padding:8px 0;color:#888;width:200px">Mode de livraison</td><td style="padding:8px 0;font-weight:500">${l.mode==='interne'?'Interne (équipe Brut)':'Transporteur externe — '+(l.transporteurs?.nom||'—')}</td></tr>
+      <tr><td style="padding:8px 0;color:#888;width:220px">Mode de livraison</td><td style="padding:8px 0;font-weight:500">${l.mode==='interne'?'Interne (équipe Brut)':'Transporteur externe — '+(l.transporteurs?.nom||'—')}</td></tr>
       ${l.transporteurs?.telephone?`<tr><td style="padding:8px 0;color:#888">Téléphone transporteur</td><td style="padding:8px 0;font-weight:500">${l.transporteurs.telephone}</td></tr>`:''}
       ${l.prix_transport>0?`<tr><td style="padding:8px 0;color:#888">Prix transport</td><td style="padding:8px 0;font-weight:500">${Number(l.prix_transport).toLocaleString('fr-FR')} MAD — payé par ${l.paye_par==='client'?'le client':'Brut'}</td></tr>`:''}
-      <tr><td style="padding:8px 0;color:#888">Relance J-1</td><td style="padding:8px 0;font-weight:500">${l.date_j1?new Date(l.date_j1).toLocaleDateString('fr-FR'):'—'} ${l.relance_j1_faite?'✓ faite':''}</td></tr>
       <tr><td style="padding:8px 0;color:#888">Date livraison estimée</td><td style="padding:8px 0;font-weight:500">${l.date_estimee?new Date(l.date_estimee).toLocaleDateString('fr-FR'):'—'}</td></tr>
-      <tr><td style="padding:8px 0;color:#888">Preuve envoyée au client</td><td style="padding:8px 0;font-weight:500">${l.preuve_envoyee?'✓ Oui':'Non'}</td></tr>
-      <tr><td style="padding:8px 0;color:#888">Client a confirmé réception</td><td style="padding:8px 0;font-weight:500">${l.client_confirme?'✓ Oui':'Non'}</td></tr>
     </table>
+    <div style="margin-bottom:20px">
+      <div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">ÉTAPES</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        ${LIVRAISON_ETAPES.map(e=>`<tr><td style="padding:6px 0;border-bottom:1px solid #f0ece4">${etapesDates[e.key]?'✓':'☐'} ${e.label}</td><td style="padding:6px 0;border-bottom:1px solid #f0ece4;text-align:right;color:#888">${etapesDates[e.key]?new Date(etapesDates[e.key]).toLocaleDateString('fr-FR'):'—'}</td></tr>`).join('')}
+      </table>
+    </div>
     ${l.note_check?`<div style="margin-bottom:20px;padding:12px;background:#f8f6f1;border-radius:6px"><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">CHECK MARCHANDISE</div><div style="font-size:13px">${l.note_check}</div></div>`:''}
-    ${photos.length?`<div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">PHOTOS DE CHARGEMENT</div><div style="display:flex;gap:8px;flex-wrap:wrap">${photos.map(url=>`<img src="${url}" style="width:140px;height:140px;object-fit:cover;border-radius:6px;border:1px solid #e8e4dc">`).join('')}</div></div>`:''}
+    ${photos.length?`<div style="margin-bottom:20px"><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">PHOTOS DE CHARGEMENT</div><div style="display:flex;gap:8px;flex-wrap:wrap">${photos.map(url=>`<img src="${url}" style="width:140px;height:140px;object-fit:cover;border-radius:6px;border:1px solid #e8e4dc">`).join('')}</div></div>`:''}
+    ${(updates&&updates.length)?`<div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">COMMENTAIRES</div>${updates.map(u=>`<div style="margin-bottom:8px;font-size:12px"><strong>${u.auteur}</strong> · ${u.type} · ${new Date(u.created_at).toLocaleDateString('fr-FR')}<br>${u.texte}</div>`).join('')}</div>`:''}
     <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center">CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96</div>`;
   finalizeDocOutput();
 }
