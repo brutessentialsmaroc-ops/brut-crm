@@ -485,6 +485,7 @@
           <button class="rh-tab" id="suivi-tab-missions" onclick="showSuiviMainTab('missions',this)">⚡ Suivi Missions Tâches Atelier</button>
           <button class="rh-tab" id="suivi-tab-fiches" onclick="showSuiviMainTab('fiches',this)">📋 Fiches Commande</button>
           <button class="rh-tab" id="suivi-tab-livraison" onclick="showSuiviMainTab('livraison',this)">🚚 Livraison</button>
+          <button class="rh-tab" id="suivi-tab-planif" onclick="showSuiviMainTab('planif',this)">🗓️ Planification</button>
         </div>
         <!-- PROJETS -->
         <div id="suivi-tab-content-projets">
@@ -521,6 +522,14 @@
             <div id="livraison-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
           </div>
           <div id="livraison-fiche" class="hidden"></div>
+        </div>
+        <!-- PLANIFICATION -->
+        <div id="suivi-tab-content-planif" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <button class="btn btn-sm" onclick="printPlanification()">🖨 Imprimer le rapport</button>
+            <button class="btn btn-primary btn-sm" onclick="openPlanifModal(null)">+ Nouvelle ligne</button>
+          </div>
+          <div id="planif-list"></div>
         </div>
       </div>
       <!-- ADMIN -->
@@ -6090,14 +6099,121 @@ async function printLivraisonRapport(id){
   finalizeDocOutput();
 }
 
+// ─── PLANIFICATION ────────────────────────────────────────────────────────────
+async function loadPlanification(){
+  const el=document.getElementById('planif-list');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const{data,error}=await sb.from('planification').select('*').order('date_fin_production',{ascending:true,nullsFirst:false});
+  if(error){el.innerHTML='<div class="empty">Table planification manquante — exécutez le SQL planification dans Supabase.</div>';return;}
+  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune ligne de planification. Cliquez sur + Nouvelle ligne.</div>';return;}
+  const today=new Date(new Date().setHours(0,0,0,0));
+  el.innerHTML=`<div class="table-wrap"><table>
+    <thead><tr><th>Client</th><th>Projet</th><th>Date fin de production</th><th></th></tr></thead>
+    <tbody>
+      ${data.map(p=>{
+        const d=p.date_fin_production?new Date(p.date_fin_production+'T12:00:00'):null;
+        const enRetard=d&&d<today;
+        return`<tr>
+          <td style="font-weight:500">${p.client||'—'}</td>
+          <td style="color:var(--muted)">${p.projet||'—'}</td>
+          <td style="font-family:'DM Mono',monospace;${enRetard?'color:var(--red);font-weight:600':''}">${d?d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}):'—'}${enRetard?' ⚠️':''}</td>
+          <td><div class="actions" style="opacity:1">
+            <button class="btn btn-sm" onclick="openPlanifModal('${p.id}')">Modifier</button>
+            <button class="btn btn-sm btn-danger" onclick="deletePlanif('${p.id}')">Suppr.</button>
+          </div></td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function openPlanifModal(id){
+  (async()=>{
+    let data={};
+    if(id){
+      const{data:p}=await sb.from('planification').select('*').eq('id',id).single();
+      data=p||{};
+    }
+    const html=`<div class="modal" style="max-width:460px">
+      <div class="modal-title">${id?'Modifier la ligne':'Nouvelle ligne de planification'}</div>
+      <input type="hidden" id="pl-id" value="${id||''}">
+      <div class="form-group"><label>Client *</label><input id="pl-client" value="${data.client||''}" placeholder="Nom du client"></div>
+      <div class="form-group"><label>Projet</label><input id="pl-projet" value="${data.projet||''}" placeholder="Ex: Villa Oujda"></div>
+      <div class="form-group"><label>Date de fin de production *</label><input type="date" id="pl-date" value="${data.date_fin_production||''}"></div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+        <button class="btn btn-primary" onclick="savePlanif()">Enregistrer</button>
+      </div>
+    </div>`;
+    showModal('rh-modal',html);
+  })();
+}
+
+async function savePlanif(){
+  const id=document.getElementById('pl-id').value;
+  const client=document.getElementById('pl-client').value.trim();
+  const projet=document.getElementById('pl-projet').value.trim();
+  const date_fin_production=document.getElementById('pl-date').value||null;
+  if(!client){toast('Client requis');return;}
+  if(!date_fin_production){toast('Date de fin de production requise');return;}
+  const payload={client,projet,date_fin_production};
+  let error;
+  if(id){({error}=await sb.from('planification').update(payload).eq('id',id));}
+  else{({error}=await sb.from('planification').insert(payload));}
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast('Enregistré ✓');
+  loadPlanification();
+}
+
+async function deletePlanif(id){
+  if(!confirm('Supprimer cette ligne ?'))return;
+  await sb.from('planification').delete().eq('id',id);
+  toast('Supprimé');
+  loadPlanification();
+}
+
+async function printPlanification(){
+  toast('Préparation du rapport…');
+  const{data}=await sb.from('planification').select('*').order('date_fin_production',{ascending:true,nullsFirst:false});
+  const rows=(data||[]).map(p=>{
+    const d=p.date_fin_production?new Date(p.date_fin_production+'T12:00:00'):null;
+    return`<tr>
+      <td style="padding:10px 14px;border-bottom:1px solid #e8e4dc;font-weight:600">${p.client||'—'}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid #e8e4dc;color:#666">${p.projet||'—'}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid #e8e4dc;text-align:right;font-family:monospace">${d?d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}):'—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:16mm}</style>
+    <div style="border-bottom:2px solid #1a1a18;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:56px;height:56px">
+        <div><div style="font-size:11px;color:#888">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div></div>
+      </div>
+      <div style="text-align:right"><div style="font-size:16px;font-weight:600">PLANIFICATION DE PRODUCTION</div><div style="font-size:11px;color:#888">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#f8f6f1">
+        <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">CLIENT</th>
+        <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">PROJET</th>
+        <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">FIN DE PRODUCTION</th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="3" style="padding:20px;text-align:center;color:#aaa">Aucune ligne</td></tr>'}</tbody>
+    </table>
+    <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center">CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96</div>`;
+  finalizeDocOutput();
+}
+
 function showSuiviMainTab(tab, el){
-  ['projets','missions','fiches','livraison'].forEach(t=>{
+  ['projets','missions','fiches','livraison','planif'].forEach(t=>{
     document.getElementById('suivi-tab-content-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('suivi-tab-'+t).classList.toggle('active', t===tab);
   });
   if(tab==='missions') loadMissions();
   else if(tab==='fiches') loadFichesCommande();
   else if(tab==='livraison') loadLivraisonKanban();
+  else if(tab==='planif') loadPlanification();
   else loadSuiviKanban();
 }
 
