@@ -6108,7 +6108,7 @@ async function loadPlanification(){
   if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune ligne de planification. Cliquez sur + Nouvelle ligne.</div>';return;}
   const today=new Date(new Date().setHours(0,0,0,0));
   el.innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Client</th><th>Projet</th><th>Date fin de production</th><th></th></tr></thead>
+    <thead><tr><th>Client</th><th>Projet</th><th>Date de livraison</th><th></th></tr></thead>
     <tbody>
       ${data.map(p=>{
         const d=p.date_fin_production?new Date(p.date_fin_production+'T12:00:00'):null;
@@ -6139,7 +6139,7 @@ function openPlanifModal(id){
       <input type="hidden" id="pl-id" value="${id||''}">
       <div class="form-group"><label>Client *</label><input id="pl-client" value="${data.client||''}" placeholder="Nom du client"></div>
       <div class="form-group"><label>Projet</label><input id="pl-projet" value="${data.projet||''}" placeholder="Ex: Villa Oujda"></div>
-      <div class="form-group"><label>Date de fin de production *</label><input type="date" id="pl-date" value="${data.date_fin_production||''}"></div>
+      <div class="form-group"><label>Date de livraison *</label><input type="date" id="pl-date" value="${data.date_fin_production||''}"></div>
       <div class="modal-footer">
         <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
         <button class="btn btn-primary" onclick="savePlanif()">Enregistrer</button>
@@ -6155,7 +6155,7 @@ async function savePlanif(){
   const projet=document.getElementById('pl-projet').value.trim();
   const date_fin_production=document.getElementById('pl-date').value||null;
   if(!client){toast('Client requis');return;}
-  if(!date_fin_production){toast('Date de fin de production requise');return;}
+  if(!date_fin_production){toast('Date de livraison requise');return;}
   const payload={client,projet,date_fin_production};
   let error;
   if(id){({error}=await sb.from('planification').update(payload).eq('id',id));}
@@ -6191,13 +6191,13 @@ async function printPlanification(){
         <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:56px;height:56px">
         <div><div style="font-size:11px;color:#888">Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech</div></div>
       </div>
-      <div style="text-align:right"><div style="font-size:16px;font-weight:600">PLANIFICATION DE PRODUCTION</div><div style="font-size:11px;color:#888">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+      <div style="text-align:right"><div style="font-size:16px;font-weight:600">PLANIFICATION DES LIVRAISONS</div><div style="font-size:11px;color:#888">${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:#f8f6f1">
         <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">CLIENT</th>
         <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">PROJET</th>
-        <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">FIN DE PRODUCTION</th>
+        <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">DATE DE LIVRAISON</th>
       </tr></thead>
       <tbody>${rows||'<tr><td colspan="3" style="padding:20px;text-align:center;color:#aaa">Aucune ligne</td></tr>'}</tbody>
     </table>
