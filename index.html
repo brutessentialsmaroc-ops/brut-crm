@@ -3066,7 +3066,10 @@ function openSalarieModal(data={}){
           ${['CDI','CDD','Intérim','Stagiaire'].map(c=>`<option ${data.type_contrat===c?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group"><label>Salaire de base (MAD)</label><input type="number" id="sal-salaire" value="${data.salaire_base||''}"></div>
+      <div class="form-group"><label>Salaire de base (MAD)</label>
+        <input type="number" id="sal-salaire" value="${data.salaire_base||''}">
+        ${data.id?`<button type="button" class="btn btn-sm" style="margin-top:6px" onclick="openHistoriqueSalaire('${data.id}','${(data.prenom||'')+' '+data.nom}',${data.salaire_base||0})">📈 Historique salaire / Augmentation</button>`:''}
+      </div>
       <div class="form-group"><label>Statut</label>
         <select id="sal-statut">
           ${['Actif','Inactif','Suspendu'].map(s=>`<option ${data.statut===s?'selected':''}>${s}</option>`).join('')}
@@ -3493,6 +3496,92 @@ async function deleteConge(id){
 }
 
 // ─── PAIE ─────────────────────────────────────────────────────────────────────
+async function openHistoriqueSalaire(salarieId, nomSalarie, salaireCourant){
+  const{data:histo}=await sb.from('salaire_historique').select('*').eq('salarie_id',salarieId).order('date_effet',{ascending:false});
+  const todayStr=new Date().toISOString().split('T')[0];
+  const html=`<div class="modal" style="max-width:520px">
+    <div class="modal-title">Historique salaire — ${nomSalarie}</div>
+    <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px">
+      <strong>Salaire actuel :</strong> ${Number(salaireCourant||0).toLocaleString('fr-FR')} MAD
+    </div>
+    <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:16px">
+      <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Augmentations enregistrées</div>
+      <div id="hs-list" style="padding:12px 14px">
+        ${!histo||!histo.length?'<div style="font-size:12px;color:var(--muted);padding:8px 0">Aucune augmentation enregistrée — le salarié a toujours eu ce salaire.</div>':
+        histo.map(h=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">À partir du ${new Date(h.date_effet).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}</span>
+            <span style="font-weight:600">${Number(h.montant).toLocaleString('fr-FR')} MAD</span>
+            <button onclick="deleteHistoriqueSalaire('${h.id}','${salarieId}','${nomSalarie}',${salaireCourant})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px">×</button>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px;letter-spacing:0.5px">+ Nouvelle augmentation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0"><label>Nouveau salaire (MAD)</label><input type="number" id="hs-montant" placeholder="Ex: 6000"></div>
+        <div class="form-group" style="margin:0"><label>Date d'effet</label><input type="date" id="hs-date" value="${todayStr}"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addHistoriqueSalaire('${salarieId}','${nomSalarie}')">+ Ajouter cette augmentation</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">Les fiches de paie antérieures à cette date garderont l'ancien montant. À partir de cette date, ce nouveau salaire sera utilisé automatiquement.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('rh-modal')">Fermer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal', html);
+}
+
+async function addHistoriqueSalaire(salarieId, nomSalarie){
+  const montant=Number(document.getElementById('hs-montant').value);
+  const date_effet=document.getElementById('hs-date').value;
+  if(!montant||montant<=0){toast('Montant invalide');return;}
+  if(!date_effet){toast('Date d\u2019effet requise');return;}
+  // Si c'est la première augmentation enregistrée pour ce salarié, on garde une trace
+  // de l'ancien salaire (pour que les mois passés restent corrects une fois l'historique actif).
+  const{data:existingHisto}=await sb.from('salaire_historique').select('id').eq('salarie_id',salarieId).limit(1);
+  if(!existingHisto||!existingHisto.length){
+    const{data:sal}=await sb.from('salaries').select('salaire_base').eq('id',salarieId).single();
+    const ancienMontant=Number(sal?.salaire_base||0);
+    if(ancienMontant>0){
+      // Date d'effet très ancienne pour couvrir tout l'historique passé
+      await sb.from('salaire_historique').insert({salarie_id:salarieId,montant:ancienMontant,date_effet:'2000-01-01'});
+    }
+  }
+  // 1. Enregistrer dans l'historique
+  const{error}=await sb.from('salaire_historique').insert({salarie_id:salarieId,montant,date_effet});
+  if(error){toast('Erreur: '+error.message);return;}
+  // 2. Mettre à jour le salaire courant sur la fiche salarié (pour les mois futurs)
+  await sb.from('salaries').update({salaire_base:montant}).eq('id',salarieId);
+  toast('Augmentation enregistrée ✓');
+  openHistoriqueSalaire(salarieId, nomSalarie, montant);
+}
+
+async function deleteHistoriqueSalaire(id, salarieId, nomSalarie, salaireCourant){
+  if(!confirm('Supprimer cette ligne d\u2019historique ?'))return;
+  await sb.from('salaire_historique').delete().eq('id',id);
+  toast('Supprimé');
+  openHistoriqueSalaire(salarieId, nomSalarie, salaireCourant);
+}
+
+// Calcule le salaire de base applicable à un salarié pour un mois/année donnés,
+// en tenant compte de l'historique des augmentations (date_effet).
+// Si aucun historique n'existe, retourne le salaire courant (comportement par défaut).
+async function getSalaireForMonth(salarieId, salaireBaseCourant, mois, annee){
+  const{data:histo}=await sb.from('salaire_historique')
+    .select('*').eq('salarie_id',salarieId).order('date_effet',{ascending:false});
+  if(!histo||!histo.length) return Number(salaireBaseCourant||0);
+  // Date de référence : dernier jour du mois concerné, pour comparer correctement
+  const refDate=new Date(annee,mois,0); // dernier jour du mois "mois" (1-indexé)
+  // On cherche la ligne d'historique la plus récente dont la date d'effet est <= refDate
+  const applicable=histo.find(h=>new Date(h.date_effet)<=refDate);
+  if(applicable) return Number(applicable.montant);
+  // Si toutes les lignes d'historique sont dans le futur par rapport au mois demandé,
+  // ça veut dire qu'avant la première augmentation enregistrée, on ne connaît pas l'ancien montant —
+  // dans ce cas on retombe sur le salaire courant par défaut (meilleur effort).
+  return Number(salaireBaseCourant||0);
+}
+
 async function loadPaie(){
   const mois=currentPaieMois;
   const annee=currentPaieAnnee;
@@ -3525,10 +3614,10 @@ async function loadPaie(){
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Salarié</th><th>Base</th><th>Absences</th><th>Retards</th><th>H.Sup</th><th>Primes</th><th>Net à payer</th><th>Avances</th><th>Reste à donner</th><th>Statut</th><th></th></tr></thead>
-      <tbody>${(sal||[]).map(s=>{
+      <tbody>${(await Promise.all((sal||[]).map(async s=>{
         const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
         const p=paieMap[s.id];
-        const base=Number(s.salaire_base||0);
+        const base=p?Number(p.salaire_base||0):await getSalaireForMonth(s.id,s.salaire_base,mois,annee);
         const net=p?Math.round(Number(p.net_a_payer)):base;
         const avances=p&&p.avances?p.avances:[];
         const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
@@ -3553,7 +3642,7 @@ async function loadPaie(){
             ${p?.statut==='Payé'?`<button class="btn btn-sm" style="color:var(--muted);font-size:11px" onclick="resetPaie('${p.id}')">↺ Réinit.</button>`:''}
           </div></td>
         </tr>`;
-      }).join('')}
+      }))).join('')}
       </tbody>
     </table></div>`;
 }
@@ -3575,7 +3664,7 @@ async function genererPaie(){
   });
   for(const s of sal||[]){
     const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
-    const base=Number(s.salaire_base||0);
+    const base=await getSalaireForMonth(s.id,s.salaire_base,mois,annee);
     const net=base;
     await sb.from('paie').upsert({
       salarie_id:s.id,mois,annee,
@@ -3600,7 +3689,7 @@ async function resetPaie(id){
 async function printFichePaie(salId,mois,annee){
   const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
-  const base=Number(s.salaire_base||0);
+  const base=p?Number(p.salaire_base||0):await getSalaireForMonth(salId,s.salaire_base,mois,annee);
   const net=p?Math.round(Number(p.net_a_payer)):base;
   const avances=p&&p.avances?p.avances:[];
   const hsupListe=p&&p.heures_sup_liste?p.heures_sup_liste:[];
@@ -3767,7 +3856,7 @@ async function removeDoc(docType, salId){
 async function openModifierPaie(salId, mois, annee){
   const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
-  const base=Number(s.salaire_base||0);
+  const base=p?Number(p.salaire_base||0):await getSalaireForMonth(salId,s.salaire_base,mois,annee);
   const avancesInit=p&&p.avances?p.avances:[];
   const hsupInit=p&&p.heures_sup_liste?p.heures_sup_liste:[];
   const primesInit=p&&p.primes_liste?p.primes_liste:[];
