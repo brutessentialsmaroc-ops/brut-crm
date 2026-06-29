@@ -6875,14 +6875,37 @@ async function loadMissions(){
   if(error){el.innerHTML=`<div class="empty">Table missions manquante — exécutez le SQL dans Supabase.</div>`;return;}
   const{data:salaries}=await sb.from('salaries').select('id,nom,prenom').eq('statut','Actif').order('nom');
   const salMap={};(salaries||[]).forEach(s=>salMap[s.id]=`${s.prenom||''} ${s.nom}`.trim());
-  if(!(missions||[]).length){el.innerHTML='<div class="empty">Aucune mission. Cliquez sur + Nouveau.</div>';return;}
-  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">
-    ${missions.map(m=>renderMissionRow(m,salMap)).join('')}
-  </div>`;
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px" id="missions-kanban"></div>`;
+  const kanban=document.getElementById('missions-kanban');
+  kanban.innerHTML=Object.keys(MISSION_STATUTS).map(statutKey=>{
+    const st=MISSION_STATUTS[statutKey];
+    const mine=(missions||[]).filter(m=>m.statut===statutKey);
+    return`<div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;letter-spacing:0.3px">${st.icon} ${statutKey}</div>
+        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--muted)">${mine.length}</span>
+      </div>
+      <div class="mission-col" data-statut="${statutKey}" style="display:flex;flex-direction:column;gap:10px;min-height:60px"
+        ondragover="missiondragOver(event)" ondrop="missiondrop(event,'${statutKey}')">
+        ${mine.map(m=>renderMissionCard(m,salMap)).join('')}
+        ${mine.length===0?`<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Aucune mission</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function renderMissionRow(m, salMap){
-  const st=MISSION_STATUTS[m.statut]||MISSION_STATUTS['En cours'];
+let missionDragId=null;
+function missiondragStart(e,id){missionDragId=id;}
+function missiondragOver(e){e.preventDefault();}
+async function missiondrop(e,statut){
+  e.preventDefault();
+  if(!missionDragId)return;
+  await sb.from('missions').update({statut}).eq('id',missionDragId);
+  missionDragId=null;
+  loadMissions();
+}
+
+function renderMissionCard(m, salMap){
   const now=new Date(); now.setHours(0,0,0,0);
   const cible=m.date_cible?new Date(m.date_cible+'T12:00:00'):null;
   const retard=cible&&cible<now&&m.statut!=='Terminé';
@@ -6890,33 +6913,21 @@ function renderMissionRow(m, salMap){
   const salNoms=salIds.map(id=>salMap[id]).filter(Boolean);
   const dateCreation=new Date(m.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
   const relances=m.relances||[];
-  return`<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:200px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-        <span style="font-weight:600;font-size:13px">${m.titre}</span>
-        ${retard?`<span style="background:#FEF2F2;color:#EF4444;font-size:10px;padding:1px 7px;border-radius:20px;font-weight:700">RETARD</span>`:''}
-        ${m.projets_suivi?`<span style="background:var(--bg);border:1px solid var(--border);font-size:10px;padding:1px 7px;border-radius:20px;color:var(--muted)">📁 ${m.projets_suivi.nom}</span>`:''}
-      </div>
-      <div style="font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
-        <span>👤 ${m.gestionnaire}</span>
-        <span>🕐 ${dateCreation}</span>
-        ${cible?`<span style="color:${retard?'#EF4444':'var(--muted)'}">📅 Cible : ${cible.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}</span>`:''}
-        ${salNoms.length?`<span>🔧 ${salNoms.join(', ')}</span>`:''}
-      </div>
+  return`<div draggable="true" ondragstart="missiondragStart(event,'${m.id}')"
+    style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:grab">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-weight:600;font-size:13px">${m.titre}</span>
+      ${retard?`<span style="background:#FEF2F2;color:#EF4444;font-size:9px;padding:1px 6px;border-radius:20px;font-weight:700">RETARD</span>`:''}
     </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      ${relances.length?`<span style="font-size:11px;color:var(--muted);background:var(--bg);padding:3px 8px;border-radius:20px;border:1px solid var(--border)">R${relances.length} · ${new Date(relances[relances.length-1].date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>`:''}
-      <div style="position:relative">
-        <span id="mst-badge-${m.id}" onclick="toggleMissionStatut('${m.id}')"
-          style="background:${st.bg};color:${st.color};font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;border:1px solid ${st.color}33;font-weight:600;white-space:nowrap">
-          ${st.icon} ${m.statut} ▾
-        </span>
-        <div id="mst-menu-${m.id}" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:140px">
-          ${Object.entries(MISSION_STATUTS).map(([key,s])=>`<div onclick="updateMissionStatut('${m.id}','${key}')"
-            style="padding:7px 12px;font-size:12px;cursor:pointer;color:${s.color};display:flex;align-items:center;gap:6px"
-            onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">${s.icon} ${key}</div>`).join('')}
-        </div>
-      </div>
+    ${m.projets_suivi?`<div style="margin-bottom:6px"><span style="background:var(--bg);border:1px solid var(--border);font-size:10px;padding:1px 7px;border-radius:20px;color:var(--muted)">📁 ${m.projets_suivi.nom}</span></div>`:''}
+    <div style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:3px;margin-bottom:8px">
+      <span>👤 ${m.gestionnaire}</span>
+      <span>🕐 ${dateCreation}</span>
+      ${cible?`<span style="color:${retard?'#EF4444':'var(--muted)'}">📅 Cible : ${cible.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}</span>`:''}
+      ${salNoms.length?`<span>🔧 ${salNoms.join(', ')}</span>`:''}
+      ${relances.length?`<span>📣 R${relances.length} · ${new Date(relances[relances.length-1].date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>`:''}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="ajouterRelance('${m.id}')">📣 Relance</button>
       <button class="btn btn-sm" onclick="openMissionModal('${m.id}')">Modifier</button>
       <button class="btn btn-sm btn-danger" onclick="deleteMission('${m.id}')">✕</button>
