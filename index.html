@@ -3085,10 +3085,11 @@ function openSalarieModal(data={}){
     <!-- Documents -->
     <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
       <div class="section-title" style="margin-bottom:12px">Documents</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
         ${renderDocSlot('cnss','CNSS',data)}
         ${renderDocSlot('contrat','Contrat',data)}
         ${renderDocSlot('fiche_poste','Fiche de poste',data)}
+        ${renderDocSlot('rib','RIB',data)}
       </div>
     </div>
     <div class="modal-footer">
