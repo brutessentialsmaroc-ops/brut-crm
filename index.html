@@ -5960,6 +5960,49 @@ async function deleteLivraison(id){
   loadLivraisonKanban();
 }
 
+function renderChecklistMarchandise(items, livraisonId){
+  if(!items||!items.length) return '<div style="font-size:13px;color:var(--muted);padding:8px 0">Aucun article dans la liste — cliquez sur "Modifier la liste" pour en ajouter.</div>';
+  return items.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;${i<items.length-1?'border-bottom:1px solid var(--border)':''}">
+      <input type="checkbox" ${item.fait?'checked':''} onchange="toggleChecklistItem('${livraisonId}',${i},this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0">
+      <div style="font-size:13px;flex:1;${item.fait?'color:var(--muted);text-decoration:line-through':''}">${item.texte}</div>
+    </div>`).join('');
+}
+
+function toggleChecklistEdit(livraisonId){
+  const view=document.getElementById('lv-checklist-view');
+  const edit=document.getElementById('lv-checklist-edit');
+  const btn=document.getElementById('lv-checklist-edit-btn');
+  const isEditing=edit.style.display!=='none';
+  view.style.display=isEditing?'block':'none';
+  edit.style.display=isEditing?'none':'block';
+  btn.style.display=isEditing?'inline-flex':'none';
+}
+
+async function saveChecklistMarchandise(livraisonId){
+  const lines=document.getElementById('lv-checklist-textarea').value.split('\n').map(t=>t.trim()).filter(Boolean);
+  // On garde l'état "fait" des articles qui existaient déjà avec le même texte, pour ne pas perdre les coches en cours
+  const{data:l}=await sb.from('livraisons').select('checklist_marchandise').eq('id',livraisonId).single();
+  const existing=l?.checklist_marchandise||[];
+  const existingMap={};
+  existing.forEach(item=>{existingMap[item.texte]=item.fait;});
+  const newList=lines.map(texte=>({texte,fait:existingMap[texte]||false}));
+  await sb.from('livraisons').update({checklist_marchandise:newList}).eq('id',livraisonId);
+  toast('Liste enregistrée ✓');
+  openLivraisonFiche(livraisonId);
+}
+
+async function toggleChecklistItem(livraisonId, index, checked){
+  const{data:l}=await sb.from('livraisons').select('checklist_marchandise').eq('id',livraisonId).single();
+  const list=[...(l?.checklist_marchandise||[])];
+  if(!list[index]) return;
+  list[index]={...list[index],fait:checked};
+  await sb.from('livraisons').update({checklist_marchandise:list}).eq('id',livraisonId);
+  // Mise à jour locale légère sans recharger toute la fiche (évite le flash)
+  const view=document.getElementById('lv-checklist-view');
+  if(view) view.innerHTML=renderChecklistMarchandise(list, livraisonId);
+}
+
 async function openLivraisonFiche(id){
   document.getElementById('livraison-main').classList.add('hidden');
   const elFiche=document.getElementById('livraison-fiche');
@@ -5973,6 +6016,13 @@ async function openLivraisonFiche(id){
   const st=LIVRAISON_STATUTS[l.statut||'À faire'];
   const photos=l.photos_chargement||[];
   const etapesDates=l.etapes_dates||{};
+  // Migration douce : si checklist_marchandise n'existe pas encore mais qu'il y a une ancienne note_check texte libre,
+  // on convertit chaque ligne non vide en item de checklist (non cochée).
+  let checklistMarchandise=l.checklist_marchandise;
+  if(!checklistMarchandise && l.note_check){
+    checklistMarchandise=l.note_check.split('\n').map(t=>t.trim()).filter(Boolean).map(texte=>({texte,fait:false}));
+  }
+  checklistMarchandise=checklistMarchandise||[];
 
   elFiche.innerHTML=`
     <button class="btn btn-sm" onclick="document.getElementById('livraison-fiche').classList.add('hidden');document.getElementById('livraison-main').classList.remove('hidden');loadLivraisonKanban()" style="margin-bottom:16px">← Retour</button>
@@ -6029,8 +6079,21 @@ async function openLivraisonFiche(id){
         }).join('')}
       </div>
       <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:16px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Notes check marchandise</div>
-        <textarea id="lv-note-check" rows="3" placeholder="Notes de vérification avant départ…" onblur="saveLivraisonNote('${l.id}','note_check',this.value)">${l.note_check||''}</textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Check marchandise — articles à vérifier</div>
+          <button class="btn btn-sm" onclick="toggleChecklistEdit('${l.id}')" id="lv-checklist-edit-btn">✏️ Modifier la liste</button>
+        </div>
+        <div id="lv-checklist-view">${renderChecklistMarchandise(checklistMarchandise, l.id)}</div>
+        <div id="lv-checklist-edit" style="display:none">
+          <textarea id="lv-checklist-textarea" rows="6" placeholder="Un article par ligne, ex :
+Miroirs
+Canapé beige
+Fauteuil rond">${(checklistMarchandise||[]).map(item=>item.texte).join('\n')}</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary btn-sm" onclick="saveChecklistMarchandise('${l.id}')">Enregistrer la liste</button>
+            <button class="btn btn-sm" onclick="toggleChecklistEdit('${l.id}')">Annuler</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -6156,6 +6219,11 @@ async function printLivraisonRapport(id){
   const projet=l.factures?.projet_nom||l.projet_nom||'';
   const photos=l.photos_chargement||[];
   const etapesDates=l.etapes_dates||{};
+  let checklistMarchandise=l.checklist_marchandise;
+  if(!checklistMarchandise && l.note_check){
+    checklistMarchandise=l.note_check.split('\n').map(t=>t.trim()).filter(Boolean).map(texte=>({texte,fait:false}));
+  }
+  checklistMarchandise=checklistMarchandise||[];
   document.getElementById('pdf-preview').innerHTML=`
     <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:16mm}</style>
     <div style="border-bottom:2px solid #1a1a18;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
@@ -6181,7 +6249,7 @@ async function printLivraisonRapport(id){
         ${LIVRAISON_ETAPES.map(e=>`<tr><td style="padding:6px 0;border-bottom:1px solid #f0ece4">${etapesDates[e.key]?'✓':'☐'} ${e.label}</td><td style="padding:6px 0;border-bottom:1px solid #f0ece4;text-align:right;color:#888">${etapesDates[e.key]?new Date(etapesDates[e.key]).toLocaleDateString('fr-FR'):'—'}</td></tr>`).join('')}
       </table>
     </div>
-    ${l.note_check?`<div style="margin-bottom:20px;padding:12px;background:#f8f6f1;border-radius:6px"><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:4px">CHECK MARCHANDISE</div><div style="font-size:13px">${l.note_check}</div></div>`:''}
+    ${checklistMarchandise.length?`<div style="margin-bottom:20px;padding:12px;background:#f8f6f1;border-radius:6px"><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">CHECK MARCHANDISE — ARTICLES</div><table style="width:100%;border-collapse:collapse;font-size:12px">${checklistMarchandise.map(item=>`<tr><td style="padding:4px 0;border-bottom:1px solid #e8e4dc">${item.fait?'✓':'☐'} ${item.texte}</td></tr>`).join('')}</table></div>`:''}
     ${photos.length?`<div style="margin-bottom:20px"><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">PHOTOS DE CHARGEMENT</div><div style="display:flex;gap:8px;flex-wrap:wrap">${photos.map(url=>`<img src="${url}" style="width:140px;height:140px;object-fit:cover;border-radius:6px;border:1px solid #e8e4dc">`).join('')}</div></div>`:''}
     ${(updates&&updates.length)?`<div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:8px">COMMENTAIRES</div>${updates.map(u=>`<div style="margin-bottom:8px;font-size:12px"><strong>${u.auteur}</strong> · ${u.type} · ${new Date(u.created_at).toLocaleDateString('fr-FR')}<br>${u.texte}</div>`).join('')}</div>`:''}
     <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8.5px;color:#aaa;text-align:center">CERAMICS DESIGN SARL - Numéro 212, Quartier industriel SIDI GHANEM, Route de Safi, Marrakech - Tél : +212 6 60 10 78 96</div>`;
