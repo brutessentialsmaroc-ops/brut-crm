@@ -571,6 +571,7 @@
           <button class="rh-tab" onclick="showRhTab('conges',this)">🌴 Congés</button>
           <button class="rh-tab" onclick="showRhTab('paie',this)">💰 Paie</button>
           <button class="rh-tab" onclick="showRhTab('organigramme',this)">🏢 Organigramme</button>
+          <button class="rh-tab" onclick="showRhTab('feries',this)">⭐ Jours fériés</button>
         </div>
         <div id="rh-salaries"><div class="loading">Chargement…</div></div>
         <div id="rh-pointage" class="hidden"><div class="loading">Chargement…</div></div>
@@ -582,6 +583,7 @@
           </div>
           <div id="org-canvas" style="position:relative;min-height:600px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:auto;padding:20px"></div>
         </div>
+        <div id="rh-feries" class="hidden"><div class="loading">Chargement…</div></div>
       </div>
       <!-- DEVIS / FACTURE PROFORMA BUILDER -->
       <div id="page-devis-builder" class="hidden">
@@ -2955,7 +2957,7 @@ function showRhTab(tab, el){
   currentRhTab = tab;
   document.querySelectorAll('.rh-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['salaries','pointage','conges','paie','organigramme'].forEach(t=>{
+  ['salaries','pointage','conges','paie','organigramme','feries'].forEach(t=>{
     document.getElementById('rh-'+t).classList.toggle('hidden', t!==tab);
   });
   if(tab==='salaries') loadRhSalaries();
@@ -2963,6 +2965,7 @@ function showRhTab(tab, el){
   else if(tab==='conges') loadConges();
   else if(tab==='paie') loadPaie();
   else if(tab==='organigramme') loadOrganigramme();
+  else if(tab==='feries') loadJoursFeries();
 }
 
 // ─── SALARIÉS ─────────────────────────────────────────────────────────────────
@@ -3149,6 +3152,69 @@ function navPointage(dir){currentPointageMois+=dir;if(currentPointageMois>11){cu
 function navConges(dir){currentCongesMois+=dir;if(currentCongesMois>11){currentCongesMois=0;currentCongesAnnee++;}if(currentCongesMois<0){currentCongesMois=11;currentCongesAnnee--;}loadConges();}
 function navPaie(dir){currentPaieMois+=dir;if(currentPaieMois>12){currentPaieMois=1;currentPaieAnnee++;}if(currentPaieMois<1){currentPaieMois=12;currentPaieAnnee--;}loadPaie();}
 
+// ─── JOURS FÉRIÉS ─────────────────────────────────────────────────────────────
+async function loadJoursFeries(){
+  const el=document.getElementById('rh-feries');
+  el.innerHTML='<div class="loading">Chargement…</div>';
+  const{data,error}=await sb.from('jours_feries').select('*').order('date',{ascending:true});
+  if(error){el.innerHTML='<div class="empty">Table jours_feries manquante — exécutez le SQL dans Supabase.</div>';return;}
+  const annees=[...new Set((data||[]).map(j=>new Date(j.date+'T12:00:00').getFullYear()))].sort();
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:13px;color:var(--muted)">Ces dates s'affichent en gris sur le calendrier de Pointage, pour t'aider à reconnaître les jours fériés sans erreur de saisie.</div>
+      <button class="btn btn-primary btn-sm" onclick="openAddJourFerieModal()">+ Ajouter un jour férié</button>
+    </div>
+    ${!data||!data.length?'<div class="empty">Aucun jour férié enregistré. Cliquez sur + Ajouter.</div>':
+    annees.map(annee=>{
+      const jours=data.filter(j=>new Date(j.date+'T12:00:00').getFullYear()===annee);
+      return`<div style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">${annee}</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Nom</th><th></th></tr></thead>
+          <tbody>
+            ${jours.map(j=>`<tr>
+              <td style="font-family:'DM Mono',monospace;font-size:13px">${new Date(j.date+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</td>
+              <td>${j.nom||'—'}</td>
+              <td><button class="btn btn-sm btn-danger" onclick="deleteJourFerie('${j.id}')">Suppr.</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>`;
+    }).join('')}`;
+}
+
+function openAddJourFerieModal(){
+  const todayStr=new Date().toISOString().split('T')[0];
+  const html=`<div class="modal" style="max-width:420px">
+    <div class="modal-title">Nouveau jour férié</div>
+    <div class="form-group"><label>Date *</label><input type="date" id="jf-date" value="${todayStr}"></div>
+    <div class="form-group"><label>Nom (optionnel)</label><input id="jf-nom" placeholder="Ex: Aïd al-Fitr, Fête du Trône..."></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveJourFerie()">Enregistrer</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function saveJourFerie(){
+  const date=document.getElementById('jf-date').value;
+  const nom=document.getElementById('jf-nom').value.trim();
+  if(!date){toast('Date requise');return;}
+  const{error}=await sb.from('jours_feries').insert({date,nom});
+  if(error){toast('Erreur: '+error.message);return;}
+  closeModal('rh-modal');
+  toast('Jour férié ajouté ✓');
+  loadJoursFeries();
+}
+
+async function deleteJourFerie(id){
+  if(!confirm('Supprimer ce jour férié ?'))return;
+  await sb.from('jours_feries').delete().eq('id',id);
+  toast('Supprimé');
+  loadJoursFeries();
+}
+
 async function loadPointage(){
   const month=currentPointageMois;
   const year=currentPointageAnnee;
@@ -3162,6 +3228,12 @@ async function loadPointage(){
   const{data:paieMois}=await sb.from('paie').select('salarie_id,heures_sup_montant').eq('mois',month+1).eq('annee',year);
   const hSupParSalarie={};
   (paieMois||[]).forEach(p=>{hSupParSalarie[p.salarie_id]=Number(p.heures_sup_montant||0);});
+  // Charger les jours fériés du mois affiché, pour les surligner en gris sur le calendrier
+  const{data:feriesMois}=await sb.from('jours_feries').select('*')
+    .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
+    .lte('date',`${year}-${String(month+1).padStart(2,'0')}-${String(lastDay1).padStart(2,'0')}`);
+  const feriesSet=new Set((feriesMois||[]).map(j=>j.date));
+  const feriesNomMap={};(feriesMois||[]).forEach(j=>{feriesNomMap[j.date]=j.nom;});
   const el=document.getElementById('rh-pointage');
   const daysInMonth=new Date(year,month+1,0).getDate();
   const ptMap={};
@@ -3174,12 +3246,15 @@ async function loadPointage(){
   const ptSortedGroups=Object.keys(ptGroups).sort((a,b)=>{const ia=ptAtelierOrder.indexOf(a);const ib=ptAtelierOrder.indexOf(b);return(ia===-1?99:ia)-(ib===-1?99:ib);});
   const ptColors={'Administration':'#C8A97A','Menuiserie bois':'#378ADD','Tapisserie':'#EF9F27','Céramique':'#5DCAA5','Ferronnerie':'#9B6DD6','Livraison':'#E05A5A'};
 
-  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Repos':'🔵','Férié':'⭐','Demi-J':'🔆','En mission extérieure':'🚗'};
+  const statusIcon={'Présent':'✅','Absent':'❌','Retard':'🕐','Congé':'🌴','Repos':'🔵','JF':'⭐','Demi-J':'🔆','En mission extérieure':'🚗'};
 
   const dayHeaders=Array.from({length:daysInMonth},(_,i)=>{
     const d=new Date(year,month,i+1);
     const isWeekend=d.getDay()===0||d.getDay()===6;
-    return`<th style="padding:6px 2px;text-align:center;background:${isWeekend?'#f0ece4':'var(--bg)'};border:1px solid var(--border);width:32px;min-width:32px;max-width:32px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${i+1}</th>`;
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+    const isFerie=feriesSet.has(dateStr);
+    const bg=isFerie?'#E5E7EB':isWeekend?'#f0ece4':'var(--bg)';
+    return`<th style="padding:6px 2px;text-align:center;background:${bg};border:1px solid var(--border);width:32px;min-width:32px;max-width:32px;font-family:'DM Mono',monospace;font-size:10px;color:${isFerie?'#374151':'var(--muted)'};font-weight:${isFerie?'700':'400'}" title="${isFerie?(feriesNomMap[dateStr]||'Jour férié'):''}">${i+1}</th>`;
   }).join('');
 
   const buildRows=(sals)=>sals.map(s=>{
@@ -3189,16 +3264,21 @@ async function loadPointage(){
       const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
       const d=new Date(year,month,i+1);
       const isWeekend=d.getDay()===0||d.getDay()===6;
+      const isFerie=feriesSet.has(dateStr);
       const pt=ptMap[s.id+'_'+dateStr];
-      if(pt&&pt.statut==='Absent') absences++;
+      if(pt&&pt.statut==='Absent') absences+=1;
+      if(pt&&pt.statut==='Demi-J') absences+=0.5;
       const icon=pt?statusIcon[pt.statut]||'?':'';
-      const bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':pt.statut==='Demi-J'?'#FFF7ED':pt.statut==='En mission extérieure'?'#F0FDF4':'#fff':'#fff';
-      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:13px;width:32px;min-width:32px;max-width:32px" onclick="openPointageDetail('${s.id}','${(s.prenom||"")+" "+s.nom}','${dateStr}')" title="${pt?(pt.statut+(pt.heure_arrivee?" · "+pt.heure_arrivee:"")):dateStr}">${icon}</td>`;
+      let bg=isWeekend?'#f5f3ee':pt?pt.statut==='Présent'?'#f0faf5':pt.statut==='Absent'?'#fdf0f0':pt.statut==='Retard'?'#fdf6e3':pt.statut==='Congé'?'#e8f4fd':pt.statut==='Repos'?'#EEF0FB':pt.statut==='Demi-J'?'#FFF7ED':pt.statut==='JF'?'#FEF9C3':pt.statut==='En mission extérieure'?'#F0FDF4':'#fff':'#fff';
+      // Si le jour est férié ET qu'il n'y a pas encore de pointage saisi, on grise la case pour le signaler visuellement
+      if(isFerie&&!pt) bg='#F3F4F6';
+      const titreFerie=isFerie?(feriesNomMap[dateStr]||'Jour férié')+' — ':'';
+      return`<td style="padding:4px 2px;text-align:center;border:1px solid var(--border);background:${bg};cursor:pointer;font-size:13px;width:32px;min-width:32px;max-width:32px" onclick="openPointageDetail('${s.id}','${(s.prenom||"")+" "+s.nom}','${dateStr}')" title="${titreFerie}${pt?(pt.statut+(pt.heure_arrivee?" · "+pt.heure_arrivee:"")):dateStr}">${icon}</td>`;
     }).join('');
     return`<tr>
       <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;width:160px;min-width:160px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.prenom||''} ${s.nom}">${s.prenom||''} ${s.nom}</td>
       ${cells}
-      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences}</td>
+      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences.toLocaleString('fr-FR')}</td>
       <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup.toLocaleString('fr-FR'):''}</td>
     </tr>`;
   }).join('');
@@ -3233,7 +3313,7 @@ async function loadPointage(){
     }).join('')}
     </div>
     <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--muted)">
-      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span><span>🔵 Repos</span><span>🔆 Demi-J</span><span>🚗 En mission extérieure</span>
+      <span>✅ Présent</span><span>❌ Absent</span><span>🕐 Retard</span><span>🌴 Congé</span><span>🔵 Repos</span><span>🔆 Demi-J (0,5 absence)</span><span style="background:#FEF9C3;padding:1px 6px;border-radius:4px">⭐ JF (jour férié travaillé)</span><span>🚗 En mission extérieure</span>
       <span style="margin-left:8px;font-style:italic">Cliquez sur une case pour saisir</span>
     </div>`;
 }
@@ -3255,6 +3335,7 @@ async function openPointageDetail(salId, salNom, date){
         <option ${existing?.statut==='Congé'?'selected':''}>Congé</option>
         <option ${existing?.statut==='Repos'?'selected':''}>Repos</option>
         <option ${existing?.statut==='Demi-J'?'selected':''}>Demi-J</option>
+        <option ${existing?.statut==='JF'?'selected':''}>JF</option>
         <option ${existing?.statut==='En mission extérieure'?'selected':''}>En mission extérieure</option>
       </select>
     </div>
@@ -3327,7 +3408,7 @@ function openPointageModal(){
     </div>
     <div class="form-group"><label>Date</label><input type="date" id="pt-date" value="${new Date().toISOString().split('T')[0]}"></div>
     <div class="form-group"><label>Statut</label>
-      <select id="pt-statut"><option>Présent</option><option>Absent</option><option>Retard</option><option>Congé</option><option>Demi-J</option><option>En mission extérieure</option></select>
+      <select id="pt-statut"><option>Présent</option><option>Absent</option><option>Retard</option><option>Congé</option><option>Demi-J</option><option>JF</option><option>En mission extérieure</option></select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
       <div class="form-group"><label>Arrivée</label><input type="time" id="pt-arrivee"></div>
@@ -3599,7 +3680,8 @@ async function loadPaie(){
   (paies||[]).forEach(p=>{paieMap[p.salarie_id]=p;});
   const ptBySal={};
   (pts||[]).forEach(p=>{if(!ptBySal[p.salarie_id])ptBySal[p.salarie_id]={absences:0,retards:0,hSup:0};
-    if(p.statut==='Absent')ptBySal[p.salarie_id].absences++;
+    if(p.statut==='Absent')ptBySal[p.salarie_id].absences+=1;
+    if(p.statut==='Demi-J')ptBySal[p.salarie_id].absences+=0.5;
     if(p.statut==='Retard')ptBySal[p.salarie_id].retards++;
     ptBySal[p.salarie_id].hSup+=Number(p.heures_sup||0);
   });
@@ -3659,7 +3741,8 @@ async function genererPaie(){
   const pts=pts2;
   const ptBySal={};
   (pts||[]).forEach(p=>{if(!ptBySal[p.salarie_id])ptBySal[p.salarie_id]={absences:0,retards:0,hSup:0};
-    if(p.statut==='Absent')ptBySal[p.salarie_id].absences++;
+    if(p.statut==='Absent')ptBySal[p.salarie_id].absences+=1;
+    if(p.statut==='Demi-J')ptBySal[p.salarie_id].absences+=0.5;
     if(p.statut==='Retard')ptBySal[p.salarie_id].retards++;
     ptBySal[p.salarie_id].hSup+=Number(p.heures_sup||0);
   });
@@ -3702,7 +3785,7 @@ async function printFichePaie(salId,mois,annee){
   const{data:pts}=await sb.from('pointages').select('*').eq('salarie_id',salId)
     .gte('date',`${annee}-${String(mois).padStart(2,'0')}-01`)
     .lte('date',`${annee}-${String(mois).padStart(2,'0')}-${String(lastDay3).padStart(2,'0')}`);
-  const absences=(pts||[]).filter(p=>p.statut==='Absent').length;
+  const absences=(pts||[]).filter(p=>p.statut==='Absent').length + (pts||[]).filter(p=>p.statut==='Demi-J').length*0.5;
   const retards=(pts||[]).filter(p=>p.statut==='Retard').length;
   const jourTravail=26;
 
@@ -3741,7 +3824,7 @@ async function printFichePaie(salId,mois,annee){
       <div><div style="font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;margin-bottom:6px">PÉRIODE</div>
         <div style="font-size:14px;font-weight:500;text-transform:capitalize">${moisLabel}</div>
         <div style="font-size:12px;color:#888;margin-top:4px">Jours ouvrés : ${jourTravail}</div>
-        <div style="font-size:12px;color:#888">Absences : ${absences}j · Retards : ${retards}×</div>
+        <div style="font-size:12px;color:#888">Absences : ${absences.toLocaleString('fr-FR')}j · Retards : ${retards}×</div>
       </div>
     </div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
