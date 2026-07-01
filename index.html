@@ -6555,9 +6555,18 @@ async function toggleGestionnaireColonne(id,checked){
 }
 
 async function deleteGestionnaire(id){
-  if(!confirm('Supprimer ce gestionnaire ? Les projets qui lui sont assignés ne seront pas affectés.'))return;
+  // Vérifier s'il y a des projets actifs assignés à ce gestionnaire
+  const{data:gests}=await sb.from('suivi_gestionnaires').select('nom').eq('id',id).single();
+  const nom=gests?.nom||'ce gestionnaire';
+  const{data:projets}=await sb.from('projets_suivi').select('id').eq('gestionnaire',nom);
+  const nbProjets=(projets||[]).length;
+  if(nbProjets>0){
+    if(!confirm(`⚠️ ATTENTION : "${nom}" a ${nbProjets} projet(s) actif(s) dans le Kanban.\n\nSupprimer ce gestionnaire ne supprime PAS les projets — ils restent en base mais n'apparaîtront plus dans aucune colonne jusqu'à ce que vous remettiez ce gestionnaire ou réassigniez les projets.\n\nVoulez-vous continuer quand même ?`))return;
+  } else {
+    if(!confirm(`Supprimer "${nom}" ? Aucun projet actif ne lui est assigné.`))return;
+  }
   await sb.from('suivi_gestionnaires').delete().eq('id',id);
-  toast('Supprimé');
+  toast('Supprimé — les projets de ce gestionnaire sont toujours en base');
   openGestionnairesModal();
 }
 
