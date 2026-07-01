@@ -3686,6 +3686,55 @@ async function loadPaie(){
     ptBySal[p.salarie_id].hSup+=Number(p.heures_sup||0);
   });
 
+  // Grouper par atelier comme le Pointage
+  const paieAtelierOrder=['Administration','Menuiserie bois','Tapisserie','Céramique','Ferronnerie','Livraison'];
+  const paieColors={'Administration':'#C8A97A','Menuiserie bois':'#378ADD','Tapisserie':'#EF9F27','Céramique':'#5DCAA5','Ferronnerie':'#9B6DD6','Livraison':'#E05A5A'};
+  const paieGroups={};
+  (sal||[]).forEach(s=>{const k=s.atelier||'Autre';if(!paieGroups[k])paieGroups[k]=[];paieGroups[k].push(s);});
+  const paieSortedGroups=Object.keys(paieGroups).sort((a,b)=>{const ia=paieAtelierOrder.indexOf(a);const ib=paieAtelierOrder.indexOf(b);return(ia===-1?99:ia)-(ib===-1?99:ib);});
+
+  const renderPaieRows=async(sals)=>( await Promise.all(sals.map(async s=>{
+    const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
+    const p=paieMap[s.id];
+    const base=p?Number(p.salaire_base||0):await getSalaireForMonth(s.id,s.salaire_base,mois,annee);
+    const net=p?Math.round(Number(p.net_a_payer)):base;
+    const avances=p&&p.avances?p.avances:[];
+    const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
+    const reste=Math.max(0,net-totalAvances);
+    const hSupMontant=p?Number(p.heures_sup_montant||0):0;
+    const primesMontant=p?Number(p.autres_primes||0):0;
+    return`<tr>
+      <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
+      <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences.toLocaleString('fr-FR')}j</td>
+      <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}×</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR'):'—'}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${primesMontant>0?'var(--green)':primesMontant<0?'var(--red)':'var(--muted)'}">${primesMontant!==0?(primesMontant>0?'+':'')+primesMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:${totalAvances>0?'var(--red)':'var(--muted)'}">${totalAvances>0?'-'+totalAvances.toLocaleString('fr-FR')+' MAD':'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--green)">${totalAvances>0?reste.toLocaleString('fr-FR')+' MAD':'—'}</td>
+      <td><span class="badge ${p?.statut==='Payé'?'badge-green':'badge-amber'}">${p?.statut||'À générer'}</span></td>
+      <td><div class="actions" style="opacity:1;flex-wrap:wrap;gap:4px">
+        <button class="btn btn-sm" onclick="printFichePaie('${s.id}',${mois},${annee})">Fiche</button>
+        <button class="btn btn-sm" onclick="openModifierPaie('${s.id}',${mois},${annee})">Modifier</button>
+        ${p?`<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="marquerPaye('${p.id}')">✓ Payé</button>`:''}
+        ${p?.statut==='Payé'?`<button class="btn btn-sm" style="color:var(--muted);font-size:11px" onclick="resetPaie('${p.id}')">↺ Réinit.</button>`:''}
+      </div></td>
+    </tr>`;
+  }))).join('');
+
+  const groupBlocks=await Promise.all(paieSortedGroups.map(async atelier=>{
+    const color=paieColors[atelier]||'#888';
+    const rows=await renderPaieRows(paieGroups[atelier]);
+    return`<div style="margin-bottom:20px">
+      <div style="padding:8px 12px;background:${color}18;border-left:3px solid ${color};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${color};margin-bottom:0">${atelier} (${paieGroups[atelier].length})</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Salarié</th><th>Base</th><th>Absences</th><th>Retards</th><th>H.Sup</th><th>Primes</th><th>Net à payer</th><th>Avances</th><th>Reste à donner</th><th>Statut</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  }));
+
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:12px">
@@ -3695,39 +3744,7 @@ async function loadPaie(){
       </div>
       <button class="btn btn-primary btn-sm" onclick="genererPaie()">Générer toutes les fiches</button>
     </div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Salarié</th><th>Base</th><th>Absences</th><th>Retards</th><th>H.Sup</th><th>Primes</th><th>Net à payer</th><th>Avances</th><th>Reste à donner</th><th>Statut</th><th></th></tr></thead>
-      <tbody>${(await Promise.all((sal||[]).map(async s=>{
-        const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
-        const p=paieMap[s.id];
-        const base=p?Number(p.salaire_base||0):await getSalaireForMonth(s.id,s.salaire_base,mois,annee);
-        const net=p?Math.round(Number(p.net_a_payer)):base;
-        const avances=p&&p.avances?p.avances:[];
-        const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
-        const reste=Math.max(0,net-totalAvances);
-        const hSupMontant=p?Number(p.heures_sup_montant||0):0;
-        const primesMontant=p?Number(p.autres_primes||0):0;
-        return`<tr>
-          <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
-          <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
-          <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences}j</td>
-          <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}×</td>
-          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR'):'—'}</td>
-          <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${primesMontant>0?'var(--green)':primesMontant<0?'var(--red)':'var(--muted)'}">${primesMontant!==0?(primesMontant>0?'+':'')+primesMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
-          <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
-          <td style="font-family:'DM Mono',monospace;font-size:12px;color:${totalAvances>0?'var(--red)':'var(--muted)'}">${totalAvances>0?'-'+totalAvances.toLocaleString('fr-FR')+' MAD':'—'}</td>
-          <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--green)">${totalAvances>0?reste.toLocaleString('fr-FR')+' MAD':'—'}</td>
-          <td><span class="badge ${p?.statut==='Payé'?'badge-green':'badge-amber'}">${p?.statut||'À générer'}</span></td>
-          <td><div class="actions" style="opacity:1;flex-wrap:wrap;gap:4px">
-            <button class="btn btn-sm" onclick="printFichePaie('${s.id}',${mois},${annee})">Fiche</button>
-            <button class="btn btn-sm" onclick="openModifierPaie('${s.id}',${mois},${annee})">Modifier</button>
-            ${p?`<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="marquerPaye('${p.id}')">✓ Payé</button>`:''}
-            ${p?.statut==='Payé'?`<button class="btn btn-sm" style="color:var(--muted);font-size:11px" onclick="resetPaie('${p.id}')">↺ Réinit.</button>`:''}
-          </div></td>
-        </tr>`;
-      }))).join('')}
-      </tbody>
-    </table></div>`;
+    ${groupBlocks.join('')}`;
 }
 
 async function genererPaie(){
@@ -3952,13 +3969,13 @@ async function openModifierPaie(salId, mois, annee){
   const netInit=p?Number(p.net_a_payer):base;
   const resteInit=Math.max(0,netInit-totalAvancesInit);
 
-  function renderListHTML(list, removeFn, base, emptyLabel){
+  function renderListHTML(list, removeFn, base, emptyLabel, unit='MAD'){
     if(!list.length) return `<div style="font-size:12px;color:var(--muted);padding:8px 0">${emptyLabel}</div>`;
     return list.map((a,i)=>`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
         <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
         ${a.label?`<span style="font-size:12px;color:var(--muted);flex:1;margin:0 8px;text-align:center">${a.label}</span>`:'<span style="flex:1"></span>'}
-        <span style="font-weight:500;color:${Number(a.montant)<0?'var(--red, #EF4444)':'inherit'}">${Number(a.montant)>=0?'+':''}${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
+        <span style="font-weight:500;color:${Number(a.montant)<0?'var(--red, #EF4444)':'inherit'}">${Number(a.montant)>=0?'+':''}${Number(a.montant).toLocaleString('fr-FR')} ${unit}</span>
         <button onclick="${removeFn}(${i},${base})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px;margin-left:6px">×</button>
       </div>`).join('');
   }
@@ -3973,17 +3990,17 @@ async function openModifierPaie(salId, mois, annee){
     <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
       <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Heures supplémentaires</div>
       <div style="padding:12px 14px">
-        <div id="pm-hsup-list">${renderListHTML(hsupInit,'removeHsup',base,'Aucune heure sup enregistrée')}</div>
+        <div id="pm-hsup-list">${renderListHTML(hsupInit,'removeHsup',base,'Aucune heure sup enregistrée','H')}</div>
         <input type="hidden" id="pm-hsup-data" value="${hsupJson}">
         <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;margin-top:8px;align-items:center">
           <input type="text" id="pm-hsup-label" placeholder="Note (optionnel)" style="font-size:13px">
-          <input type="number" id="pm-hsup-montant" placeholder="Montant (MAD)" step="1" style="font-size:13px">
+          <input type="number" id="pm-hsup-montant" placeholder="Nb heures" step="0.5" style="font-size:13px">
           <input type="date" id="pm-hsup-date" value="${todayStr}" style="font-size:13px;width:140px">
           <button class="btn btn-sm" onclick="addHsup(${base})">+ Ajouter</button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
           <span>Total heures sup</span>
-          <span id="pm-total-hsup" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${hsupInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} MAD</span>
+          <span id="pm-total-hsup" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${hsupInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} H</span>
         </div>
       </div>
     </div>
@@ -4114,13 +4131,13 @@ function removePrime(index,base){
   refreshPrimesUI(list,base);
 }
 
-function renderListInline(list, removeFn, emptyLabel){
+function renderListInline(list, removeFn, emptyLabel, unit='MAD'){
   if(!list.length) return `<div style="font-size:12px;color:var(--muted);padding:8px 0">${emptyLabel}</div>`;
   return list.map((a,i)=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
       <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</span>
       ${a.label?`<span style="font-size:12px;color:var(--muted);flex:1;margin:0 8px;text-align:center">${a.label}</span>`:'<span style="flex:1"></span>'}
-      <span style="font-weight:500;color:${Number(a.montant)<0?'#EF4444':'inherit'}">${Number(a.montant)>=0?'+':''}${Number(a.montant).toLocaleString('fr-FR')} MAD</span>
+      <span style="font-weight:500;color:${Number(a.montant)<0?'#EF4444':'inherit'}">${Number(a.montant)>=0?'+':''}${Number(a.montant).toLocaleString('fr-FR')} ${unit}</span>
       <button onclick="${removeFn}(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 4px;margin-left:6px">×</button>
     </div>`).join('');
 }
@@ -4134,8 +4151,8 @@ function refreshAvancesUI(avances,base){
 
 function refreshHsupUI(list,base){
   const total=list.reduce((s,a)=>s+Number(a.montant),0);
-  document.getElementById('pm-total-hsup').textContent=total.toLocaleString('fr-FR')+' MAD';
-  document.getElementById('pm-hsup-list').innerHTML=renderListInline(list,'removeHsup','Aucune heure sup enregistrée').replace(/removeHsup\((\d+)\)/g,(m,i)=>`removeHsup(${i},${base})`);
+  document.getElementById('pm-total-hsup').textContent=total.toLocaleString('fr-FR')+' H';
+  document.getElementById('pm-hsup-list').innerHTML=renderListInline(list,'removeHsup','Aucune heure sup enregistrée','H').replace(/removeHsup\((\d+)\)/g,(m,i)=>`removeHsup(${i},${base})`);
 }
 
 function refreshPrimesUI(list,base){
