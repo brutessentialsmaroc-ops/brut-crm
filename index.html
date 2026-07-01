@@ -490,6 +490,7 @@
         <!-- PROJETS -->
         <div id="suivi-tab-content-projets">
           <div id="suivi-main">
+            <div id="suivi-kanban-header" style="display:flex;justify-content:flex-end;margin-bottom:12px"></div>
             <div id="suivi-kanban" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"></div>
           </div>
           <div id="suivi-fiche" class="hidden"></div>
@@ -5866,8 +5867,8 @@ async function removeAchatBon(achatId){
 
 // ─── SUIVI PROJETS ────────────────────────────────────────────────────────────
 
-const SUIVI_GESTIONNAIRES_TOUS = ['Nabil','Cherazade','Loubna']; // utilisé pour les listes déroulantes (gestionnaire/suppléant)
-const SUIVI_GESTIONNAIRES = ['Cherazade','Loubna']; // colonnes affichées dans le Kanban (Nabil masqué — vide la plupart du temps)
+let SUIVI_GESTIONNAIRES_TOUS = ['Nabil','Cherazade','Loubna']; // utilisé pour les listes déroulantes (gestionnaire/suppléant)
+let SUIVI_GESTIONNAIRES = ['Cherazade','Loubna']; // colonnes affichées dans le Kanban
 const SUIVI_STATUTS = {
   'En cours':   {color:'#3B82F6', bg:'#EFF6FF', icon:'🔵'},
   'Bloqué':     {color:'#EF4444', bg:'#FEF2F2', icon:'🔴'},
@@ -6507,13 +6508,75 @@ async function loadSuivi(){
   loadSuiviKanban();
 }
 
+async function openGestionnairesModal(){
+  const{data:gests}=await sb.from('suivi_gestionnaires').select('*').order('ordre',{ascending:true});
+  const rows=(gests||[]).map(g=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;font-weight:500">${g.nom}</span>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer">
+        <input type="checkbox" ${g.afficher_colonne?'checked':''} onchange="toggleGestionnaireColonne('${g.id}',this.checked)"> Colonne visible
+      </label>
+      <button class="btn btn-sm btn-danger" onclick="deleteGestionnaire('${g.id}')">Suppr.</button>
+    </div>`).join('');
+  const html=`<div class="modal" style="max-width:480px">
+    <div class="modal-title">⚙ Gérer les gestionnaires</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Chaque gestionnaire est disponible dans les listes déroulantes (Gestionnaire/Suppléant). Ceux avec "Colonne visible" ont leur propre colonne dans le kanban.</div>
+    <div id="gests-list">${rows||'<div style="color:var(--muted);font-size:13px;padding:8px 0">Aucun gestionnaire — ajoutez-en ci-dessous.</div>'}</div>
+    <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);align-items:center">
+      <input id="new-gest-nom" placeholder="Prénom Nom" style="flex:1">
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="new-gest-col" checked> Colonne visible
+      </label>
+      <button class="btn btn-primary btn-sm" onclick="addGestionnaire()">+ Ajouter</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('rh-modal');loadSuiviKanban()">Fermer et actualiser</button>
+    </div>
+  </div>`;
+  showModal('rh-modal',html);
+}
+
+async function addGestionnaire(){
+  const nom=document.getElementById('new-gest-nom').value.trim();
+  if(!nom){toast('Prénom/Nom requis');return;}
+  const afficher=document.getElementById('new-gest-col').checked;
+  const{data:existing}=await sb.from('suivi_gestionnaires').select('ordre').order('ordre',{ascending:false}).limit(1);
+  const nextOrdre=(existing?.[0]?.ordre||0)+1;
+  const{error}=await sb.from('suivi_gestionnaires').insert({nom,afficher_colonne:afficher,ordre:nextOrdre});
+  if(error){toast('Erreur: '+error.message);return;}
+  document.getElementById('new-gest-nom').value='';
+  toast('Gestionnaire ajouté ✓');
+  openGestionnairesModal();
+}
+
+async function toggleGestionnaireColonne(id,checked){
+  await sb.from('suivi_gestionnaires').update({afficher_colonne:checked}).eq('id',id);
+  toast(checked?'Colonne activée ✓':'Colonne masquée ✓');
+}
+
+async function deleteGestionnaire(id){
+  if(!confirm('Supprimer ce gestionnaire ? Les projets qui lui sont assignés ne seront pas affectés.'))return;
+  await sb.from('suivi_gestionnaires').delete().eq('id',id);
+  toast('Supprimé');
+  openGestionnairesModal();
+}
+
 async function loadSuiviKanban(){
   document.getElementById('suivi-fiche').classList.add('hidden');
   document.getElementById('suivi-main').classList.remove('hidden');
+  // Charger les gestionnaires depuis Supabase
+  const{data:gests}=await sb.from('suivi_gestionnaires').select('*').order('ordre',{ascending:true});
+  if(gests&&gests.length){
+    SUIVI_GESTIONNAIRES_TOUS=gests.map(g=>g.nom);
+    SUIVI_GESTIONNAIRES=gests.filter(g=>g.afficher_colonne).map(g=>g.nom);
+  }
   const {data:projets}=await sb.from('projets_suivi')
     .select('*,factures(reference,clients(nom),projet_nom),projets_updates(id,auteur,type,texte,created_at)')
     .order('ordre',{ascending:true});
   const kanban=document.getElementById('suivi-kanban');
+  // En-tête avec bouton gestion
+  const header=document.getElementById('suivi-kanban-header');
+  if(header) header.innerHTML=`<button class="btn btn-sm" onclick="openGestionnairesModal()" style="color:var(--muted)">⚙ Gérer les gestionnaires</button>`;
   kanban.innerHTML=SUIVI_GESTIONNAIRES.map(g=>{
     const mine=(projets||[]).filter(p=>p.gestionnaire===g);
     return`<div>
