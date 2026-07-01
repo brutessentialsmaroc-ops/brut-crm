@@ -3698,12 +3698,12 @@ async function loadPaie(){
     const pt=ptBySal[s.id]||{absences:0,retards:0,hSup:0};
     const p=paieMap[s.id];
     const base=p?Number(p.salaire_base||0):await getSalaireForMonth(s.id,s.salaire_base,mois,annee);
-    const net=p?Math.round(Number(p.net_a_payer)):base;
+    const hSupMontant=p?Number(p.heures_sup_montant||0):0;
+    const primesMontant=p?Number(p.autres_primes||0):0;
+    const net=Math.max(0,base+hSupMontant+primesMontant);
     const avances=p&&p.avances?p.avances:[];
     const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
     const reste=Math.max(0,net-totalAvances);
-    const hSupMontant=p?Number(p.heures_sup_montant||0):0;
-    const primesMontant=p?Number(p.autres_primes||0):0;
     return`<tr>
       <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
@@ -3792,7 +3792,9 @@ async function printFichePaie(salId,mois,annee){
   const{data:s}=await sb.from('salaries').select('*').eq('id',salId).single();
   const{data:p}=await sb.from('paie').select('*').eq('salarie_id',salId).eq('mois',mois).eq('annee',annee).maybeSingle();
   const base=p?Number(p.salaire_base||0):await getSalaireForMonth(salId,s.salaire_base,mois,annee);
-  const net=p?Math.round(Number(p.net_a_payer)):base;
+  const hSupMontantFiche=p?Number(p.heures_sup_montant||0):0;
+  const primesMontantFiche=p?Number(p.autres_primes||0):0;
+  const net=Math.max(0,base+hSupMontantFiche+primesMontantFiche);
   const avances=p&&p.avances?p.avances:[];
   const hsupListe=p&&p.heures_sup_liste?p.heures_sup_liste:[];
   const primesListe=p&&p.primes_liste?p.primes_liste:[];
