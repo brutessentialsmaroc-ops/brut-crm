@@ -4154,18 +4154,24 @@ function refreshHsupUI(list,base){
   const total=list.reduce((s,a)=>s+Number(a.montant),0);
   document.getElementById('pm-total-hsup').textContent=total.toLocaleString('fr-FR')+' H';
   document.getElementById('pm-hsup-list').innerHTML=renderListInline(list,'removeHsup','Aucune heure sup enregistrée','H').replace(/removeHsup\((\d+)\)/g,(m,i)=>`removeHsup(${i},${base})`);
+  calcNetModif(base);
 }
 
 function refreshPrimesUI(list,base){
   const total=list.reduce((s,a)=>s+Number(a.montant),0);
   document.getElementById('pm-total-primes').textContent=total.toLocaleString('fr-FR')+' MAD';
   document.getElementById('pm-primes-list').innerHTML=renderListInline(list,'removePrime','Aucune prime/déduction enregistrée').replace(/removePrime\((\d+)\)/g,(m,i)=>`removePrime(${i},${base})`);
+  calcNetModif(base);
 }
 
 function calcNetModif(base){
   const avances=getAvances();
+  const hsup=getHsup();
+  const primes=getPrimes();
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
-  const net=base;
+  const totalHsup=hsup.reduce((s,a)=>s+Number(a.montant),0);
+  const totalPrimes=primes.reduce((s,a)=>s+Number(a.montant),0);
+  const net=Math.max(0,base+totalHsup+totalPrimes);
   const reste=Math.max(0,net-totalAvances);
   document.getElementById('pm-net').textContent=net.toLocaleString('fr-FR')+' MAD';
   document.getElementById('pm-reste').textContent=reste.toLocaleString('fr-FR')+' MAD';
@@ -4180,7 +4186,7 @@ async function savePaieModif(salId,mois,annee,base){
   const hSupMontant=hsupListe.reduce((s,a)=>s+Number(a.montant),0);
   const autres=primesListe.reduce((s,a)=>s+Number(a.montant),0);
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
-  const net=base;
+  const net=Math.max(0,base+hSupMontant+autres);
   const reste=Math.max(0,net-totalAvances);
   const{error}=await sb.from('paie').upsert({
     salarie_id:salId,mois,annee,
