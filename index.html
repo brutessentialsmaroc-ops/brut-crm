@@ -6378,7 +6378,7 @@ async function loadPlanification(){
       <td><div class="actions" style="opacity:1;gap:4px">
         ${isArchive
           ? `<button class="btn btn-sm" onclick="setPlanifStatut('${p.id}','En cours')" title="Remettre en cours">↩ Remettre</button>`
-          : `<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="setPlanifStatut('${p.id}','Terminé')">✓ Terminé</button>
+          : `<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="setPlanifStatut('${p.id}','Termin\u00e9')">✓ Terminé</button>
              <button class="btn btn-sm" onclick="openPlanifModal('${p.id}')">Modifier</button>`}
         <button class="btn btn-sm btn-danger" onclick="deletePlanif('${p.id}')">Suppr.</button>
       </div></td>
