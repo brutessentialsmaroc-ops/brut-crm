@@ -6363,27 +6363,45 @@ async function loadPlanification(){
   el.innerHTML='<div class="loading">Chargement…</div>';
   const{data,error}=await sb.from('planification').select('*').order('date_fin_production',{ascending:true,nullsFirst:false});
   if(error){el.innerHTML='<div class="empty">Table planification manquante — exécutez le SQL planification dans Supabase.</div>';return;}
-  if(!(data||[]).length){el.innerHTML='<div class="empty">Aucune ligne de planification. Cliquez sur + Nouvelle ligne.</div>';return;}
   const today=new Date(new Date().setHours(0,0,0,0));
-  el.innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Client</th><th>Projet</th><th>Date de livraison</th><th></th></tr></thead>
-    <tbody>
-      ${data.map(p=>{
-        const d=p.date_fin_production?new Date(p.date_fin_production+'T12:00:00'):null;
-        const enRetard=d&&d<today;
-        return`<tr>
-          <td style="font-weight:500">${p.client||'—'}</td>
-          <td style="color:var(--muted)">${p.projet||'—'}</td>
-          <td style="font-family:'DM Mono',monospace;${enRetard?'color:var(--red);font-weight:600':''}">${d?d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}):'—'}${enRetard?' ⚠️':''}</td>
-          <td><div class="actions" style="opacity:1">
-            <button class="btn btn-sm" onclick="openPlanifModal('${p.id}')">Modifier</button>
-            <button class="btn btn-sm btn-danger" onclick="deletePlanif('${p.id}')">Suppr.</button>
-          </div></td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table></div>`;
-}
+  const enCours=(data||[]).filter(p=>p.statut!=='Terminé');
+  const termines=(data||[]).filter(p=>p.statut==='Terminé');
+
+  const renderRow=(p, isArchive=false)=>{
+    const d=p.date_fin_production?new Date(p.date_fin_production+'T12:00:00'):null;
+    const enRetard=!isArchive&&d&&d<today;
+    return`<tr${isArchive?' style="opacity:0.6"':''}>
+      <td style="font-weight:500">${p.client||'—'}</td>
+      <td style="color:var(--muted)">${p.projet||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;${enRetard?'color:var(--red);font-weight:600':''}">${d?d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}):'—'}${enRetard?' ⚠️':''}</td>
+      <td><div class="actions" style="opacity:1;gap:4px">
+        ${isArchive
+          ? `<button class="btn btn-sm" onclick="setPlanifStatut('${p.id}','En cours')" title="Remettre en cours">↩ Remettre</button>`
+          : `<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none" onclick="setPlanifStatut('${p.id}','Terminé')">✓ Terminé</button>
+             <button class="btn btn-sm" onclick="openPlanifModal('${p.id}')">Modifier</button>`}
+        <button class="btn btn-sm btn-danger" onclick="deletePlanif('${p.id}')">Suppr.</button>
+      </div></td>
+    </tr>`;
+  };
+
+  el.innerHTML=`
+    <div class="table-wrap" style="margin-bottom:24px"><table>
+      <thead><tr><th>Client</th><th>Projet</th><th>Date de livraison</th><th></th></tr></thead>
+      <tbody>
+        ${enCours.length?enCours.map(p=>renderRow(p,false)).join(''):'<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">Aucune livraison en cours</td></tr>'}
+      </tbody>
+    </table></div>
+    ${termines.length?`
+    <div style="margin-top:8px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span>Archives — Terminés</span>
+        <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:1px 8px;font-size:10px">${termines.length}</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Projet</th><th>Date de livraison</th><th></th></tr></thead>
+        <tbody>${termines.map(p=>renderRow(p,true)).join('')}</tbody>
+      </table></div>
+    </div>`:''}`;
 
 function openPlanifModal(id){
   (async()=>{
@@ -6424,7 +6442,11 @@ async function savePlanif(){
   loadPlanification();
 }
 
-async function deletePlanif(id){
+async function setPlanifStatut(id, statut){
+  await sb.from('planification').update({statut}).eq('id',id);
+  toast(statut==='Terminé'?'Archivé ✓':'Remis en cours ✓');
+  loadPlanification();
+}
   if(!confirm('Supprimer cette ligne ?'))return;
   await sb.from('planification').delete().eq('id',id);
   toast('Supprimé');
@@ -6433,7 +6455,7 @@ async function deletePlanif(id){
 
 async function printPlanification(){
   toast('Préparation du rapport…');
-  const{data}=await sb.from('planification').select('*').order('date_fin_production',{ascending:true,nullsFirst:false});
+  const{data}=await sb.from('planification').select('*').neq('statut','Terminé').order('date_fin_production',{ascending:true,nullsFirst:false});
   const rows=(data||[]).map(p=>{
     const d=p.date_fin_production?new Date(p.date_fin_production+'T12:00:00'):null;
     return`<tr>
