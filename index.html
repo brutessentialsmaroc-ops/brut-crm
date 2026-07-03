@@ -3865,7 +3865,7 @@ async function printFichePaie(salId,mois,annee){
         ${absencesListe.length?absencesListe.map(a=>`
         <tr><td style="padding:8px 14px;border-bottom:1px solid #f0ece4;color:#a32d2d">
           Retenue absence — ${new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'long'})}${a.label?' ('+a.label+')':''}
-        </td><td style="padding:8px 14px;text-align:right;font-family:monospace;font-weight:500;border-bottom:1px solid #f0ece4;color:#a32d2d">${Number(a.montant).toLocaleString('fr-FR')}</td></tr>`).join(''):''}
+        </td><td style="padding:8px 14px;text-align:right;font-family:monospace;font-weight:500;border-bottom:1px solid #f0ece4;color:#a32d2d">${Number(a.montant).toLocaleString('fr-FR')}</td></tr>`).join('')+'<tr><td style="padding:8px 14px;border-bottom:1px solid #e8e4dc;font-weight:600;font-size:12px;color:#a32d2d">Total retenues absences</td><td style="padding:8px 14px;text-align:right;font-family:monospace;font-weight:700;border-bottom:1px solid #e8e4dc;color:#a32d2d">'+absencesListe.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')+' MAD</td></tr>':''}
       </tbody>
     </table>
 
