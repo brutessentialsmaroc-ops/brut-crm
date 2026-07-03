@@ -3226,9 +3226,13 @@ async function loadPointage(){
     .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
     .lte('date',`${year}-${String(month+1).padStart(2,'0')}-${String(lastDay1).padStart(2,'0')}`);
   // Charger les heures sup enregistrées dans la Paie pour ce même mois — c'est la Paie qui fait foi, pas le pointage
-  const{data:paieMois}=await sb.from('paie').select('salarie_id,heures_sup_montant').eq('mois',month+1).eq('annee',year);
+  const{data:paieMois}=await sb.from('paie').select('salarie_id,heures_sup_montant,heures_sup_liste').eq('mois',month+1).eq('annee',year);
   const hSupParSalarie={};
-  (paieMois||[]).forEach(p=>{hSupParSalarie[p.salarie_id]=Number(p.heures_sup_montant||0);});
+  (paieMois||[]).forEach(p=>{
+    const liste=p.heures_sup_liste||[];
+    const totalH=liste.reduce((s,a)=>s+Number(a.nb||0),0);
+    hSupParSalarie[p.salarie_id]=totalH;
+  });
   // Charger les jours fériés du mois affiché, pour les surligner en gris sur le calendrier
   const{data:feriesMois}=await sb.from('jours_feries').select('*')
     .gte('date',`${year}-${String(month+1).padStart(2,'0')}-01`)
@@ -3280,7 +3284,7 @@ async function loadPointage(){
       <td style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);position:sticky;left:0;font-weight:500;width:160px;min-width:160px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.prenom||''} ${s.nom}">${s.prenom||''} ${s.nom}</td>
       ${cells}
       <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:${absences>3?'var(--red)':'var(--text)'}">${absences.toLocaleString('fr-FR')}</td>
-      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup.toLocaleString('fr-FR'):''}</td>
+      <td style="padding:6px;text-align:center;border:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--green)">${hSup>0?'+'+hSup+'H':''}</td>
     </tr>`;
   }).join('');
 
