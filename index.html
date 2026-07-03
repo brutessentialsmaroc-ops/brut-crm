@@ -3297,6 +3297,7 @@ async function loadPointage(){
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="printEmargement()">🖨 Feuille d'émargement</button>
+        <button class="btn btn-sm" onclick="printAbsencesMois()">📋 Absences</button>
         <button class="btn btn-primary btn-sm" onclick="openPointageModal()">+ Saisir pointage</button>
       </div>
     </div>
@@ -5143,6 +5144,101 @@ let orgPositions = {};
 let orgDragEl = null, orgDragOffX = 0, orgDragOffY = 0;
 
 
+
+async function printAbsencesMois(){
+  toast('Préparation du rapport absences…');
+  const month=currentPointageMois;
+  const year=currentPointageAnnee;
+  const moisLabel=new Date(year,month,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const lastDay=new Date(year,month+1,0).getDate();
+  const mStr=String(month+1).padStart(2,'0');
+
+  const[{data:sal},{data:pts},{data:paieMois}]=await Promise.all([
+    sb.from('salaries').select('*').eq('statut','Actif').order('nom'),
+    sb.from('pointages').select('*')
+      .gte('date',`${year}-${mStr}-01`)
+      .lte('date',`${year}-${mStr}-${String(lastDay).padStart(2,'0')}`),
+    sb.from('paie').select('salarie_id,salaire_base').eq('mois',month+1).eq('annee',year)
+  ]);
+
+  // Index pointages par salarié
+  const ptBySal={};
+  (pts||[]).forEach(p=>{
+    if(!ptBySal[p.salarie_id]) ptBySal[p.salarie_id]=[];
+    ptBySal[p.salarie_id].push(p);
+  });
+  const paieMap={};
+  (paieMois||[]).forEach(p=>{paieMap[p.salarie_id]=p;});
+
+  // Grouper par atelier (même ordre que pointage)
+  const atelierOrder=['Administration','Menuiserie bois','Tapisserie','Céramique','Ferronnerie','Livraison'];
+  const groups={};
+  (sal||[]).forEach(s=>{const k=s.atelier||'Autre';if(!groups[k])groups[k]=[];groups[k].push(s);});
+  const sortedGroups=Object.keys(groups).sort((a,b)=>{const ia=atelierOrder.indexOf(a);const ib=atelierOrder.indexOf(b);return(ia===-1?99:ia)-(ib===-1?99:ib);});
+
+  // Calcul taux journalier
+  const tauxJ=(base)=>Math.round(base/26*100)/100;
+
+  const groupBlocks=sortedGroups.map(atelier=>{
+    const sals=groups[atelier];
+    // Garder uniquement ceux qui ont des absences
+    const rows=sals.map(s=>{
+      const pts_s=ptBySal[s.id]||[];
+      const absJours=pts_s.filter(p=>p.statut==='Absent');
+      const demijours=pts_s.filter(p=>p.statut==='Demi-J');
+      const totalAbs=absJours.length+demijours.length*0.5;
+      if(totalAbs===0) return null;
+      const base=Number(paieMap[s.id]?.salaire_base||s.salaire_base||0);
+      const tj=tauxJ(base);
+      const retenue=Math.round(totalAbs*tj*100)/100;
+      const joursList=[
+        ...absJours.map(p=>({date:p.date,type:'Absent',val:1})),
+        ...demijours.map(p=>({date:p.date,type:'Demi-J',val:0.5}))
+      ].sort((a,b)=>a.date.localeCompare(b.date));
+      return {s, totalAbs, retenue, tj, joursList};
+    }).filter(Boolean);
+
+    if(!rows.length) return '';
+    return `
+      <div style="margin-bottom:20px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:#888;text-transform:uppercase;padding:6px 0;border-bottom:2px solid #e8e4dc;margin-bottom:8px">${atelier}</div>
+        ${rows.map(({s,totalAbs,retenue,tj,joursList})=>`
+        <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0ece4">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+            <div style="font-weight:600;font-size:13px">${s.prenom||''} ${s.nom} <span style="font-weight:400;font-size:11px;color:#888">— ${s.poste||s.atelier||''}</span></div>
+            <div style="font-size:12px;text-align:right">
+              <span style="color:#a32d2d;font-weight:600">${totalAbs}j absent${totalAbs>1?'s':''}</span>
+              <span style="color:#888;margin-left:8px">Taux/j : ${tj.toLocaleString('fr-FR')} MAD</span>
+              <span style="color:#a32d2d;font-weight:700;margin-left:8px">Retenue : -${retenue.toLocaleString('fr-FR')} MAD</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${joursList.map(j=>`<span style="background:#FEF2F2;color:#a32d2d;border:1px solid #fca5a5;border-radius:4px;padding:2px 8px;font-size:10px;font-family:monospace">
+              ${new Date(j.date+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'})}${j.val===0.5?' (½)':''}
+            </span>`).join('')}
+          </div>
+        </div>`).join('')}
+      </div>`;
+  }).join('');
+
+  const hasAbsences=groupBlocks.some(b=>b.length>0);
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:14mm 16mm}</style>
+    <div style="border-bottom:2px solid #1a1a18;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:48px;height:48px">
+        <div><div style="font-size:11px;color:#888">CERAMICS DESIGN — Sidi Ghanem, Marrakech</div></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:600">RAPPORT D'ABSENCES</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${moisLabel}</div>
+      </div>
+    </div>
+    ${hasAbsences ? groupBlocks.join('') : '<div style="padding:40px;text-align:center;color:#888;font-size:13px">Aucune absence enregistrée pour ce mois.</div>'}
+    <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8px;color:#aaa;text-align:center">CERAMICS DESIGN SARL — R.C : 109 729 — ICE : 002672298000046</div>`;
+  finalizeDocOutput();
+}
 
 async function loadOrganigramme(){
   const[{data:sals},{data:pos}]=await Promise.all([
