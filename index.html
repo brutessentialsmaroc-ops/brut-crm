@@ -3706,10 +3706,10 @@ async function loadPaie(){
     const hSupMontant=p?Number(p.heures_sup_montant||0):0;
     const primesMontant=p?Number(p.autres_primes||0):0;
     const absencesMontant=p&&p.total_absences?Number(p.total_absences):0;
-    const net=Math.max(0,base+hSupMontant+primesMontant+absencesMontant);
+    const net=Math.round(Math.max(0,base+hSupMontant+primesMontant+absencesMontant));
     const avances=p&&p.avances?p.avances:[];
-    const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
-    const reste=Math.max(0,net-totalAvances);
+    const totalAvances=Math.round(avances.reduce((acc,a)=>acc+Number(a.montant),0));
+    const reste=Math.round(Math.max(0,net-totalAvances));
     return`<tr>
       <td style="font-weight:500">${s.prenom||''} ${s.nom}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
@@ -3801,13 +3801,13 @@ async function printFichePaie(salId,mois,annee){
   const hSupMontantFiche=p?Number(p.heures_sup_montant||0):0;
   const primesMontantFiche=p?Number(p.autres_primes||0):0;
   const absencesMontantFiche=p&&p.total_absences?Number(p.total_absences):0;
-  const net=Math.max(0,base+hSupMontantFiche+primesMontantFiche+absencesMontantFiche);
+  const net=Math.round(Math.max(0,base+hSupMontantFiche+primesMontantFiche+absencesMontantFiche));
   const avances=p&&p.avances?p.avances:[];
   const hsupListe=p&&p.heures_sup_liste?p.heures_sup_liste:[];
   const primesListe=p&&p.primes_liste?p.primes_liste:[];
   const absencesListe=p&&p.absences_liste?p.absences_liste:[];
   const totalAvances=Math.round(avances.reduce((s,a)=>s+Number(a.montant),0));
-  const reste=Math.max(0,net-totalAvances);
+  const reste=Math.round(Math.max(0,net-totalAvances));
   const moisLabel=new Date(annee,mois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   const lastDay3=new Date(annee,mois,0).getDate();
   const{data:pts}=await sb.from('pointages').select('*').eq('salarie_id',salId)
