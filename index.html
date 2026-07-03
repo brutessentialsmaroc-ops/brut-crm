@@ -3750,8 +3750,41 @@ async function loadPaie(){
         <button class="btn btn-sm" onclick="navPaie(1)">→</button>
       </div>
       <button class="btn btn-primary btn-sm" onclick="genererPaie()">Générer toutes les fiches</button>
+      <button class="btn btn-sm" onclick="showResteADonner()">💰 Reste à donner</button>
     </div>
     ${groupBlocks.join('')}`;
+}
+
+async function showResteADonner(){
+  const mois=currentPaieMois;
+  const annee=currentPaieAnnee;
+  const{data:paie}=await sb.from('paie').select('*,salaries(nom,prenom,atelier)').eq('mois',mois).eq('annee',annee).gt('reste_a_donner',0).order('created_at');
+  const lignes=(paie||[]).filter(p=>Number(p.reste_a_donner||0)>0);
+  const total=lignes.reduce((s,p)=>s+Math.round(Number(p.reste_a_donner||0)),0);
+  const rows=lignes.map(p=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:10px 0;font-weight:500">${p.salaries?.prenom||''} ${p.salaries?.nom||'—'}</td>
+      <td style="padding:10px 8px;color:var(--muted);font-size:12px">${p.salaries?.atelier||''}</td>
+      <td style="padding:10px 0;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:var(--green)">${Math.round(Number(p.reste_a_donner)).toLocaleString('fr-FR')} MAD</td>
+    </tr>`).join('');
+  const html=`<div class="modal" style="max-width:480px">
+    <div class="modal-title">💰 Reste à donner — ${new Date(annee,mois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}</div>
+    ${!lignes.length?'<div class="empty">Aucun reste à donner ce mois-ci.</div>':`
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:8px 0;text-align:left;font-size:11px;color:var(--muted);font-weight:600">SALARIÉ</th>
+        <th style="padding:8px 8px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">ATELIER</th>
+        <th style="padding:8px 0;text-align:right;font-size:11px;color:var(--muted);font-weight:600">MONTANT</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--border)">
+        <td colspan="2" style="padding:12px 0;font-weight:700;font-size:14px">TOTAL</td>
+        <td style="padding:12px 0;text-align:right;font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green)">${total.toLocaleString('fr-FR')} MAD</td>
+      </tr></tfoot>
+    </table>`}
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal('rh-modal')">Fermer</button></div>
+  </div>`;
+  showModal('rh-modal',html);
 }
 
 async function genererPaie(){
