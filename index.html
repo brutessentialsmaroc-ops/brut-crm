@@ -3709,7 +3709,7 @@ async function loadPaie(){
       <td style="font-family:'DM Mono',monospace;font-size:12px">${base.toLocaleString('fr-FR')} MAD</td>
       <td style="text-align:center;color:${pt.absences>0?'var(--red)':'var(--muted)'}">-${pt.absences.toLocaleString('fr-FR')}j</td>
       <td style="text-align:center;color:${pt.retards>0?'var(--amber)':'var(--muted)'}">-${pt.retards}×</td>
-      <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR'):'—'}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${hSupMontant>0?'var(--green)':'var(--muted)'}">${hSupMontant>0?'+'+hSupMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
       <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:${primesMontant>0?'var(--green)':primesMontant<0?'var(--red)':'var(--muted)'}">${primesMontant!==0?(primesMontant>0?'+':'')+primesMontant.toLocaleString('fr-FR')+' MAD':'—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500">${net.toLocaleString('fr-FR')} MAD</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:${totalAvances>0?'var(--red)':'var(--muted)'}">${totalAvances>0?'-'+totalAvances.toLocaleString('fr-FR')+' MAD':'—'}</td>
@@ -3993,17 +3993,23 @@ async function openModifierPaie(salId, mois, annee){
     <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
       <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Heures supplémentaires</div>
       <div style="padding:12px 14px">
-        <div id="pm-hsup-list">${renderListHTML(hsupInit,'removeHsup',base,'Aucune heure sup enregistrée','H')}</div>
+        <div id="pm-hsup-list">${renderListHTML(hsupInit,'removeHsup',base,'Aucune heure sup enregistrée','MAD')}</div>
         <input type="hidden" id="pm-hsup-data" value="${hsupJson}">
-        <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;margin-top:8px;align-items:center">
-          <input type="text" id="pm-hsup-label" placeholder="Note (optionnel)" style="font-size:13px">
-          <input type="number" id="pm-hsup-montant" placeholder="Nb heures" step="0.5" style="font-size:13px">
-          <input type="date" id="pm-hsup-date" value="${todayStr}" style="font-size:13px;width:140px">
+        <div style="display:grid;grid-template-columns:1fr 80px 80px 110px auto;gap:8px;margin-top:8px;align-items:center">
+          <input type="number" id="pm-hsup-nb" placeholder="Nb heures" step="0.5" min="0" style="font-size:13px" oninput="calcHsupMontant()">
+          <input type="number" id="pm-hsup-taux" placeholder="Taux/h" step="1" min="0" style="font-size:13px" oninput="calcHsupMontant()">
+          <select id="pm-hsup-coef" onchange="calcHsupMontant()" style="font-size:13px">
+            <option value="1.25">×1,25</option>
+            <option value="1.5">×1,50</option>
+            <option value="2">×2,00</option>
+          </select>
+          <input type="date" id="pm-hsup-date" value="${todayStr}" style="font-size:13px">
           <button class="btn btn-sm" onclick="addHsup(${base})">+ Ajouter</button>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">= <span id="pm-hsup-preview" style="font-weight:600;color:var(--text)">0 MAD</span> <span style="font-size:10px">(nb h × taux × coef)</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
           <span>Total heures sup</span>
-          <span id="pm-total-hsup" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${hsupInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} H</span>
+          <span id="pm-total-hsup" style="font-family:'DM Mono',monospace;font-weight:500;color:var(--text)">${hsupInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} MAD</span>
         </div>
       </div>
     </div>
@@ -4092,17 +4098,32 @@ function removeAvance(index,base){
   refreshAvancesUI(avances,base);
 }
 
+function calcHsupMontant(){
+  const nb=Number(document.getElementById('pm-hsup-nb')?.value||0);
+  const taux=Number(document.getElementById('pm-hsup-taux')?.value||0);
+  const coef=Number(document.getElementById('pm-hsup-coef')?.value||1.25);
+  const montant=Math.round(nb*taux*coef);
+  const preview=document.getElementById('pm-hsup-preview');
+  if(preview) preview.textContent=montant.toLocaleString('fr-FR')+' MAD';
+}
+
 function addHsup(base){
-  const montant=Number(document.getElementById('pm-hsup-montant').value);
+  const nb=Number(document.getElementById('pm-hsup-nb').value||0);
+  const taux=Number(document.getElementById('pm-hsup-taux').value||0);
+  const coef=Number(document.getElementById('pm-hsup-coef').value||1.25);
   const date=document.getElementById('pm-hsup-date').value;
-  const label=document.getElementById('pm-hsup-label').value.trim();
-  if(!montant){toast('Montant invalide');return;}
+  if(!nb||nb<=0){toast('Nombre d\u2019heures requis');return;}
+  if(!taux||taux<=0){toast('Taux horaire requis');return;}
   if(!date){toast('Date requise');return;}
+  const montant=Math.round(nb*taux*coef);
+  const coefLabel=coef===1.25?'×1,25':coef===1.5?'×1,50':coef===2?'×2,00':'×'+coef;
+  const label=`${nb}h × ${taux} MAD ${coefLabel} = ${montant} MAD`;
   const list=getHsup();
-  list.push({montant,date,label});
+  list.push({montant,date,label,nb,taux,coef});
   document.getElementById('pm-hsup-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
-  document.getElementById('pm-hsup-montant').value='';
-  document.getElementById('pm-hsup-label').value='';
+  document.getElementById('pm-hsup-nb').value='';
+  document.getElementById('pm-hsup-taux').value='';
+  document.getElementById('pm-hsup-preview').textContent='0 MAD';
   refreshHsupUI(list,base);
 }
 
@@ -4154,8 +4175,8 @@ function refreshAvancesUI(avances,base){
 
 function refreshHsupUI(list,base){
   const total=list.reduce((s,a)=>s+Number(a.montant),0);
-  document.getElementById('pm-total-hsup').textContent=total.toLocaleString('fr-FR')+' H';
-  document.getElementById('pm-hsup-list').innerHTML=renderListInline(list,'removeHsup','Aucune heure sup enregistrée','H').replace(/removeHsup\((\d+)\)/g,(m,i)=>`removeHsup(${i},${base})`);
+  document.getElementById('pm-total-hsup').textContent=total.toLocaleString('fr-FR')+' MAD';
+  document.getElementById('pm-hsup-list').innerHTML=renderListInline(list,'removeHsup','Aucune heure sup enregistrée','MAD').replace(/removeHsup\((\d+)\)/g,(m,i)=>`removeHsup(${i},${base})`);
   calcNetModif(base);
 }
 
