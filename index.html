@@ -3700,7 +3700,8 @@ async function loadPaie(){
     const base=p?Number(p.salaire_base||0):await getSalaireForMonth(s.id,s.salaire_base,mois,annee);
     const hSupMontant=p?Number(p.heures_sup_montant||0):0;
     const primesMontant=p?Number(p.autres_primes||0):0;
-    const net=Math.max(0,base+hSupMontant+primesMontant);
+    const absencesMontant=p&&p.total_absences?Number(p.total_absences):0;
+    const net=Math.max(0,base+hSupMontant+primesMontant+absencesMontant);
     const avances=p&&p.avances?p.avances:[];
     const totalAvances=avances.reduce((acc,a)=>acc+Number(a.montant),0);
     const reste=Math.max(0,net-totalAvances);
@@ -3794,7 +3795,8 @@ async function printFichePaie(salId,mois,annee){
   const base=p?Number(p.salaire_base||0):await getSalaireForMonth(salId,s.salaire_base,mois,annee);
   const hSupMontantFiche=p?Number(p.heures_sup_montant||0):0;
   const primesMontantFiche=p?Number(p.autres_primes||0):0;
-  const net=Math.max(0,base+hSupMontantFiche+primesMontantFiche);
+  const absencesMontantFiche=p&&p.total_absences?Number(p.total_absences):0;
+  const net=Math.max(0,base+hSupMontantFiche+primesMontantFiche+absencesMontantFiche);
   const avances=p&&p.avances?p.avances:[];
   const hsupListe=p&&p.heures_sup_liste?p.heures_sup_liste:[];
   const primesListe=p&&p.primes_liste?p.primes_liste:[];
@@ -3972,6 +3974,13 @@ async function openModifierPaie(salId, mois, annee){
   const netInit=p?Number(p.net_a_payer):base;
   const resteInit=Math.max(0,netInit-totalAvancesInit);
 
+  // Taux journalier et horaire
+  const tauxJournalier=Math.round(base/26*100)/100;
+  const tauxHoraire=Math.round(base/26/8*100)/100;
+  // Absences déjà enregistrées (stockées dans p.absences_liste)
+  const absencesInit=p&&p.absences_liste?p.absences_liste:[];
+  const absencesJson=JSON.stringify(absencesInit).replace(/"/g,'&quot;');
+
   function renderListHTML(list, removeFn, base, emptyLabel, unit='MAD'){
     if(!list.length) return `<div style="font-size:12px;color:var(--muted);padding:8px 0">${emptyLabel}</div>`;
     return list.map((a,i)=>`
@@ -3985,8 +3994,29 @@ async function openModifierPaie(salId, mois, annee){
 
   const html=`<div class="modal" style="max-width:560px">
     <div class="modal-title">Modifier paie — ${s.prenom||''} ${s.nom}</div>
-    <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px">
-      <strong>Salaire de base :</strong> ${base.toLocaleString('fr-FR')} MAD
+    <div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:13px;display:flex;gap:24px;flex-wrap:wrap">
+      <span><strong>Salaire de base :</strong> ${base.toLocaleString('fr-FR')} MAD</span>
+      <span style="color:var(--muted)">Taux jour : <strong style="color:var(--text)">${tauxJournalier.toLocaleString('fr-FR')} MAD</strong></span>
+      <span style="color:var(--muted)">Taux heure : <strong style="color:var(--text)">${tauxHoraire.toLocaleString('fr-FR')} MAD</strong></span>
+    </div>
+
+    <!-- ABSENCES -->
+    <div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:12px">
+      <div style="padding:10px 14px;background:#FEF2F2;border-bottom:1px solid var(--border);font-size:11px;font-weight:500;color:#EF4444;text-transform:uppercase;letter-spacing:0.5px;font-family:'DM Mono',monospace">Absences</div>
+      <div style="padding:12px 14px">
+        <div id="pm-abs-list">${renderListHTML(absencesInit,'removeAbsence',base,'Aucune absence enregistrée','MAD')}</div>
+        <input type="hidden" id="pm-abs-data" value="${absencesJson}">
+        <div style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;margin-top:8px;align-items:center">
+          <input type="number" id="pm-abs-nb" placeholder="Nb jours" step="0.5" min="0" style="font-size:13px" oninput="calcAbsMontant(${tauxJournalier})">
+          <input type="date" id="pm-abs-date" value="${todayStr}" style="font-size:13px">
+          <button class="btn btn-sm" onclick="addAbsence(${base},${tauxJournalier})">+ Ajouter</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">= <span id="pm-abs-preview" style="font-weight:600;color:#EF4444">0 MAD</span> <span style="font-size:10px">(nb j × ${tauxJournalier.toLocaleString('fr-FR')} MAD)</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+          <span>Total absences</span>
+          <span id="pm-total-abs" style="font-family:'DM Mono',monospace;font-weight:500;color:#EF4444">${absencesInit.reduce((s,a)=>s+Number(a.montant),0).toLocaleString('fr-FR')} MAD</span>
+        </div>
+      </div>
     </div>
 
     <!-- HEURES SUP -->
@@ -3997,7 +4027,7 @@ async function openModifierPaie(salId, mois, annee){
         <input type="hidden" id="pm-hsup-data" value="${hsupJson}">
         <div style="display:grid;grid-template-columns:1fr 80px 80px 110px auto;gap:8px;margin-top:8px;align-items:center">
           <input type="number" id="pm-hsup-nb" placeholder="Nb heures" step="0.5" min="0" style="font-size:13px" oninput="calcHsupMontant()">
-          <input type="number" id="pm-hsup-taux" placeholder="Taux/h" step="1" min="0" style="font-size:13px" oninput="calcHsupMontant()">
+          <input type="number" id="pm-hsup-taux" placeholder="Taux/h" step="0.01" min="0" value="${tauxHoraire}" style="font-size:13px" oninput="calcHsupMontant()">
           <select id="pm-hsup-coef" onchange="calcHsupMontant()" style="font-size:13px">
             <option value="1.25">×1,25</option>
             <option value="1.5">×1,50</option>
@@ -4187,14 +4217,57 @@ function refreshPrimesUI(list,base){
   calcNetModif(base);
 }
 
+function calcAbsMontant(tauxJ){
+  const nb=Number(document.getElementById('pm-abs-nb')?.value||0);
+  const montant=Math.round(nb*tauxJ*100)/100;
+  const preview=document.getElementById('pm-abs-preview');
+  if(preview) preview.textContent='-'+montant.toLocaleString('fr-FR')+' MAD';
+}
+
+function getAbsences(){
+  const data=document.getElementById('pm-abs-data')?.value||'[]';
+  try{return JSON.parse(data.replace(/&quot;/g,'"'));}catch{return [];}
+}
+
+function addAbsence(base, tauxJ){
+  const nb=Number(document.getElementById('pm-abs-nb').value||0);
+  const date=document.getElementById('pm-abs-date').value;
+  if(!nb||nb<=0){toast('Nombre de jours requis');return;}
+  if(!date){toast('Date requise');return;}
+  const montant=-Math.round(nb*tauxJ*100)/100;
+  const label=`${nb}j × ${tauxJ.toLocaleString('fr-FR')} MAD/j`;
+  const list=getAbsences();
+  list.push({montant,date,label,nb,taux:tauxJ});
+  document.getElementById('pm-abs-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
+  document.getElementById('pm-abs-nb').value='';
+  document.getElementById('pm-abs-preview').textContent='0 MAD';
+  refreshAbsUI(list,base);
+}
+
+function removeAbsence(index,base){
+  const list=getAbsences();
+  list.splice(index,1);
+  document.getElementById('pm-abs-data').value=JSON.stringify(list).replace(/"/g,'&quot;');
+  refreshAbsUI(list,base);
+}
+
+function refreshAbsUI(list,base){
+  const total=list.reduce((s,a)=>s+Number(a.montant),0);
+  document.getElementById('pm-total-abs').textContent=Math.abs(total).toLocaleString('fr-FR')+' MAD';
+  document.getElementById('pm-abs-list').innerHTML=renderListInline(list,'removeAbsence','Aucune absence enregistrée','MAD').replace(/removeAbsence\((\d+)\)/g,(m,i)=>`removeAbsence(${i},${base})`);
+  calcNetModif(base);
+}
+
 function calcNetModif(base){
   const avances=getAvances();
   const hsup=getHsup();
   const primes=getPrimes();
+  const absences=getAbsences();
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
   const totalHsup=hsup.reduce((s,a)=>s+Number(a.montant),0);
   const totalPrimes=primes.reduce((s,a)=>s+Number(a.montant),0);
-  const net=Math.max(0,base+totalHsup+totalPrimes);
+  const totalAbs=absences.reduce((s,a)=>s+Number(a.montant),0); // déjà négatif
+  const net=Math.max(0,base+totalHsup+totalPrimes+totalAbs);
   const reste=Math.max(0,net-totalAvances);
   document.getElementById('pm-net').textContent=net.toLocaleString('fr-FR')+' MAD';
   document.getElementById('pm-reste').textContent=reste.toLocaleString('fr-FR')+' MAD';
@@ -4206,10 +4279,12 @@ async function savePaieModif(salId,mois,annee,base){
   const hsupListe=getHsup();
   const primesListe=getPrimes();
   const avances=getAvances();
+  const absencesListe=getAbsences();
   const hSupMontant=hsupListe.reduce((s,a)=>s+Number(a.montant),0);
   const autres=primesListe.reduce((s,a)=>s+Number(a.montant),0);
+  const totalAbsences=absencesListe.reduce((s,a)=>s+Number(a.montant),0);
   const totalAvances=avances.reduce((s,a)=>s+Number(a.montant),0);
-  const net=Math.max(0,base+hSupMontant+autres);
+  const net=Math.max(0,base+hSupMontant+autres+totalAbsences);
   const reste=Math.max(0,net-totalAvances);
   const{error}=await sb.from('paie').upsert({
     salarie_id:salId,mois,annee,
@@ -4218,6 +4293,8 @@ async function savePaieModif(salId,mois,annee,base){
     heures_sup_liste:hsupListe,
     autres_primes:autres,
     primes_liste:primesListe,
+    absences_liste:absencesListe,
+    total_absences:totalAbsences,
     avances:avances,
     total_avances:totalAvances,
     reste_a_donner:reste,
