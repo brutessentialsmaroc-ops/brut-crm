@@ -3764,7 +3764,7 @@ async function printResteADonner(mois, annee){
     <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;font-weight:600">${p.salaries?.prenom||''} ${p.salaries?.nom||'—'}</td>
     <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;color:#666;font-size:12px">${p.salaries?.atelier||''}</td>
     <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;text-align:right;font-family:monospace;font-weight:600;color:#2d7a4f">${Math.round(Number(p.reste_a_donner)).toLocaleString('fr-FR')} MAD</td>
-    <td style="padding:10px 14px;border-bottom:1px solid #f0ece4;width:80px"></td>
+    
   </tr>`).join('');
   document.getElementById('pdf-preview').innerHTML=`
     <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:14mm 16mm}</style>
@@ -3783,13 +3783,12 @@ async function printResteADonner(mois, annee){
         <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">SALARIÉ</th>
         <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">ATELIER</th>
         <th style="padding:8px 14px;text-align:right;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">RESTE À DONNER</th>
-        <th style="padding:8px 14px;text-align:left;font-size:10px;color:#aaa;font-family:monospace;letter-spacing:1px;border-bottom:2px solid #e8e4dc">SIGNATURE</th>
+        
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr style="background:#f8f6f1">
         <td colspan="2" style="padding:12px 14px;font-weight:700;font-size:14px">TOTAL</td>
         <td style="padding:12px 14px;text-align:right;font-family:monospace;font-weight:700;font-size:15px;color:#2d7a4f">${total.toLocaleString('fr-FR')} MAD</td>
-        <td></td>
       </tr></tfoot>
     </table>
     <div style="margin-top:30px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8px;color:#aaa;text-align:center">CERAMICS DESIGN SARL — R.C : 109 729 — ICE : 002672298000046</div>`;
