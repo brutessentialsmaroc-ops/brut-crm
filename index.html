@@ -3985,8 +3985,8 @@ async function openModifierPaie(salId, mois, annee){
   const resteInit=Math.max(0,netInit-totalAvancesInit);
 
   // Taux journalier et horaire
-  const tauxJournalier=Math.round(base/26*100)/100;
-  const tauxHoraire=Math.round(base/26/8*100)/100;
+  const tauxJournalier=Math.round(base/26);
+  const tauxHoraire=Math.round(base/26/8);
   // Absences déjà enregistrées (stockées dans p.absences_liste)
   const absencesInit=p&&p.absences_liste?p.absences_liste:[];
   const absencesJson=JSON.stringify(absencesInit).replace(/"/g,'&quot;');
@@ -5186,7 +5186,7 @@ async function printAbsencesMois(){
       const total=absents.length+demis.length*0.5;
       if(total===0) return;
       const base=Number(paieMap[s.id]?.salaire_base||s.salaire_base||0);
-      const tj=base>0?Math.round(base/26*100)/100:0;
+      const tj=base>0?Math.round(base/26):0;
       const retenue=Math.round(total*tj*100)/100;
       const jours=[...absents.map(p=>({date:p.date,demi:false})),...demis.map(p=>({date:p.date,demi:true}))].sort((a,b)=>a.date.localeCompare(b.date));
       rows.push({s,total,retenue,tj,jours});
