@@ -3297,6 +3297,7 @@ async function loadPointage(){
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="printEmargement()">🖨 Feuille d'émargement</button>
+        <button class="btn btn-sm" onclick="openFeuilleViergeModal()">📋 Feuille vierge</button>
         <button class="btn btn-sm" onclick="printAbsencesMois()">📋 Absences</button>
         <button class="btn btn-primary btn-sm" onclick="openPointageModal()">+ Saisir pointage</button>
       </div>
@@ -5121,6 +5122,69 @@ function generateFicheProspect(){
     </div>`;
 
   finalizeDocOutput();
+}
+
+function openFeuilleViergeModal(){
+  const todayStr=new Date().toISOString().split('T')[0];
+  showModal('rh-modal',`<div class="modal" style="max-width:380px">
+    <div class="modal-title">📋 Feuille de pointage vierge</div>
+    <div class="form-group"><label>Date</label><input type="date" id="fv-date" value="${todayStr}"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="printFeuilleVierge()">🖨 Générer</button>
+    </div>
+  </div>`);
+}
+
+async function printFeuilleVierge(){
+  const dateStr=document.getElementById('fv-date').value;
+  if(!dateStr){toast('Date requise');return;}
+  const date=new Date(dateStr+'T12:00:00');
+  const dateLabel=date.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const{data:sal}=await sb.from('salaries').select('*').eq('statut','Actif').order('nom');
+  const atelierOrder=['Administration','Menuiserie bois','Tapisserie','Céramique','Ferronnerie','Livraison'];
+  const groups={};
+  (sal||[]).forEach(s=>{const k=s.atelier||'Autre';if(!groups[k])groups[k]=[];groups[k].push(s);});
+  const sortedGroups=Object.keys(groups).sort((a,b)=>(atelierOrder.indexOf(a)===-1?99:atelierOrder.indexOf(a))-(atelierOrder.indexOf(b)===-1?99:atelierOrder.indexOf(b)));
+
+  const groupHtml=sortedGroups.map(atelier=>`
+    <div style="margin-bottom:20px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:#888;text-transform:uppercase;padding:5px 0;border-bottom:2px solid #e8e4dc;margin-bottom:4px">${atelier}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f8f6f1">
+          <th style="padding:6px 10px;text-align:left;border:1px solid #e8e4dc;font-weight:600">Salarié</th>
+          <th style="padding:6px 10px;text-align:center;border:1px solid #e8e4dc;width:80px">Arrivée</th>
+          <th style="padding:6px 10px;text-align:center;border:1px solid #e8e4dc;width:80px">Départ</th>
+          <th style="padding:6px 10px;text-align:center;border:1px solid #e8e4dc;width:100px">Statut</th>
+          <th style="padding:6px 10px;text-align:center;border:1px solid #e8e4dc;width:100px">Signature</th>
+        </tr></thead>
+        <tbody>${groups[atelier].map(s=>`<tr>
+          <td style="padding:10px 10px;border:1px solid #e8e4dc;font-weight:500">${s.prenom||''} ${s.nom}</td>
+          <td style="padding:10px;border:1px solid #e8e4dc"></td>
+          <td style="padding:10px;border:1px solid #e8e4dc"></td>
+          <td style="padding:10px;border:1px solid #e8e4dc"></td>
+          <td style="padding:10px;border:1px solid #e8e4dc"></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`).join('');
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');body{font-family:'DM Sans',sans-serif;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:12mm 14mm}</style>
+    <div style="border-bottom:2px solid #1a1a18;padding-bottom:10px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:10px">
+        <img src="data:image/png;base64,${BRUT_LOGO_BADGE}" style="width:44px;height:44px">
+        <div style="font-size:10px;color:#888">CERAMICS DESIGN — Sidi Ghanem, Marrakech</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:600">FEUILLE DE POINTAGE</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${dateLabel}</div>
+      </div>
+    </div>
+    ${groupHtml}
+    <div style="margin-top:20px;padding-top:8px;border-top:1px solid #e8e4dc;font-size:8px;color:#aaa;text-align:center">CERAMICS DESIGN SARL — R.C : 109 729</div>`;
+  closeModal('rh-modal');
+  document.getElementById('pdf-preview-modal-doc').innerHTML=document.getElementById('pdf-preview').innerHTML;
+  document.getElementById('pdf-preview-modal').classList.add('show');
 }
 
 async function printEmargement(){
