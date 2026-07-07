@@ -1501,9 +1501,21 @@ function closePdfPreviewModal(){
 }
 
 function printFromPreviewModal(){
-  document.getElementById('pdf-preview').innerHTML=document.getElementById('pdf-preview-modal-doc').innerHTML;
-  document.getElementById('pdf-preview').style.display='block';
-  setTimeout(()=>{window.print();document.getElementById('pdf-preview').style.display='none';},300);
+  const content=document.getElementById('pdf-preview-modal-doc').innerHTML;
+  const iframe=document.createElement('iframe');
+  iframe.style.cssText='position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;';
+  document.body.appendChild(iframe);
+  const doc=iframe.contentDocument||iframe.contentWindow.document;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:DM Sans,sans-serif;background:#fff}@page{margin:0}</style></head><body>'+content+'</body></html>');
+  doc.close();
+  iframe.onload=function(){
+    setTimeout(()=>{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(()=>document.body.removeChild(iframe),1000);
+    },300);
+  };
 }
 
 // Wrapper: call any printXxx(...) function in "preview" mode (shows on-screen modal instead of printing)
