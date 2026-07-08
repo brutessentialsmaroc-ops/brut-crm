@@ -7260,42 +7260,65 @@ const ATELIERS_LIST=['Carcasse','Menuiserie','Tapisserie','Céramique','Ferronne
 async function loadFichesCommande(){
   const el=document.getElementById('fiches-list');
   el.innerHTML='<div class="loading">Chargement…</div>';
-  const{data:devis}=await sb.from('devis')
-    .select('*,clients(nom,telephone),devis_sections(nom,sous_titre,devis_articles(description,sous_titre,quantite))')
-    .eq('statut','Accepté')
-    .order('created_at',{ascending:false});
-  if(!(devis||[]).length){
-    el.innerHTML='<div class="empty">Aucun devis accepté.</div>';return;
+  const[{data:devis},{data:facturesProforma}]=await Promise.all([
+    sb.from('devis')
+      .select('*,clients(nom,telephone),devis_sections(nom,sous_titre,devis_articles(description,sous_titre,quantite))')
+      .eq('statut','Accepté')
+      .order('created_at',{ascending:false}),
+    sb.from('factures')
+      .select('*,clients(nom,telephone),facture_proforma_sections(nom,sous_titre,facture_proforma_articles(description,sous_titre,quantite))')
+      .eq('type','proforma')
+      .order('created_at',{ascending:false})
+  ]);
+  const items=[
+    ...(devis||[]).map(d=>({...d,_type:'devis',_date:d.date_envoi})),
+    ...(facturesProforma||[]).map(f=>({...f,_type:'proforma',_date:f.date_emission}))
+  ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if(!items.length){
+    el.innerHTML='<div class="empty">Aucun devis accepté ni facture pro forma.</div>';return;
   }
   el.innerHTML=`
     <div style="display:flex;flex-direction:column;gap:12px">
-      ${(devis||[]).map(d=>`
+      ${items.map(d=>`
         <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between">
           <div>
-            <div style="font-weight:600;font-size:15px">${d.clients?.nom||'—'}</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px">${d.reference} · ${d.projet_nom||'—'} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
+            <div style="font-weight:600;font-size:15px">${d.clients?.nom||'—'}${d._type==='proforma'?' <span class="badge" style="background:#EEF2FF;color:#6366F1;font-size:9px;vertical-align:middle">PRO FORMA</span>':''}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${d.reference} · ${d.projet_nom||'—'} · ${d._date?new Date(d._date).toLocaleDateString('fr-FR'):'—'}</div>
           </div>
-          <button class="btn btn-primary" onclick="openFicheModal('${d.id}')">📋 Créer la fiche</button>
+          <button class="btn btn-primary" onclick="openFicheModal('${d.id}','${d._type}')">📋 Créer la fiche</button>
         </div>`).join('')}
     </div>`;
 }
 
-async function openFicheModal(devisId){
-  const{data:d}=await sb.from('devis')
-    .select('*,clients(nom,telephone),devis_sections(nom,sous_titre,devis_articles(description,sous_titre,quantite))')
-    .eq('id',devisId).single();
-  if(!d){toast('Devis introuvable');return;}
+async function openFicheModal(devisId,type='devis'){
+  let d;
+  if(type==='proforma'){
+    const{data}=await sb.from('factures')
+      .select('*,clients(nom,telephone),facture_proforma_sections(nom,sous_titre,facture_proforma_articles(description,sous_titre,quantite))')
+      .eq('id',devisId).single();
+    d=data;
+    if(d) d._date=d.date_emission;
+  } else {
+    const{data}=await sb.from('devis')
+      .select('*,clients(nom,telephone),devis_sections(nom,sous_titre,devis_articles(description,sous_titre,quantite))')
+      .eq('id',devisId).single();
+    d=data;
+    if(d) d._date=d.date_envoi;
+  }
+  if(!d){toast('Introuvable');return;}
 
   const articles=[];
-  (d.devis_sections||[]).forEach(sec=>{
-    (sec.devis_articles||[]).filter(a=>a.description&&a.description!=='__custom__').forEach(a=>{
+  const sections=type==='proforma'?(d.facture_proforma_sections||[]):(d.devis_sections||[]);
+  sections.forEach(sec=>{
+    const secArticles=type==='proforma'?(sec.facture_proforma_articles||[]):(sec.devis_articles||[]);
+    secArticles.filter(a=>a.description&&a.description!=='__custom__').forEach(a=>{
       articles.push({description:a.description,sous_titre:a.sous_titre||'',quantite:a.quantite||1,section:sec.nom||''});
     });
   });
 
   const html=`<div class="modal" style="max-width:680px">
     <div class="modal-title">📋 Fiche Commande — ${d.clients?.nom||'—'}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">${d.reference} · ${d.projet_nom||''} · ${d.date_envoi?new Date(d.date_envoi).toLocaleDateString('fr-FR'):'—'}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">${d.reference} · ${d.projet_nom||''} · ${d._date?new Date(d._date).toLocaleDateString('fr-FR'):'—'}</div>
     <div style="margin-bottom:16px">
       <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Ateliers impliqués dans cette commande</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -7335,7 +7358,7 @@ async function openFicheModal(devisId){
     </table>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('rh-modal')">Annuler</button>
-      <button class="btn btn-primary" onclick="printFicheCommande(${JSON.stringify({id:d.id,client:d.clients?.nom||'—',ref:d.reference,projet:d.projet_nom||'',date:d.date_envoi||'',articles}).replace(/"/g,'&quot;')})">🖨 Imprimer PDF</button>
+      <button class="btn btn-primary" onclick="printFicheCommande(${JSON.stringify({id:d.id,client:d.clients?.nom||'—',ref:d.reference,projet:d.projet_nom||'',date:d._date||'',articles}).replace(/"/g,'&quot;')})">🖨 Imprimer PDF</button>
     </div>
   </div>`;
   showModal('rh-modal',html);
